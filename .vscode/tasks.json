@@ -1,0 +1,13 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build",
+			"type": "shell",
+			"command": "${userHome}\\.platformio\\penv\\Scripts\\platformio.exe",
+			"args": ["run", "-e", "heltec_wifi_lora_32_V4"],
+			"problemMatcher": [],
+			"group": "build"
+		}
+	]
+}

@@ -1,0 +1,99 @@
+#include "Constants.h"
+
+// Display text constants stored in PROGMEM to save RAM
+const char PROGMEM DISPLAY_LORAX[] = "LoRaTNCX";
+const char PROGMEM DISPLAY_APRS_TRACKER[] = "APRS Tracker";
+const char PROGMEM DISPLAY_INITIALIZING[] = "Initializing...";
+const char PROGMEM DISPLAY_CONNECTING[] = "WiFi Connecting...";
+const char PROGMEM DISPLAY_AP_MODE[] = "WiFi: AP Mode";
+const char PROGMEM DISPLAY_CONNECTED[] = "WiFi: Connected";
+const char PROGMEM DISPLAY_BATTERY[] = "Bat: ";
+const char PROGMEM DISPLAY_NO_BATTERY[] = "Bat: No Battery";
+const char PROGMEM DISPLAY_CHARGING[] = " CHG";
+const char PROGMEM DISPLAY_VOLTAGE[] = "V";
+const char PROGMEM DISPLAY_IP[] = "IP: ";
+const char PROGMEM DISPLAY_BEACONS[] = "Beacons: ";
+const char PROGMEM DISPLAY_KISS_STATS[] = "KISS RX:";
+const char PROGMEM DISPLAY_RADIO[] = "Radio";
+const char PROGMEM DISPLAY_FREQUENCY[] = "Freq: ";
+const char PROGMEM DISPLAY_MHZ[] = " MHz";
+const char PROGMEM DISPLAY_POWER[] = "Power: ";
+const char PROGMEM DISPLAY_DBM[] = " dBm";
+const char PROGMEM DISPLAY_SF[] = "SF: ";
+const char PROGMEM DISPLAY_BW[] = " BW: ";
+const char PROGMEM DISPLAY_KHZ[] = "k";
+const char PROGMEM DISPLAY_LAST[] = "Last: ";
+const char PROGMEM DISPLAY_SECONDS_AGO[] = "s ago";
+const char PROGMEM DISPLAY_IDLE[] = "Idle";
+const char PROGMEM DISPLAY_GNSS[] = "GNSS";
+const char PROGMEM DISPLAY_STATUS_ENABLED[] = "Status: Enabled";
+const char PROGMEM DISPLAY_STATUS_DISABLED[] = "Status: Disabled";
+const char PROGMEM DISPLAY_BAUD[] = "Baud: ";
+const char PROGMEM DISPLAY_TCP[] = "TCP: ";
+const char PROGMEM DISPLAY_USB[] = " USB: ";
+const char PROGMEM DISPLAY_YES[] = "Yes";
+const char PROGMEM DISPLAY_NO[] = "No";
+const char PROGMEM DISPLAY_NMEA[] = "NMEA: ";
+const char PROGMEM DISPLAY_NO_RECENT_NMEA[] = "No recent NMEA";
+const char PROGMEM DISPLAY_NOT_COMPILED[] = "Not compiled";
+const char PROGMEM DISPLAY_DISABLED[] = "GNSS disabled";
+const char PROGMEM DISPLAY_BUILD_CONFIG[] = "in build config";
+const char PROGMEM DISPLAY_APRS[] = "APRS";
+const char PROGMEM DISPLAY_CALL[] = "Call: ";
+const char PROGMEM DISPLAY_NO_GPS_FIX[] = "No GPS fix";
+const char PROGMEM DISPLAY_WAITING_SATELLITES[] = "Waiting for satellites";
+const char PROGMEM DISPLAY_NEXT[] = "Next: ";
+const char PROGMEM DISPLAY_BEACON_DUE[] = "Beacon due (#";
+const char PROGMEM DISPLAY_MODE_KISS[] = "Mode: KISS TNC";
+const char PROGMEM DISPLAY_USE_CONFIG[] = "Use config menu";
+const char PROGMEM DISPLAY_ENABLE_APRS[] = "to enable APRS";
+const char PROGMEM DISPLAY_TRACKER_MODE[] = "Tracker mode";
+const char PROGMEM DISPLAY_NETWORK[] = "Network";
+const char PROGMEM DISPLAY_KISS_PORT[] = "KISS (8001): ";
+const char PROGMEM DISPLAY_NMEA_PORT[] = "NMEA (10110): ";
+const char PROGMEM DISPLAY_CONNECTED_CLIENT[] = "Connected";
+const char PROGMEM DISPLAY_NO_CLIENT[] = "None";
+const char PROGMEM DISPLAY_AP_CLIENTS[] = "AP Clients: ";
+const char PROGMEM DISPLAY_RSSI[] = "RSSI: ";
+const char PROGMEM DISPLAY_WEB_STATUS[] = "Web: http://IP/status";
+const char PROGMEM DISPLAY_STATISTICS[] = "Statistics";
+const char PROGMEM DISPLAY_KISS_RX[] = "KISS RX: ";
+const char PROGMEM DISPLAY_KISS_TX[] = "KISS TX: ";
+const char PROGMEM DISPLAY_RADIO_RX[] = "Radio RX: ";
+const char PROGMEM DISPLAY_RADIO_TX[] = "Radio TX: ";
+const char PROGMEM DISPLAY_BATTERY_VOLTAGE[] = "Battery: ";
+const char PROGMEM DISPLAY_SOC[] = "SoC: ";
+const char PROGMEM DISPLAY_PERCENT[] = "%";
+const char PROGMEM DISPLAY_STATUS[] = "Status: ";
+const char PROGMEM DISPLAY_ADC[] = "ADC: ";
+const char PROGMEM DISPLAY_NOT_DETECTED[] = "Battery: Not detected";
+const char PROGMEM DISPLAY_UPTIME[] = "Uptime: ";
+const char PROGMEM DISPLAY_MINUTES[] = "m";
+const char PROGMEM DISPLAY_HEAP[] = "Heap: ";
+const char PROGMEM DISPLAY_KB[] = "KB";
+const char PROGMEM DISPLAY_POWER_OFF_MSG[] = "Hold btn 2s: power off";
+
+// Screen navigation strings
+const char PROGMEM DISPLAY_NEXT_ARROW[] = "Next >";
+const char PROGMEM DISPLAY_POWER_OFF[] = "Power Off";
+const char PROGMEM DISPLAY_DISABLED_MSG[] = "Disabled";
+const char PROGMEM DISPLAY_SERIAL_CONNECTED[] = "Serial connected";
+const char PROGMEM DISPLAY_POWERING_OFF[] = "Powering Off...";
+const char PROGMEM DISPLAY_GOODBYE[] = "Goodbye!";
+const char PROGMEM DISPLAY_RELEASE_CANCEL[] = "Release to cancel";
+
+// Debug and system info strings
+const char PROGMEM DISPLAY_KMPH[] = "km/h ";
+const char PROGMEM DISPLAY_SATS[] = "sats";
+
+// OTA update strings
+const char PROGMEM DISPLAY_OTA_STATUS[] = "OTA Status";
+const char PROGMEM DISPLAY_OTA_READY[] = "Ready";
+const char PROGMEM DISPLAY_OTA_CHECKING[] = "Checking...";
+const char PROGMEM DISPLAY_OTA_DOWNLOADING[] = "Downloading...";
+const char PROGMEM DISPLAY_OTA_INSTALLING[] = "Installing...";
+const char PROGMEM DISPLAY_OTA_SUCCESS[] = "Success!";
+const char PROGMEM DISPLAY_OTA_FAILED[] = "Failed";
+const char PROGMEM DISPLAY_OTA_AVAILABLE[] = "Update Available";
+const char PROGMEM DISPLAY_OTA_PROGRESS[] = "Progress: ";
+const char PROGMEM DISPLAY_UPDATE_VER[] = "Ver: ";
