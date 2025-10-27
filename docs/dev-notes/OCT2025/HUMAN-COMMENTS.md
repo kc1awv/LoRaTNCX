@@ -33,3 +33,9 @@ Updates:
   - Backup configuration doesn't produce a file? At least, nothing attempts a download
 - Added in dark-mode support for the web interface
 - Going to try creating a custom board definition based on the V3 to utilize the larger flash space without causing future issues or reversions
+  
+---
+
+**`27 OCT 25` at `16:13` UTC**
+
+- Added a board definition for the V4
