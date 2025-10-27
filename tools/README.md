@@ -14,6 +14,24 @@ A command-line utility for configuring LoRaTNCX devices using KISS protocol comm
    pip3 install -r requirements.txt
    ```
 
+### Quick Start
+
+1. **Test your connection first**:
+   ```bash
+   python3 test_connection.py /dev/ttyACM0
+   ```
+   This will verify connectivity and show device debug output.
+
+2. **Get current configuration**:
+   ```bash
+   python3 loratncx_config.py --port /dev/ttyACM0 --get-config
+   ```
+
+3. **Try interactive mode**:
+   ```bash
+   python3 loratncx_config.py --port /dev/ttyACM0 --interactive
+   ```
+
 ### Usage
 
 #### Basic Configuration Commands
@@ -70,6 +88,8 @@ In interactive mode, you can enter commands like:
 #### Actions
 - `--get-config`: Get current configuration
 - `--interactive`, `-i`: Run in interactive mode
+- `--debug`, `-d`: Show debug output from device
+- `--monitor`, `-m`: Monitor debug output for specified seconds
 
 ### Parameter Guidelines
 
@@ -142,6 +162,19 @@ python3 loratncx_config.py --port /dev/ttyACM0 \
     --txdelay 50 --persist 31 --slottime 20
 ```
 
+#### Debug and Monitoring
+```bash
+# Monitor device debug output for 30 seconds
+python3 loratncx_config.py --port /dev/ttyACM0 --monitor 30
+
+# Configure with debug output visible
+python3 loratncx_config.py --port /dev/ttyACM0 --debug \
+    --frequency 433.175 --power 14
+
+# Interactive mode with debug output
+python3 loratncx_config.py --port /dev/ttyACM0 --debug --interactive
+```
+
 ### Troubleshooting
 
 **Connection Issues**:
@@ -150,10 +183,31 @@ python3 loratncx_config.py --port /dev/ttyACM0 \
 - Ensure no other applications are using the serial port
 - Try different baud rates if communication fails
 
+**Debug Output Interference**:
+If you see debug messages like `[LOOP] System running - uptime: XXX seconds`, this is normal device debug output. The tool now handles this automatically:
+
+```bash
+# The tool filters debug output automatically
+python3 loratncx_config.py --port /dev/ttyACM0 --get-config
+
+# To see debug output alongside commands, use --debug
+python3 loratncx_config.py --port /dev/ttyACM0 --debug --get-config
+
+# To monitor debug output only
+python3 loratncx_config.py --port /dev/ttyACM0 --monitor 30
+```
+
 **Configuration Not Applied**:
 - Check for error messages in the device's serial console output
 - Verify parameters are within valid ranges
 - Use `--get-config` to verify current settings
+- The device may print configuration to debug console instead of KISS interface
+
+**Configuration Query Shows No Response**:
+This can happen if the device outputs configuration to the debug console rather than the KISS interface. Try:
+1. Use `--debug` flag to see all device output
+2. Use `--monitor 10` to watch the debug stream
+3. Check if configuration appears in the debug messages
 
 **Permission Errors (Linux/macOS)**:
 ```bash

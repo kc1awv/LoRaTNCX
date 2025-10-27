@@ -66,17 +66,19 @@ class KISSCommands:
 class LoRaTNCXConfig:
     """LoRaTNCX configuration utility using KISS protocol."""
     
-    def __init__(self, port: str, baudrate: int = 115200, timeout: float = 2.0):
+    def __init__(self, port: str, baudrate: int = 115200, timeout: float = 2.0, debug: bool = False):
         """Initialize the configuration tool.
         
         Args:
             port: Serial port path (e.g., '/dev/ttyACM0', 'COM3')
             baudrate: Serial communication speed
             timeout: Serial read timeout in seconds
+            debug: Whether to show debug output from device
         """
         self.port = port
         self.baudrate = baudrate
         self.timeout = timeout
+        self.debug = debug
         self.serial = None
         
         # Valid parameter ranges and options
@@ -107,6 +109,10 @@ class LoRaTNCXConfig:
             )
             print(f"Connected to LoRaTNCX on {self.port}")
             time.sleep(1)  # Allow device to stabilize
+            
+            # Clear any existing debug output from the buffer
+            self._clear_serial_buffer()
+            
             return True
         except serial.SerialException as e:
             print(f"Error: Failed to connect to {self.port}: {e}")
@@ -117,6 +123,133 @@ class LoRaTNCXConfig:
         if self.serial and self.serial.is_open:
             self.serial.close()
             print("Disconnected from LoRaTNCX")
+
+    def _clear_serial_buffer(self):
+        """Clear any existing data from the serial buffer."""
+        if self.serial and self.serial.is_open:
+            # Read and discard any pending data
+            if self.serial.in_waiting > 0:
+                discarded = self.serial.read(self.serial.in_waiting)
+                if self.debug:
+                    print(f"Debug output ({len(discarded)} bytes):")
+                    try:
+                        print(discarded.decode('utf-8', errors='ignore'))
+                    except:
+                        print(discarded.hex())
+                else:
+                    print(f"Cleared {len(discarded)} bytes of debug output from buffer")
+
+    def _read_response_with_timeout(self, timeout_seconds: float = 2.0) -> bytes:
+        """Read response from device, filtering out debug messages.
+        
+        Args:
+            timeout_seconds: Maximum time to wait for response
+            
+        Returns:
+            Response bytes (may be empty if no valid response)
+        """
+        if not self.serial or not self.serial.is_open:
+            return b''
+            
+        start_time = time.time()
+        response_data = b''
+        
+        while time.time() - start_time < timeout_seconds:
+            if self.serial.in_waiting > 0:
+                data = self.serial.read(self.serial.in_waiting)
+                response_data += data
+                
+                # Look for KISS frames (start with 0xC0)
+                # or check if we have what looks like configuration output
+                if b'Current Radio Configuration:' in response_data:
+                    break
+                    
+            time.sleep(0.1)
+        
+        return response_data
+
+    def _parse_config_response(self, response: bytes) -> str:
+        """Parse configuration response, filtering debug output.
+        
+        Args:
+            response: Raw response bytes from device
+            
+        Returns:
+            Parsed configuration string
+        """
+        try:
+            response_str = response.decode('utf-8', errors='ignore')
+            
+            # Look for configuration block
+            if 'Current Radio Configuration:' in response_str:
+                # Extract just the configuration part
+                config_start = response_str.find('Current Radio Configuration:')
+                config_lines = []
+                lines = response_str[config_start:].split('\n')
+                
+                for line in lines:
+                    # Skip debug messages that start with [LOOP], [DEBUG], etc.
+                    if (line.strip() and 
+                        not line.strip().startswith('[') and 
+                        ('Current Radio Configuration:' in line or
+                         'Frequency:' in line or
+                         'TX Power:' in line or
+                         'Bandwidth:' in line or
+                         'Spreading Factor:' in line or
+                         'Coding Rate:' in line or
+                         'TX Delay:' in line or
+                         'Persistence:' in line or
+                         'Slot Time:' in line)):
+                        config_lines.append(line.strip())
+                
+                return '\n'.join(config_lines)
+            else:
+                # Filter out debug messages
+                lines = response_str.split('\n')
+                filtered_lines = []
+                for line in lines:
+                    if (line.strip() and 
+                        not line.strip().startswith('[LOOP]') and
+                        not line.strip().startswith('[DEBUG]') and
+                        not 'uptime:' in line and
+                        not 'free heap:' in line and
+                        not 'bytes' in line.strip()):
+                        filtered_lines.append(line.strip())
+                
+                return '\n'.join(filtered_lines) if filtered_lines else "No configuration data received"
+                
+        except Exception as e:
+            return f"Error parsing response: {e}"
+
+    def monitor_debug_output(self, duration: int = 10):
+        """Monitor and display debug output from the device.
+        
+        Args:
+            duration: How long to monitor in seconds
+        """
+        if not self.serial or not self.serial.is_open:
+            print("Error: Not connected to device")
+            return
+            
+        print(f"Monitoring debug output for {duration} seconds (press Ctrl+C to stop early)...")
+        print("-" * 50)
+        
+        start_time = time.time()
+        try:
+            while time.time() - start_time < duration:
+                if self.serial.in_waiting > 0:
+                    data = self.serial.read(self.serial.in_waiting)
+                    try:
+                        output = data.decode('utf-8', errors='ignore')
+                        print(output, end='')
+                    except:
+                        print(f"[Binary data: {data.hex()}]")
+                time.sleep(0.1)
+        except KeyboardInterrupt:
+            print("\nMonitoring stopped by user")
+        
+        print("-" * 50)
+        print("Debug monitoring complete")
 
     def escape_kiss_data(self, data: bytes) -> bytes:
         """Apply KISS byte stuffing to prevent frame marker conflicts.
@@ -134,12 +267,13 @@ class LoRaTNCXConfig:
                            bytes([KISSCommands.FESC, KISSCommands.TFEND]))
         return data
 
-    def send_kiss_command(self, cmd: int, data: bytes = b'') -> bool:
+    def send_kiss_command(self, cmd: int, data: bytes = b'', clear_buffer: bool = False) -> bool:
         """Send a KISS command to the device.
         
         Args:
             cmd: KISS command byte
             data: Optional command data
+            clear_buffer: Whether to clear the serial buffer before sending
             
         Returns:
             True if command sent successfully, False otherwise
@@ -149,6 +283,10 @@ class LoRaTNCXConfig:
             return False
 
         try:
+            # Clear buffer if requested (useful to avoid mixing with debug output)
+            if clear_buffer:
+                self._clear_serial_buffer()
+            
             # Build frame data
             frame_data = bytes([cmd]) + data
             frame_data = self.escape_kiss_data(frame_data)
@@ -333,19 +471,28 @@ class LoRaTNCXConfig:
         Returns:
             True if command sent successfully
         """
+        # Clear buffer before sending command
+        self._clear_serial_buffer()
+        
         data = bytes([KISSCommands.GET_CONFIG])
         
         if self.send_kiss_command(KISSCommands.SET_HARDWARE, data):
-            print("Configuration query sent. Check serial console for response.")
+            print("Requesting current configuration...")
             
-            # Try to read any response from serial
-            time.sleep(0.5)
-            if self.serial and self.serial.in_waiting > 0:
-                response = self.serial.read(self.serial.in_waiting)
-                try:
-                    print("Device response:", response.decode('utf-8', errors='ignore'))
-                except:
-                    print("Device response (raw):", response.hex())
+            # Wait for and read response
+            response = self._read_response_with_timeout(3.0)
+            
+            if response:
+                config_text = self._parse_config_response(response)
+                if config_text.strip():
+                    print("\nCurrent Configuration:")
+                    print(config_text)
+                else:
+                    print("No configuration data received. Device may not support this command.")
+                    print(f"Raw response ({len(response)} bytes):", response[:200] + (b'...' if len(response) > 200 else b''))
+            else:
+                print("No response received from device.")
+                print("Note: Configuration may be printed to device's debug console.")
             
             return True
         return False
@@ -413,6 +560,8 @@ class LoRaTNCXConfig:
                         self.set_slot_time(slot)
                     except (ValueError, IndexError):
                         print("Usage: slottime <slot_time_units>")
+                elif cmd == 'monitor' or cmd == 'debug':
+                    self.monitor_debug_output()
                 elif cmd == '':
                     continue
                 else:
@@ -437,6 +586,7 @@ Available Commands:
   persist <value>     Set persistence (0-255)
   slottime <units>    Set slot time (0-255, units of 10ms)
   config              Get current configuration
+  monitor             Monitor debug output from device (10 seconds)
   help                Show this help
   quit                Exit interactive mode
 
@@ -445,6 +595,7 @@ Examples:
   power 14            Set to 14 dBm
   sf 9                Set spreading factor to 9
   cr 7                Set coding rate to 4/7
+  monitor             Show device debug messages
 """)
 
 
@@ -501,11 +652,15 @@ Regional Frequency Guidelines:
                        help='Get current configuration')
     parser.add_argument('--interactive', '-i', action='store_true',
                        help='Run in interactive mode')
+    parser.add_argument('--debug', '-d', action='store_true',
+                       help='Show debug output from device')
+    parser.add_argument('--monitor', '-m', type=int, metavar='SECONDS',
+                       help='Monitor debug output for specified seconds')
 
     args = parser.parse_args()
 
     # Create configuration tool instance
-    config_tool = LoRaTNCXConfig(args.port, args.baudrate, args.timeout)
+    config_tool = LoRaTNCXConfig(args.port, args.baudrate, args.timeout, args.debug)
     
     # Connect to device
     if not config_tool.connect():
@@ -555,9 +710,14 @@ Regional Frequency Guidelines:
             config_tool.interactive_mode()
             commands_executed = True
             
+        if args.monitor:
+            config_tool.monitor_debug_output(args.monitor)
+            commands_executed = True
+            
         if not commands_executed:
             print("No configuration commands specified. Use --help for usage information.")
             print("Or use --interactive for interactive mode.")
+            print("Use --monitor 10 to watch debug output, or --debug to see debug output during commands.")
             
     except KeyboardInterrupt:
         print("\nOperation cancelled by user")
