@@ -1,0 +1,75 @@
+{
+  "build_time": "2024-10-27T12:00:00Z",
+  "version": "1.0.0",
+  "files": [
+    {
+      "name": "bootstrap.min.css",
+      "size": 232948
+    },
+    {
+      "name": "bootstrap.bundle.min.js",
+      "size": 80663
+    },
+    {
+      "name": "bootstrap-icons.min.css",
+      "size": 85875
+    },
+    {
+      "name": "chart.min.js",
+      "size": 204948
+    },
+    {
+      "name": "favicon.svg",
+      "size": 269
+    },
+    {
+      "name": "index.html",
+      "size": 28081
+    },
+    {
+      "name": "style.css",
+      "size": 5140
+    },
+    {
+      "name": "app.js",
+      "size": 28090
+    },
+    {
+      "name": "bootstrap.min.css.gz",
+      "size": 30858
+    },
+    {
+      "name": "bootstrap.bundle.min.js.gz",
+      "size": 23712
+    },
+    {
+      "name": "bootstrap-icons.min.css.gz",
+      "size": 13287
+    },
+    {
+      "name": "chart.min.js.gz",
+      "size": 69324
+    },
+    {
+      "name": "index.html.gz",
+      "size": 3707
+    },
+    {
+      "name": "style.css.gz",
+      "size": 1566
+    },
+    {
+      "name": "app.js.gz",
+      "size": 6162
+    },
+    {
+      "name": "fonts/bootstrap-icons.woff2",
+      "size": 130608
+    },
+    {
+      "name": "fonts/bootstrap-icons.woff",
+      "size": 176200
+    }
+  ],
+  "total_size": 1121438
+}

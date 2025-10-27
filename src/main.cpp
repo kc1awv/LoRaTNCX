@@ -16,6 +16,8 @@
 #include "DisplayManager.h"
 #include "ErrorHandler.h"
 #include "OTA.h"
+#include "WebSocketServer.h"
+#include <ESPAsyncWebServer.h>
 
 #ifndef WIFI_SSID
 #define WIFI_SSID "LoRaTNCX"
@@ -42,6 +44,9 @@ WiFiServer kissServer(TCP_KISS_PORT);
 WiFiServer nmeaServer(TCP_NMEA_PORT);
 WiFiClient kissClient;
 WiFiClient nmeaClient;
+
+// Web server for the interface
+AsyncWebServer webServer(WEB_SERVER_PORT);
 
 static unsigned long lastPpsCheck = 0;
 static int lastPpsState = -1;
@@ -113,6 +118,9 @@ void handleButton();
 void handleButtonShortPress();
 void handleButtonLongPress();
 void showLongPressProgress(float progress);
+bool reinitializeDisplay();
+bool reinitializeGNSS();
+void shutdownGNSS();
 
 struct MonitorData
 {
@@ -934,15 +942,17 @@ void handleButtonLongPress()
   }
 }
 
-void setupDisplay()
+bool reinitializeDisplay()
 {
-  Serial.println("[OLED] Initializing I2C and display...");
+  Serial.println("[OLED] Reinitializing I2C and display...");
 
+  // Power control
   pinMode(VEXT_PIN, OUTPUT);
   digitalWrite(VEXT_PIN, LOW);
   Serial.printf("[OLED] Vext power enabled (pin %d = LOW)\r\n", VEXT_PIN);
   delay(300);
 
+  // Reset sequence
   pinMode(OLED_RST, OUTPUT);
   digitalWrite(OLED_RST, LOW);
   delay(100);
@@ -950,12 +960,13 @@ void setupDisplay()
   delay(200);
   Serial.printf("[OLED] Reset sequence completed - V4 (pin %d)\r\n", OLED_RST);
 
+  // I2C initialization
   Wire.begin(OLED_SDA, OLED_SCL);
   Serial.printf("[OLED] Using Heltec V4 OLED pins: SDA=%d, SCL=%d\r\n", OLED_SDA, OLED_SCL);
-
   Wire.setClock(100000);
   delay(100);
 
+  // Device detection
   Serial.println("[OLED] Checking for OLED at common addresses...");
   bool deviceFound = false;
   for (byte address : {0x3C, 0x3D})
@@ -973,10 +984,10 @@ void setupDisplay()
   if (!deviceFound)
   {
     Serial.println("[OLED] WARNING: No OLED found at 0x3C or 0x3D!");
-    displayAvailable = false;
-    return;
+    return false;
   }
 
+  // Display initialization
   Serial.println("[OLED] Initializing display...");
   bool initResult = display.init();
   Serial.printf("[OLED] Display init result: %s\r\n", initResult ? "SUCCESS" : "FAILED");
@@ -992,8 +1003,6 @@ void setupDisplay()
     display.drawString(0, 0, FPSTR(DISPLAY_LORAX));
     display.drawString(0, 12, FPSTR(DISPLAY_INITIALIZING));
     display.display();
-
-    displayAvailable = true;
     
     // Initialize display utilities and manager
     displayUtils.setup(&display);
@@ -1003,13 +1012,87 @@ void setupDisplay()
     Serial.println("[OLED] Display initialized successfully");
 
     delay(1000);
+    return true;
+  }
+  else
+  {
+    HANDLE_ERROR(ErrorHandler::ERROR_DISPLAY_INIT, "Init result false");
+    Serial.println("[OLED] Display initialization failed");
+    return false;
+  }
+}
+
+void setupDisplay()
+{
+  if (reinitializeDisplay())
+  {
+    displayAvailable = true;
   }
   else
   {
     displayAvailable = false;
-    HANDLE_ERROR(ErrorHandler::ERROR_DISPLAY_INIT, "Init result false");
-    Serial.println("[OLED] Display initialization failed - continuing without display");
+    Serial.println("[OLED] Display setup failed - continuing without display");
   }
+}
+
+void shutdownGNSS()
+{
+#if GNSS_ENABLE
+  Serial.println("[GNSS] Shutting down GNSS module...");
+  
+  // Stop the GNSS driver
+  gnss.setEnabled(false);
+  
+  // Power down the GNSS module
+  digitalWrite(VGNSS_CTRL, HIGH);  // Turn off GNSS power
+  digitalWrite(VEXT_CTRL, HIGH);   // Turn off external power  
+  digitalWrite(GNSS_RST, LOW);     // Hold in reset
+  digitalWrite(GNSS_WAKE, LOW);    // Sleep mode
+  
+  Serial.println("[GNSS] GNSS module powered down");
+#endif
+}
+
+bool reinitializeGNSS()
+{
+#if GNSS_ENABLE
+  Serial.println("[GNSS] Reinitializing GNSS module...");
+  
+  const auto& gnssCfg = config.getGNSSConfig();
+  
+  // Hardware initialization
+  pinMode(VGNSS_CTRL, OUTPUT);
+  digitalWrite(VGNSS_CTRL, LOW);   // Enable GNSS power
+  
+  pinMode(VEXT_CTRL, OUTPUT);
+  digitalWrite(VEXT_CTRL, LOW);    // Enable external power
+  
+  pinMode(GNSS_RST, OUTPUT);
+  digitalWrite(GNSS_RST, HIGH);    // Release reset
+  
+  pinMode(GNSS_WAKE, OUTPUT);
+  digitalWrite(GNSS_WAKE, HIGH);   // Wake up
+  
+  pinMode(GNSS_PPS, INPUT);        // PPS input
+  
+  delay(500);  // Allow power to stabilize
+  
+  // Initialize UART communication
+  if (gnssCfg.verboseLogging)
+  {
+    Serial.printf("[GNSS] Starting UART at %lu baud (RX:%d, TX:%d)\n", 
+                  gnssCfg.baudRate, GNSS_RX, GNSS_TX);
+  }
+  
+  gnss.begin(gnssCfg.baudRate, GNSS_RX, GNSS_TX);
+  gnss.setEnabled(true);
+  
+  Serial.println("[GNSS] GNSS module reinitialized successfully");
+  return true;
+#else
+  Serial.println("[GNSS] GNSS support not compiled in");
+  return false;
+#endif
 }
 
 void setupWiFi()
@@ -1088,6 +1171,19 @@ void setupWiFi()
   Serial.println("[NET] TCP servers started");
   Serial.printf("[NET] KISS server on port %d\n", TCP_KISS_PORT);
   Serial.printf("[NET] NMEA server on port %d\n", TCP_NMEA_PORT);
+
+  // Initialize WebSocket server for web interface
+  WebSocketServer::begin(webServer);
+  WebSocketServer::setRadio(&radio);
+  WebSocketServer::setGNSS(&gnss);
+  WebSocketServer::setKISS(&kiss);
+  WebSocketServer::setConfig(&config);
+  WebSocketServer::setBattery(&battery);
+  
+  // Start web server
+  webServer.begin();
+  Serial.printf("[NET] Web server started on port %d\n", WEB_SERVER_PORT);
+  Serial.println("[NET] Web interface available at http://[device-ip]/");
 
   if (displayAvailable)
   {
@@ -1530,6 +1626,9 @@ void loop()
   FEED_WATCHDOG();
 
   serviceTCP();
+
+  // Handle WebSocket server
+  WebSocketServer::handle();
 
   // Feed watchdog after network processing
   FEED_WATCHDOG();

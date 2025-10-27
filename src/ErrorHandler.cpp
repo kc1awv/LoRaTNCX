@@ -133,13 +133,8 @@ void ErrorHandler::enableWatchdog(uint32_t timeoutMs) {
         Serial.println("[WDT] Watchdog already initialized, adding current task");
         esp_task_wdt_add(NULL);
     } else {
-        // Initialize watchdog with new API
-        esp_task_wdt_config_t wdt_config = {
-            .timeout_ms = timeoutMs,
-            .idle_core_mask = (1 << portNUM_PROCESSORS) - 1,  // All cores
-            .trigger_panic = true
-        };
-        esp_err_t init_result = esp_task_wdt_init(&wdt_config);
+        // Initialize watchdog with compatible API
+        esp_err_t init_result = esp_task_wdt_init(timeoutMs / 1000, true); // timeout in seconds, panic on timeout
         if (init_result == ESP_OK) {
             esp_task_wdt_add(NULL);  // Add current task
             Serial.printf("[WDT] Watchdog initialized with %lu ms timeout\n", timeoutMs);
