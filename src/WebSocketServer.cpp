@@ -447,11 +447,10 @@ void WebSocketServer::handleSendAPRSMessage(JsonObject data) {
 void WebSocketServer::handleBackupConfig(AsyncWebSocketClient* client) {
     if (!configRef) return;
     
-    // TODO: Implement configuration backup
+    // Create configuration backup
     JsonDocument doc;
-    JsonObject response = doc.to<JsonObject>();
-    response["config_data"] = "backup_data_placeholder";
-    sendResponse(client, "config_backup", response);
+    JsonObject payload = createConfigurationBackup(doc);
+    sendResponse(client, "backup_config", payload);
 }
 
 void WebSocketServer::sendResponse(AsyncWebSocketClient* client, const String& type, JsonObject& payload) {
@@ -824,8 +823,9 @@ JsonObject WebSocketServer::createConfigurationBackup(JsonDocument& doc) {
         payload["timestamp"] = millis();
         payload["firmware_version"] = FIRMWARE_VERSION;
         
-        // Get full configuration
-        JsonObject config = createConfigurationData(doc);
+        // Get full configuration using a separate document to avoid circular reference
+        JsonDocument configDoc;
+        JsonObject config = createConfigurationData(configDoc);
         payload["configuration"] = config;
         
         // Add additional system info

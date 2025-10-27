@@ -47,3 +47,9 @@ Updates:
 - Fixed the OLED and GNSS toggles
 
 ---
+
+**`27 OCT 25` at `18:23` UTC**
+
+- Fixed the Backup Configuration button, it now gives a JSON file with the current config
+
+I'm ready to make this into a PR. Any other small issues can be fixed in the next branch.
