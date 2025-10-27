@@ -1,0 +1,22 @@
+# Things To Work On
+
+- Implement web interface for device configuration and monitoring (we have 16MB of flash and 2MB of PSRAM to utilize, let's make the most of it).
+- Add support for additional modulation schemes that the SX126x supports (e.g., FSK).
+- Implement IGate functionality to forward APRS packets to the internet.
+- Better OLED graphics and status indicators, possibly using a graphics library.
+- Better OLED power management to reduce consumption when idle.
+- Implement OTA (Over-The-Air) firmware updates via WiFi. (I think it works now, but needs testing and documentation).
+- Add support and/or documentation for additional LoRa frequency bands (e.g., 433MHz, 868MHz) to make the device more versatile.
+- Implement advanced logging features, such as logging to an SD card or sending logs over WiFi.
+- Eventually, consider adding Bluetooth LE support for configuration, monitoring, and applications via mobile apps.
+- Implement adaptive data rate (ADR) for LoRa communication to optimize performance based on link conditions.
+- Add support for additional sensors (e.g., temperature, humidity) and display their readings on the OLED, web interface, and over APRS.
+- Implement a more user-friendly configuration interface, possibly with a web-based GUI (see above).
+- Explore power-saving modes for the ESP32 to extend battery life in portable applications.
+- Add support for mesh networking capabilities using LoRa. (oh god, the horror)
+- Implement security features for LoRa communication, such as encryption and authentication.
+- Implement a more robust error handling and recovery mechanism for LoRa communication.
+- Add support for additional display types (e.g., TFT, e-ink) for more versatile user interfaces.
+- Implement a more modular code structure to facilitate future development and maintenance.
+- Improve documentation and add more examples for users and developers.
+- Implement unit tests and integration tests to ensure code quality and reliability.
