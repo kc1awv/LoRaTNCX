@@ -39,3 +39,11 @@ Updates:
 **`27 OCT 25` at `16:13` UTC**
 
 - Added a board definition for the V4
+
+---
+
+**`27 OCT 25` at `18:04` UTC**
+
+- Fixed the OLED and GNSS toggles
+
+---

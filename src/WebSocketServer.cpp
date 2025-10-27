@@ -350,10 +350,12 @@ void WebSocketServer::updateSystemConfig(JsonObject data) {
         bool enabled = data["oled_enabled"].as<bool>();
         // Control OLED display availability
         extern bool displayAvailable;
+        extern bool reinitializeDisplay();
+        extern SSD1306Wire display;
+        
         if (enabled && !displayAvailable) {
-            // Try to enable display
-            extern SSD1306Wire display;
-            bool success = display.init();
+            // Try to enable display with proper hardware reinitialization
+            bool success = reinitializeDisplay();
             if (success) {
                 displayAvailable = true;
                 Serial.println("[OLED] Display enabled via web interface");
@@ -365,7 +367,6 @@ void WebSocketServer::updateSystemConfig(JsonObject data) {
         } else if (!enabled && displayAvailable) {
             // Disable display
             displayAvailable = false;
-            extern SSD1306Wire display;
             display.displayOff();
             Serial.println("[OLED] Display disabled via web interface");
             broadcastLogMessage("INFO", "OLED display disabled via web interface");
@@ -378,9 +379,28 @@ void WebSocketServer::updateSystemConfig(JsonObject data) {
         auto& gnssConfig = configRef->getGNSSConfig();
         if (gnssConfig.enabled != enabled) {
             gnssConfig.enabled = enabled;
-            Serial.printf("[GNSS] %s via web interface\n", enabled ? "Enabled" : "Disabled");
-            broadcastLogMessage("INFO", String("GNSS ") + (enabled ? "enabled" : "disabled") + " via web interface");
-            // Note: GNSS restart will happen on next device restart
+            
+            // Declare external functions from main.cpp
+            extern bool reinitializeGNSS();
+            extern void shutdownGNSS();
+            
+            if (enabled) {
+                // Enable GNSS with proper hardware reinitialization
+                bool success = reinitializeGNSS();
+                if (success) {
+                    Serial.println("[GNSS] GNSS enabled via web interface");
+                    broadcastLogMessage("INFO", "GNSS enabled via web interface");
+                } else {
+                    Serial.println("[GNSS] Failed to enable GNSS");
+                    broadcastLogMessage("ERROR", "Failed to enable GNSS");
+                    gnssConfig.enabled = false;  // Revert config on failure
+                }
+            } else {
+                // Disable GNSS with proper shutdown
+                shutdownGNSS();
+                Serial.println("[GNSS] GNSS disabled via web interface");
+                broadcastLogMessage("INFO", "GNSS disabled via web interface");
+            }
         }
     }
     
