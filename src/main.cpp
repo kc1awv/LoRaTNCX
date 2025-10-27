@@ -1100,6 +1100,7 @@ void setupWiFi()
   WebSocketServer::setGNSS(&gnss);
   WebSocketServer::setKISS(&kiss);
   WebSocketServer::setConfig(&config);
+  WebSocketServer::setBattery(&battery);
   
   // Start web server
   webServer.begin();

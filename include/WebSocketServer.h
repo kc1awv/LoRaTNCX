@@ -12,6 +12,7 @@ class GNSSDriver;
 class KISS;
 class ConfigManager;
 class OTAManager;
+class BatteryMonitor;
 
 /**
  * @brief WebSocket server for LoRaTNCX web interface
@@ -40,6 +41,7 @@ public:
     static void setGNSS(GNSSDriver* gnss);
     static void setKISS(KISS* kiss);
     static void setConfig(ConfigManager* config);
+    static void setBattery(BatteryMonitor* battery);
     
     /**
      * @brief Broadcast status updates to all connected clients
@@ -66,6 +68,7 @@ private:
     static GNSSDriver* gnssRef;
     static KISS* kissRef;
     static ConfigManager* configRef;
+    static BatteryMonitor* batteryRef;
     
     // Status tracking
     static unsigned long lastStatusBroadcast;
@@ -107,6 +110,8 @@ private:
     static JsonObject createGNSSStatus(JsonDocument& doc);
     static JsonObject createBatteryStatus(JsonDocument& doc);
     static JsonObject createWiFiStatus(JsonDocument& doc);
+    static JsonObject createConfigurationData(JsonDocument& doc);
+    static JsonObject createConfigurationBackup(JsonDocument& doc);
     
     // Utility functions
     static String formatUptime(unsigned long seconds);

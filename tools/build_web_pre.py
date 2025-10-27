@@ -32,10 +32,17 @@ def build_web_interface(*args, **kwargs):
         deps = {
             "bootstrap.min.css": "https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css",
             "bootstrap.bundle.min.js": "https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js",
+            "bootstrap-icons.min.css": "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css",
             "chart.umd.js": "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"
         }
         
-        for filename, url in deps.items():
+        # Download font files for Bootstrap Icons
+        font_deps = {
+            "bootstrap-icons.woff": "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/fonts/bootstrap-icons.woff",
+            "bootstrap-icons.woff2": "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/fonts/bootstrap-icons.woff2"
+        }
+        
+        for filename, url in {**deps, **font_deps}.items():
             file_path = dist_dir / filename
             if not file_path.exists():
                 print(f"Downloading {filename}...")
@@ -47,6 +54,11 @@ def build_web_interface(*args, **kwargs):
         for src_file in src_dir.glob("*"):
             if src_file.is_file():
                 shutil.copy2(src_file, dist_dir)
+        
+        # Copy all files to data directory (both compressed and uncompressed)
+        for file_path in dist_dir.glob("*"):
+            if file_path.is_file():
+                shutil.copy2(file_path, data_dir)
         
         # Compress all files
         total_size = 0

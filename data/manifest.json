@@ -16,19 +16,23 @@
     },
     {
       "name": "chart.min.js",
-      "size": 183850
+      "size": 204948
+    },
+    {
+      "name": "favicon.svg",
+      "size": 269
     },
     {
       "name": "index.html",
-      "size": 25664
+      "size": 28081
     },
     {
       "name": "style.css",
-      "size": 4578
+      "size": 5140
     },
     {
       "name": "app.js",
-      "size": 20910
+      "size": 28090
     },
     {
       "name": "bootstrap.min.css.gz",
@@ -44,20 +48,28 @@
     },
     {
       "name": "chart.min.js.gz",
-      "size": 57282
+      "size": 69324
     },
     {
       "name": "index.html.gz",
-      "size": 3414
+      "size": 3707
     },
     {
       "name": "style.css.gz",
-      "size": 1447
+      "size": 1566
     },
     {
       "name": "app.js.gz",
-      "size": 4719
+      "size": 6162
+    },
+    {
+      "name": "fonts/bootstrap-icons.woff2",
+      "size": 130608
+    },
+    {
+      "name": "fonts/bootstrap-icons.woff",
+      "size": 176200
     }
   ],
-  "total_size": 769207
+  "total_size": 1121438
 }

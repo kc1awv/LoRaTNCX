@@ -12,6 +12,29 @@
 body {
     background-color: #f8f9fa;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    transition: background-color 0.3s ease;
+}
+
+/* Dark mode support */
+[data-bs-theme="dark"] body {
+    background-color: #212529;
+    color: #ffffff;
+}
+
+[data-bs-theme="dark"] .card-header {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.125);
+}
+
+[data-bs-theme="dark"] #system-log {
+    background-color: #1a1d20;
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.125);
+}
+
+[data-bs-theme="dark"] .table {
+    --bs-table-bg: transparent;
+    --bs-table-border-color: rgba(255, 255, 255, 0.2);
 }
 
 /* Tab content management */

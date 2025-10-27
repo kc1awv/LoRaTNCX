@@ -6,7 +6,7 @@
 
 ## **HUMAN** KC1AWV
 
-**Updated `27 OCT 25` at `12:49` UTC**
+**`27 OCT 25` at `12:49` UTC**
 
 *Initial findings: Though Claude considers this implementation complete, there are a few outstanding issues. Additionally, Claude also thought (and incorrectly corrected) that the target device (Heltec WiFi LoRa 32 V4) has 8MB flash. This was reasoned because the board definition uses the V3 (V4 is "pin compatible") which by definition has only 8MB flash. Despite this, the code compiles and still uses a reasonable amount of space, giving promise to also adding in V3 support if I feel like it. Perhaps asking Claude to create a custom board definition until Platformio adds in the new board will help.*
 
@@ -24,3 +24,12 @@ It's still a good start. With some additional abuse of Claude explaining the sho
 Continue work until the web interface is satisfactory. This is not PR ready yet.
 
 ---
+
+**`27 OCT 25` at `15:47` UTC**
+
+Updates:
+
+- Fixed a lot of the web interface issues, though not all 
+  - Backup configuration doesn't produce a file? At least, nothing attempts a download
+- Added in dark-mode support for the web interface
+- Going to try creating a custom board definition based on the V3 to utilize the larger flash space without causing future issues or reversions

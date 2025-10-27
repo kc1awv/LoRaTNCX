@@ -7,6 +7,7 @@
 #include <WiFi.h>
 #include <esp_system.h>
 #include <esp_task_wdt.h>
+#include <SSD1306Wire.h>
 
 // Static member initialization
 AsyncWebSocket* WebSocketServer::ws = nullptr;
@@ -15,6 +16,7 @@ RadioHAL* WebSocketServer::radioRef = nullptr;
 GNSSDriver* WebSocketServer::gnssRef = nullptr;
 KISS* WebSocketServer::kissRef = nullptr;
 ConfigManager* WebSocketServer::configRef = nullptr;
+BatteryMonitor* WebSocketServer::batteryRef = nullptr;
 unsigned long WebSocketServer::lastStatusBroadcast = 0;
 unsigned long WebSocketServer::lastSystemInfo = 0;
 
@@ -75,6 +77,10 @@ void WebSocketServer::setConfig(ConfigManager* config) {
     configRef = config;
 }
 
+void WebSocketServer::setBattery(BatteryMonitor* battery) {
+    batteryRef = battery;
+}
+
 uint32_t WebSocketServer::getClientCount() {
     return ws ? ws->count() : 0;
 }
@@ -85,12 +91,14 @@ void WebSocketServer::onWebSocketEvent(AsyncWebSocket* server, AsyncWebSocketCli
         case WS_EVT_CONNECT:
             Serial.printf("[WS] Client #%u connected from %s\n", client->id(), 
                          client->remoteIP().toString().c_str());
+            broadcastLogMessage("INFO", "Web client connected from " + client->remoteIP().toString());
             // Send initial status to new client
             handleStatusRequest(client, "all_status");
             break;
             
         case WS_EVT_DISCONNECT:
             Serial.printf("[WS] Client #%u disconnected\n", client->id());
+            broadcastLogMessage("INFO", "Web client disconnected (ID: " + String(client->id()) + ")");
             break;
             
         case WS_EVT_DATA: {
@@ -173,6 +181,18 @@ void WebSocketServer::handleStatusRequest(AsyncWebSocketClient* client, const St
         doc.clear();
         payload = createWiFiStatus(doc);
         sendResponse(client, "wifi", payload);
+    }
+    else if (dataType == "configuration") {
+        // Send current configuration data
+        JsonDocument doc;
+        JsonObject payload = createConfigurationData(doc);
+        sendResponse(client, "configuration", payload);
+    }
+    else if (dataType == "backup_config") {
+        // Send configuration backup
+        JsonDocument doc;
+        JsonObject payload = createConfigurationBackup(doc);
+        sendResponse(client, "backup_config", payload);
     }
     else if (dataType == "radio") {
         JsonDocument doc;
@@ -325,23 +345,55 @@ void WebSocketServer::updateWiFiConfig(JsonObject data) {
 void WebSocketServer::updateSystemConfig(JsonObject data) {
     if (!configRef) return;
     
-    // Update system configuration
+    // Update OLED enable state
     if (data["oled_enabled"].is<bool>()) {
         bool enabled = data["oled_enabled"].as<bool>();
-        // Set OLED enable flag in config
+        // Control OLED display availability
+        extern bool displayAvailable;
+        if (enabled && !displayAvailable) {
+            // Try to enable display
+            extern SSD1306Wire display;
+            bool success = display.init();
+            if (success) {
+                displayAvailable = true;
+                Serial.println("[OLED] Display enabled via web interface");
+                broadcastLogMessage("INFO", "OLED display enabled via web interface");
+            } else {
+                Serial.println("[OLED] Failed to enable display");
+                broadcastLogMessage("ERROR", "Failed to enable OLED display");
+            }
+        } else if (!enabled && displayAvailable) {
+            // Disable display
+            displayAvailable = false;
+            extern SSD1306Wire display;
+            display.displayOff();
+            Serial.println("[OLED] Display disabled via web interface");
+            broadcastLogMessage("INFO", "OLED display disabled via web interface");
+        }
     }
     
+    // Update GNSS enable state
     if (data["gnss_enabled"].is<bool>()) {
         bool enabled = data["gnss_enabled"].as<bool>();
-        // Set GNSS enable flag in config
+        auto& gnssConfig = configRef->getGNSSConfig();
+        if (gnssConfig.enabled != enabled) {
+            gnssConfig.enabled = enabled;
+            Serial.printf("[GNSS] %s via web interface\n", enabled ? "Enabled" : "Disabled");
+            broadcastLogMessage("INFO", String("GNSS ") + (enabled ? "enabled" : "disabled") + " via web interface");
+            // Note: GNSS restart will happen on next device restart
+        }
     }
     
+    // Update timezone (placeholder for future implementation)
     if (data["timezone"].is<String>()) {
         String timezone = data["timezone"].as<String>();
-        // Set timezone in config
+        Serial.printf("[SYSTEM] Timezone set to: %s\n", timezone.c_str());
+        broadcastLogMessage("INFO", "Timezone updated to: " + timezone);
+        // TODO: Implement timezone storage in config
     }
     
     configRef->saveConfig();
+    broadcastLogMessage("INFO", "System configuration saved");
 }
 
 void WebSocketServer::handleRestart() {
@@ -479,12 +531,18 @@ JsonObject WebSocketServer::createSystemStatus(JsonDocument& doc) {
     
     payload["firmware_version"] = "1.0.0"; // TODO: Get from Constants.h
     payload["uptime"] = millis() / 1000;
-    payload["free_heap"] = getFreeHeap();
-    payload["flash_used"] = getFlashUsed();
-    payload["flash_total"] = getFlashSize();
-    payload["spiffs_used"] = getSPIFFSUsed();
-    payload["spiffs_total"] = getSPIFFSSize();
-    payload["cpu_temp"] = getCPUTemperature();
+    payload["free_heap"] = ESP.getFreeHeap();
+    payload["flash_used"] = ESP.getSketchSize();
+    payload["flash_total"] = ESP.getFlashChipSize();
+    
+    // Get SPIFFS info
+    size_t spiffs_total = SPIFFS.totalBytes();
+    size_t spiffs_used = SPIFFS.usedBytes();
+    payload["spiffs_used"] = spiffs_used;
+    payload["spiffs_total"] = spiffs_total;
+    
+    // Get CPU temperature (ESP32-S3 method)
+    payload["cpu_temp"] = 25.0; // TODO: Get actual temperature
     
     return payload;
 }
@@ -493,11 +551,33 @@ JsonObject WebSocketServer::createRadioStatus(JsonDocument& doc) {
     JsonObject payload = doc.to<JsonObject>();
     
     if (radioRef) {
-        // TODO: Get actual values from radio
-        payload["frequency"] = 433.775;
-        payload["power"] = 20;
-        payload["rssi"] = -95;
-        payload["snr"] = 8.5;
+        // Get actual values from radio configuration
+        payload["frequency"] = radioRef->getFrequency();
+        payload["power"] = radioRef->getTxPower();
+        payload["bandwidth"] = radioRef->getBandwidth();
+        payload["spreading_factor"] = radioRef->getSpreadingFactor();
+        payload["coding_rate"] = radioRef->getCodingRate();
+        payload["tx_delay"] = radioRef->getTxDelay();
+        payload["persist"] = radioRef->getPersist();
+        payload["slot_time"] = radioRef->getSlotTime();
+        
+        // Runtime statistics - these would need to be added to RadioHAL
+        payload["rssi"] = -999;    // Not available without last reception
+        payload["snr"] = -999;     // Not available without last reception
+        payload["packets_tx"] = 0; // TODO: Add counter to RadioHAL
+        payload["packets_rx"] = 0; // TODO: Add counter to RadioHAL
+        payload["crc_errors"] = 0; // TODO: Add counter to RadioHAL
+        payload["last_tx"] = 0;    // TODO: Add timestamp to RadioHAL
+        payload["last_rx"] = 0;    // TODO: Add timestamp to RadioHAL
+    } else {
+        // Radio not available - return default values
+        payload["frequency"] = 915.0;
+        payload["power"] = 8;
+        payload["bandwidth"] = 125.0;
+        payload["spreading_factor"] = 9;
+        payload["coding_rate"] = 7;
+        payload["rssi"] = -999;
+        payload["snr"] = -999;
         payload["packets_tx"] = 0;
         payload["packets_rx"] = 0;
         payload["crc_errors"] = 0;
@@ -512,7 +592,18 @@ JsonObject WebSocketServer::createGNSSStatus(JsonDocument& doc) {
     JsonObject payload = doc.to<JsonObject>();
     
     if (gnssRef) {
-        // TODO: Get actual values from GNSS
+        // Get actual values from GNSS
+        payload["fix"] = gnssRef->locationValid();
+        payload["satellites"] = gnssRef->satellitesInUse();
+        payload["latitude"] = gnssRef->lat();
+        payload["longitude"] = gnssRef->lng();
+        payload["altitude"] = gnssRef->altitudeMeters();
+        payload["speed"] = gnssRef->speedKmph();
+        payload["course"] = gnssRef->courseDeg();
+        payload["hdop"] = 99.9; // TODO: Add HDOP to GNSSDriver
+        payload["age"] = 0;     // TODO: Add age to GNSSDriver
+    } else {
+        // GNSS not available - return default values
         payload["fix"] = false;
         payload["satellites"] = 0;
         payload["latitude"] = 0.0;
@@ -520,6 +611,8 @@ JsonObject WebSocketServer::createGNSSStatus(JsonDocument& doc) {
         payload["altitude"] = 0.0;
         payload["speed"] = 0.0;
         payload["course"] = 0.0;
+        payload["hdop"] = 99.9;
+        payload["age"] = 0;
     }
     
     return payload;
@@ -528,10 +621,23 @@ JsonObject WebSocketServer::createGNSSStatus(JsonDocument& doc) {
 JsonObject WebSocketServer::createBatteryStatus(JsonDocument& doc) {
     JsonObject payload = doc.to<JsonObject>();
     
-    // TODO: Get actual battery status
-    payload["voltage"] = 3.7;
-    payload["level"] = 75;
-    payload["charging"] = false;
+    if (batteryRef) {
+        const auto& status = batteryRef->getStatus();
+        payload["voltage"] = status.voltage;
+        payload["level"] = status.stateOfCharge;
+        payload["charging"] = (status.state == BatteryMonitor::CHARGING);
+        payload["connected"] = status.isConnected;
+        payload["critical"] = status.criticalLevel;
+        payload["state"] = BatteryMonitor::batteryStateToString(status.state);
+    } else {
+        // Battery monitor not available
+        payload["voltage"] = 0.0;
+        payload["level"] = 0;
+        payload["charging"] = false;
+        payload["connected"] = false;
+        payload["critical"] = false;
+        payload["state"] = "Unknown";
+    }
     
     return payload;
 }
@@ -649,4 +755,63 @@ String WebSocketServer::getContentType(const String& filename) {
     else if (filename.endsWith(".gz")) return "application/x-gzip";
     else if (filename.endsWith(".json")) return "application/json";
     return "text/plain";
+}
+
+JsonObject WebSocketServer::createConfigurationData(JsonDocument& doc) {
+    JsonObject payload = doc.to<JsonObject>();
+    
+    if (configRef) {
+        // Radio configuration
+        JsonObject radio = payload["radio"].to<JsonObject>();
+        const auto& radioConfig = configRef->getRadioConfig();
+        radio["frequency"] = radioConfig.frequency;
+        radio["power"] = radioConfig.txPower;
+        radio["bandwidth"] = radioConfig.bandwidth;
+        radio["spreading_factor"] = radioConfig.spreadingFactor;
+        radio["coding_rate"] = radioConfig.codingRate;
+        
+        // APRS configuration
+        JsonObject aprs = payload["aprs"].to<JsonObject>();
+        const auto& aprsConfig = configRef->getAPRSConfig();
+        aprs["callsign"] = aprsConfig.callsign;
+        aprs["ssid"] = aprsConfig.ssid;
+        aprs["beacon_interval"] = aprsConfig.beaconInterval;
+        aprs["beacon_text"] = aprsConfig.comment;
+        aprs["auto_beacon"] = aprsConfig.smartBeaconing;
+        
+        // WiFi configuration (without password for security)
+        JsonObject wifi = payload["wifi"].to<JsonObject>();
+        const auto& wifiConfig = configRef->getWiFiConfig();
+        wifi["ssid"] = wifiConfig.ssid;
+        wifi["ap_mode"] = wifiConfig.useAP;
+        
+        // System configuration
+        JsonObject system = payload["system"].to<JsonObject>();
+        extern bool displayAvailable;
+        system["oled_enabled"] = displayAvailable;
+        system["gnss_enabled"] = configRef->getGNSSConfig().enabled;
+        system["timezone"] = "UTC"; // TODO: Add timezone to config structure
+    }
+    
+    return payload;
+}
+
+JsonObject WebSocketServer::createConfigurationBackup(JsonDocument& doc) {
+    JsonObject payload = doc.to<JsonObject>();
+    
+    if (configRef) {
+        // Include all configuration data for backup
+        payload["timestamp"] = millis();
+        payload["firmware_version"] = FIRMWARE_VERSION;
+        
+        // Get full configuration
+        JsonObject config = createConfigurationData(doc);
+        payload["configuration"] = config;
+        
+        // Add additional system info
+        payload["device_id"] = WiFi.macAddress();
+        payload["backup_format_version"] = "1.0";
+    }
+    
+    return payload;
 }

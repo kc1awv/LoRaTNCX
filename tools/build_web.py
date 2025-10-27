@@ -50,14 +50,52 @@ class WebBuilder:
                 'filename': 'bootstrap-icons.min.css'
             },
             {
-                'url': f'https://cdn.jsdelivr.net/npm/chart.js@{chartjs_version}/dist/chart.min.js',
+                'url': f'https://cdn.jsdelivr.net/npm/chart.js@{chartjs_version}/dist/chart.umd.js',
                 'filename': 'chart.min.js'
+            },
+            {
+                'url': f'https://cdn.jsdelivr.net/npm/bootstrap-icons@{bootstrap_icons_version}/font/fonts/bootstrap-icons.woff2',
+                'filename': 'bootstrap-icons.woff2'
+            },
+            {
+                'url': f'https://cdn.jsdelivr.net/npm/bootstrap-icons@{bootstrap_icons_version}/font/fonts/bootstrap-icons.woff',
+                'filename': 'bootstrap-icons.woff'
             }
         ]
         
         print("Downloading external dependencies...")
         for file_info in files_to_download:
             self.download_file(file_info['url'], self.dist_dir / file_info['filename'])
+        
+        # Create fonts directory and move font files
+        self.organize_fonts()
+    
+    def organize_fonts(self):
+        """Create fonts directory and move font files to correct location"""
+        fonts_dir = self.dist_dir / 'fonts'
+        fonts_dir.mkdir(exist_ok=True)
+        
+        # Move font files to fonts directory
+        font_files = ['bootstrap-icons.woff2', 'bootstrap-icons.woff']
+        for font_file in font_files:
+            src_file = self.dist_dir / font_file
+            dst_file = fonts_dir / font_file
+            if src_file.exists():
+                shutil.move(str(src_file), str(dst_file))
+                print(f"  Moved {font_file} to fonts/")
+    
+    def create_favicon(self):
+        """Create a simple SVG favicon"""
+        favicon_content = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <circle cx="50" cy="50" r="45" fill="#0d6efd" stroke="#fff" stroke-width="3"/>
+  <text x="50" y="60" text-anchor="middle" fill="white" font-family="Arial" font-size="40" font-weight="bold">L</text>
+</svg>'''
+        
+        favicon_path = self.dist_dir / 'favicon.svg'
+        with open(favicon_path, 'w') as f:
+            f.write(favicon_content)
+        print("  Created favicon.svg")
+    
     
     def download_file(self, url, filepath):
         """Download a file from URL"""
@@ -153,10 +191,18 @@ class WebBuilder:
         """Prepare files for SPIFFS deployment"""
         print("Preparing SPIFFS data...")
         
-        # Copy all files to data directory
-        for file_path in self.dist_dir.glob('*'):
-            if file_path.is_file():
-                shutil.copy2(file_path, self.data_dir / file_path.name)
+        # Copy all files to data directory, including subdirectories
+        for item_path in self.dist_dir.glob('**/*'):
+            if item_path.is_file():
+                # Calculate relative path to preserve directory structure
+                rel_path = item_path.relative_to(self.dist_dir)
+                dest_path = self.data_dir / rel_path
+                
+                # Create parent directory if it doesn't exist
+                dest_path.parent.mkdir(parents=True, exist_ok=True)
+                
+                # Copy the file
+                shutil.copy2(item_path, dest_path)
         
         print(f"  Files copied to: {self.data_dir}")
     
@@ -169,12 +215,14 @@ class WebBuilder:
         }
         
         total_size = 0
-        for file_path in self.data_dir.glob('*'):
+        for file_path in self.data_dir.glob('**/*'):
             if file_path.is_file() and file_path.name != 'manifest.json':
                 size = file_path.stat().st_size
                 total_size += size
+                # Use relative path for manifest
+                rel_path = file_path.relative_to(self.data_dir)
                 manifest["files"].append({
-                    "name": file_path.name,
+                    "name": str(rel_path),
                     "size": size
                 })
         
@@ -197,14 +245,16 @@ class WebBuilder:
         print(f"{'File':<30} {'Size':<15} {'Type':<10}")
         print("-" * 55)
         
-        for file_path in sorted(self.data_dir.glob('*')):
+        for file_path in sorted(self.data_dir.glob('**/*')):
             if file_path.is_file():
                 size = file_path.stat().st_size
                 total_size += size
                 file_count += 1
                 
                 file_type = "Compressed" if file_path.suffix == '.gz' else "Regular"
-                print(f"{file_path.name:<30} {self.format_size(size):<15} {file_type:<10}")
+                # Use relative path for display
+                rel_path = file_path.relative_to(self.data_dir)
+                print(f"{str(rel_path):<30} {self.format_size(size):<15} {file_type:<10}")
         
         print("-" * 55)
         print(f"{'TOTAL':<30} {self.format_size(total_size):<15} {file_count} files")
@@ -230,6 +280,9 @@ class WebBuilder:
         # Download dependencies
         if download_deps:
             self.download_bootstrap()
+        
+        # Create favicon
+        self.create_favicon()
         
         # Process files
         if not self.process_html():

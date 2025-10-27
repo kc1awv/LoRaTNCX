@@ -14,8 +14,10 @@ class LoRaTNCXInterface {
     init() {
         this.setupEventListeners();
         this.setupCharts();
+        this.setupThemeToggle();
         this.connectWebSocket();
         this.startPeriodicUpdates();
+        this.loadStoredConfigurations();
     }
 
     // WebSocket Connection Management
@@ -60,6 +62,12 @@ class LoRaTNCXInterface {
             type: 'request',
             data: 'all_status'
         });
+
+        // Request current configuration
+        this.requestCurrentConfiguration();
+
+        // Add initial log message
+        this.addLogEntry({ level: 'INFO', message: 'Web interface connected to device' });
     }
 
     onWebSocketClose() {
@@ -123,6 +131,13 @@ class LoRaTNCXInterface {
                 break;
             case 'wifi':
                 this.updateWiFiData(data.payload);
+                this.updateWiFiStatus(data.payload);
+                break;
+            case 'configuration':
+                this.updateConfigurationForms(data.payload);
+                break;
+            case 'backup_config':
+                this.handleConfigurationBackup(data.payload);
                 break;
             case 'log':
                 this.addLogEntry(data.payload);
@@ -633,6 +648,184 @@ class LoRaTNCXInterface {
                 });
             }
         }, 5000);
+    }
+
+    // Theme Management
+    setupThemeToggle() {
+        // Get stored theme preference or default to auto
+        const storedTheme = localStorage.getItem('theme') || 'auto';
+        this.setTheme(storedTheme);
+
+        // Add event listeners for theme buttons
+        document.querySelectorAll('[data-theme]').forEach(button => {
+            button.addEventListener('click', () => {
+                const theme = button.getAttribute('data-theme');
+                this.setTheme(theme);
+                localStorage.setItem('theme', theme);
+            });
+        });
+
+        // Listen for system theme changes
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+            if (localStorage.getItem('theme') === 'auto') {
+                this.setTheme('auto');
+            }
+        });
+    }
+
+    setTheme(theme) {
+        const htmlElement = document.documentElement;
+        
+        if (theme === 'auto') {
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            htmlElement.setAttribute('data-bs-theme', prefersDark ? 'dark' : 'light');
+        } else {
+            htmlElement.setAttribute('data-bs-theme', theme);
+        }
+
+        // Update dropdown to show current selection
+        document.querySelectorAll('[data-theme]').forEach(button => {
+            button.classList.remove('active');
+            if (button.getAttribute('data-theme') === theme) {
+                button.classList.add('active');
+            }
+        });
+    }
+
+    // Configuration Loading
+    loadStoredConfigurations() {
+        // Request current configuration when connection is established
+        if (this.isConnected) {
+            this.requestCurrentConfiguration();
+        }
+    }
+
+    requestCurrentConfiguration() {
+        this.sendWebSocketMessage({
+            type: 'request',
+            data: 'configuration'
+        });
+    }
+
+    updateConfigurationForms(data) {
+        // Update radio configuration form
+        if (data.radio) {
+            this.setElementValue('frequency', data.radio.frequency);
+            this.setElementValue('power', data.radio.power);
+            this.setElementValue('bandwidth', data.radio.bandwidth);
+            this.setElementValue('spreading-factor', data.radio.spreading_factor);
+            this.setElementValue('coding-rate', data.radio.coding_rate);
+        }
+
+        // Update APRS configuration form
+        if (data.aprs) {
+            this.setElementValue('callsign', data.aprs.callsign);
+            this.setElementValue('ssid', data.aprs.ssid);
+            this.setElementValue('beacon-interval', data.aprs.beacon_interval);
+            this.setElementValue('beacon-text', data.aprs.beacon_text);
+            this.setElementChecked('auto-beacon', data.aprs.auto_beacon);
+        }
+
+        // Update WiFi configuration form
+        if (data.wifi) {
+            this.setElementValue('wifi-ssid-input', data.wifi.ssid);
+            // Don't populate password for security
+            this.setElementChecked('wifi-ap-mode', data.wifi.ap_mode);
+        }
+
+        // Update system configuration form
+        if (data.system) {
+            this.setElementChecked('oled-enabled', data.system.oled_enabled);
+            this.setElementChecked('gnss-enabled', data.system.gnss_enabled);
+            this.setElementValue('timezone', data.system.timezone);
+        }
+    }
+
+    updateWiFiStatus(data) {
+        // Update WiFi status card
+        this.updateElement('wifi-mode', data.ap_mode ? 'AP Mode' : 'Station Mode');
+        this.updateElement('wifi-current-ssid', data.ssid || 'N/A');
+        this.updateElement('wifi-connection-status', data.connected ? 'Connected' : 'Disconnected');
+        this.updateElement('wifi-current-ip', data.ip || 'N/A');
+
+        // Update badges
+        const modeElement = document.getElementById('wifi-mode');
+        if (modeElement) {
+            modeElement.className = data.ap_mode ? 'badge bg-primary' : 'badge bg-info';
+        }
+
+        const statusElement = document.getElementById('wifi-connection-status');
+        if (statusElement) {
+            statusElement.className = data.connected ? 'badge bg-success' : 'badge bg-danger';
+        }
+    }
+
+    setElementValue(id, value) {
+        const element = document.getElementById(id);
+        if (element && value !== undefined) {
+            element.value = value;
+        }
+    }
+
+    setElementChecked(id, checked) {
+        const element = document.getElementById(id);
+        if (element && checked !== undefined) {
+            element.checked = checked;
+        }
+    }
+
+    // System Log Management
+    addLogEntry(logData) {
+        const logContainer = document.getElementById('system-log');
+        if (logContainer && logData) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `<span class="text-muted">[${timestamp}]</span> <span class="badge bg-${this.getLogLevelColor(logData.level)}">${logData.level}</span> ${logData.message}`;
+            logContainer.appendChild(logEntry);
+            
+            // Auto-scroll to bottom
+            logContainer.scrollTop = logContainer.scrollHeight;
+            
+            // Limit log entries to prevent memory issues
+            while (logContainer.children.length > 1000) {
+                logContainer.removeChild(logContainer.firstChild);
+            }
+        }
+    }
+
+    getLogLevelColor(level) {
+        switch (level?.toUpperCase()) {
+            case 'ERROR': return 'danger';
+            case 'WARN': case 'WARNING': return 'warning';
+            case 'INFO': return 'info';
+            case 'DEBUG': return 'secondary';
+            default: return 'light';
+        }
+    }
+
+    // Backup Configuration Implementation
+    backupConfiguration() {
+        this.sendWebSocketMessage({
+            type: 'request',
+            data: 'backup_config'
+        });
+    }
+
+    handleConfigurationBackup(data) {
+        // Create and download configuration file
+        const configBlob = new Blob([JSON.stringify(data, null, 2)], 
+            { type: 'application/json' });
+        const url = URL.createObjectURL(configBlob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `loratncx_config_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        this.showSuccess('Configuration downloaded successfully');
     }
 }
 
