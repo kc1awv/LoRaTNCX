@@ -47,6 +47,16 @@ Yes, we can usually tell when code was AI-generated. But this isn't a "you don't
 
 Good question! This is a **LoRa KISS Terminal Node Controller (TNC)** for the **Heltec WiFi LoRa 32 V4** board. It's basically a fancy radio modem that speaks the KISS protocol (the packet radio standard that's older than your favorite memes) and can also pretend to be an APRS tracker when you're feeling adventurous.
 
+### Chat Application
+
+Want to test this thing out? Check out the `chat_app/` directory for a simple Python keyboard-to-keyboard chat application! It's perfect for:
+- **Testing your TNC setup** - Make sure everything works before diving into complex applications
+- **Simple packet chat** - Talk to other LoRa stations using a clean terminal interface
+- **Learning KISS protocol** - See how the protocol works in a real application
+- **Station discovery** - Automatic hello beacons help you find other stations
+
+The chat app supports both a full-featured version with colors and a simple version with minimal dependencies. See `chat_app/README.md` for details.
+
 ### Wait, What's a KISS TNC Anyway?
 
 KISS stands for "Keep It Simple, Stupid" - a protocol designed by people who were tired of complex radio modem interfaces. A TNC (Terminal Node Controller) is basically a translator between your computer and a radio, turning digital data into radio signals and back again.

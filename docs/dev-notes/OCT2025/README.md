@@ -36,6 +36,29 @@ Practical guide for developers working on the web interface:
 
 **👥 Audience**: Developers modifying, extending, or maintaining the web interface
 
+### 💬 [Chat Application Usage Guide](chat-app-usage-guide.md)
+Comprehensive guide for using the Python chat application to test the LoRaTNCX:
+- **Quick Start**: Installation and first-run instructions
+- **Detailed Usage**: Setup process, chat interface, and commands
+- **Radio Configuration**: Frequency guidelines and parameter settings
+- **Message Protocol**: Packet format and communication details
+- **Troubleshooting**: Common issues and solutions
+- **Best Practices**: Operating procedures and legal compliance
+
+**👥 Audience**: Amateur radio operators testing the LoRaTNCX, developers validating KISS protocol
+
+### 🏗️ [Chat Application Code Architecture](chat-app-code-architecture.md)
+Technical documentation of the Python chat application code created by Claude Sonnet 4:
+- **Architecture Overview**: Core components and design philosophy
+- **Protocol Implementation**: KISS frame handling and byte stuffing
+- **Threading Model**: Background reception and user interface
+- **Configuration Management**: Persistent storage and TNC setup
+- **Error Handling**: Multi-level error management strategy
+- **Testing Framework**: Protocol validation and connectivity testing
+- **Extensibility**: Future enhancement opportunities and design trade-offs
+
+**👥 Audience**: Developers studying KISS protocol implementation, contributors extending the chat application
+
 ## Quick Reference
 
 ### Key Technologies Used

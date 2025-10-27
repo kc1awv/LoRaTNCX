@@ -26,11 +26,6 @@
   
 ---
 
-- Add support for additional modulation schemes that the SX126x supports (e.g., FSK).
-  - NOT POSSIBLE WITH HELTEC WIFI LORA 32 V4 - No DIO2 pin wired to GPIO
-
----
-
 - Implement IGate functionality to forward APRS packets to the internet.
 - Better OLED graphics and status indicators, possibly using a graphics library.
 - Better OLED power management to reduce consumption when idle.
@@ -49,3 +44,9 @@
 - Implement a more modular code structure to facilitate future development and maintenance.
 - Improve documentation and add more examples for users and developers.
 - Implement unit tests and integration tests to ensure code quality and reliability.
+
+---
+
+## Can't / Won't implement
+- Add support for additional modulation schemes that the SX126x supports (e.g., FSK).
+  - NOT POSSIBLE WITH HELTEC WIFI LORA 32 V4 - DIO2 pin used as RF switch for PA on board V4 board

@@ -190,17 +190,6 @@
                         </div>
                         <div class="card-body">
                             <form id="radio-config-form">
-                                <!-- Modulation Mode Selection -->
-                                <div class="mb-3">
-                                    <label for="modulation-mode" class="form-label">Modulation Mode</label>
-                                    <select class="form-select" id="modulation-mode">
-                                        <option value="0">LoRa</option>
-                                        <option value="1">FSK</option>
-                                        <option value="2">AFSK Bell 1200</option>
-                                    </select>
-                                </div>
-                                
-                                <!-- Common Parameters -->
                                 <div class="mb-3">
                                     <label for="frequency" class="form-label">Frequency (MHz)</label>
                                     <input type="number" class="form-control" id="frequency" step="0.001" min="410" max="928">
@@ -214,63 +203,42 @@
                                         <small>20 dBm</small>
                                     </div>
                                 </div>
-                                
-                                <!-- LoRa-specific Parameters -->
-                                <div id="lora-params">
-                                    <div class="mb-3">
-                                        <label for="bandwidth" class="form-label">LoRa Bandwidth</label>
-                                        <select class="form-select" id="bandwidth">
-                                            <option value="7800">7.8 kHz</option>
-                                            <option value="10400">10.4 kHz</option>
-                                            <option value="15600">15.6 kHz</option>
-                                            <option value="20800">20.8 kHz</option>
-                                            <option value="31250">31.25 kHz</option>
-                                            <option value="41700">41.7 kHz</option>
-                                            <option value="62500">62.5 kHz</option>
-                                            <option value="125000">125 kHz</option>
-                                            <option value="250000">250 kHz</option>
-                                            <option value="500000">500 kHz</option>
-                                        </select>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="spreading-factor" class="form-label">Spreading Factor</label>
-                                        <select class="form-select" id="spreading-factor">
-                                            <option value="6">SF6</option>
-                                            <option value="7">SF7</option>
-                                            <option value="8">SF8</option>
-                                            <option value="9">SF9</option>
-                                            <option value="10">SF10</option>
-                                            <option value="11">SF11</option>
-                                            <option value="12">SF12</option>
-                                        </select>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="coding-rate" class="form-label">Coding Rate</label>
-                                        <select class="form-select" id="coding-rate">
-                                            <option value="5">4/5</option>
-                                            <option value="6">4/6</option>
-                                            <option value="7">4/7</option>
-                                            <option value="8">4/8</option>
-                                        </select>
-                                    </div>
+                                <div class="mb-3">
+                                    <label for="bandwidth" class="form-label">Bandwidth</label>
+                                    <select class="form-select" id="bandwidth">
+                                        <option value="7800">7.8 kHz</option>
+                                        <option value="10400">10.4 kHz</option>
+                                        <option value="15600">15.6 kHz</option>
+                                        <option value="20800">20.8 kHz</option>
+                                        <option value="31250">31.25 kHz</option>
+                                        <option value="41700">41.7 kHz</option>
+                                        <option value="62500">62.5 kHz</option>
+                                        <option value="125000">125 kHz</option>
+                                        <option value="250000">250 kHz</option>
+                                        <option value="500000">500 kHz</option>
+                                    </select>
                                 </div>
-                                
-                                <!-- FSK-specific Parameters -->
-                                <div id="fsk-params" style="display: none;">
-                                    <div class="mb-3">
-                                        <label for="fsk-bandwidth" class="form-label">RX Bandwidth (kHz)</label>
-                                        <input type="number" class="form-control" id="fsk-bandwidth" step="0.1" min="4.8" max="467" value="156.2">
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="bit-rate" class="form-label">Bit Rate (kbps)</label>
-                                        <input type="number" class="form-control" id="bit-rate" step="0.1" min="0.6" max="300" value="4.8">
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="freq-deviation" class="form-label">Frequency Deviation (kHz)</label>
-                                        <input type="number" class="form-control" id="freq-deviation" step="0.1" min="0.6" max="200" value="5.0">
-                                    </div>
+                                <div class="mb-3">
+                                    <label for="spreading-factor" class="form-label">Spreading Factor</label>
+                                    <select class="form-select" id="spreading-factor">
+                                        <option value="6">SF6</option>
+                                        <option value="7">SF7</option>
+                                        <option value="8">SF8</option>
+                                        <option value="9">SF9</option>
+                                        <option value="10">SF10</option>
+                                        <option value="11">SF11</option>
+                                        <option value="12">SF12</option>
+                                    </select>
                                 </div>
-                                
+                                <div class="mb-3">
+                                    <label for="coding-rate" class="form-label">Coding Rate</label>
+                                    <select class="form-select" id="coding-rate">
+                                        <option value="5">4/5</option>
+                                        <option value="6">4/6</option>
+                                        <option value="7">4/7</option>
+                                        <option value="8">4/8</option>
+                                    </select>
+                                </div>
                                 <button type="submit" class="btn btn-primary">Apply Settings</button>
                             </form>
                         </div>
