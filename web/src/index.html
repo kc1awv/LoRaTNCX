@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LoRaTNCX Web Interface</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="style.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class="bi bi-broadcast"></i> LoRaTNCX
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#dashboard" data-tab="dashboard">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#radio" data-tab="radio">Radio</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#aprs" data-tab="aprs">APRS</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#config" data-tab="config">Configuration</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#system" data-tab="system">System</a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <span class="navbar-text">
+                            <span id="connection-status" class="badge bg-danger">Disconnected</span>
+                        </span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container-fluid mt-3">
+        <!-- Dashboard Tab -->
+        <div id="dashboard-tab" class="tab-content active">
+            <div class="row">
+                <!-- Status Cards -->
+                <div class="col-md-3 mb-3">
+                    <div class="card border-primary">
+                        <div class="card-body">
+                            <h5 class="card-title text-primary">
+                                <i class="bi bi-broadcast"></i> Radio Status
+                            </h5>
+                            <p class="card-text">
+                                <strong>Frequency:</strong> <span id="radio-frequency">433.775 MHz</span><br>
+                                <strong>Power:</strong> <span id="radio-power">20 dBm</span><br>
+                                <strong>RSSI:</strong> <span id="radio-rssi">-95 dBm</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-3 mb-3">
+                    <div class="card border-success">
+                        <div class="card-body">
+                            <h5 class="card-title text-success">
+                                <i class="bi bi-geo-alt"></i> GNSS Status
+                            </h5>
+                            <p class="card-text">
+                                <strong>Fix:</strong> <span id="gnss-fix">No Fix</span><br>
+                                <strong>Satellites:</strong> <span id="gnss-sats">0</span><br>
+                                <strong>Location:</strong> <span id="gnss-location">N/A</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-3 mb-3">
+                    <div class="card border-warning">
+                        <div class="card-body">
+                            <h5 class="card-title text-warning">
+                                <i class="bi bi-battery-half"></i> Battery
+                            </h5>
+                            <p class="card-text">
+                                <strong>Voltage:</strong> <span id="battery-voltage">N/A</span><br>
+                                <strong>Level:</strong> <span id="battery-level">N/A</span><br>
+                                <strong>Charging:</strong> <span id="battery-charging">No</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-3 mb-3">
+                    <div class="card border-info">
+                        <div class="card-body">
+                            <h5 class="card-title text-info">
+                                <i class="bi bi-wifi"></i> Network
+                            </h5>
+                            <p class="card-text">
+                                <strong>WiFi:</strong> <span id="wifi-status">Connected</span><br>
+                                <strong>IP:</strong> <span id="wifi-ip">192.168.1.100</span><br>
+                                <strong>SSID:</strong> <span id="wifi-ssid">MyNetwork</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Real-time Data Charts -->
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-graph-up"></i> Signal Strength (RSSI)</h5>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="rssi-chart" width="400" height="200"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 mb-3">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-activity"></i> Packet Activity</h5>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="packet-chart" width="400" height="200"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent APRS Messages -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-chat-dots"></i> Recent APRS Messages</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-striped table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Time</th>
+                                            <th>From</th>
+                                            <th>To</th>
+                                            <th>Message</th>
+                                            <th>RSSI</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="aprs-messages">
+                                        <!-- Dynamic content -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Radio Tab -->
+        <div id="radio-tab" class="tab-content">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-sliders"></i> Radio Configuration</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="radio-config-form">
+                                <div class="mb-3">
+                                    <label for="frequency" class="form-label">Frequency (MHz)</label>
+                                    <input type="number" class="form-control" id="frequency" step="0.001" min="410" max="928">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="power" class="form-label">Power (dBm)</label>
+                                    <input type="range" class="form-range" id="power" min="2" max="20" step="1">
+                                    <div class="d-flex justify-content-between">
+                                        <small>2 dBm</small>
+                                        <small id="power-value">20 dBm</small>
+                                        <small>20 dBm</small>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="bandwidth" class="form-label">Bandwidth</label>
+                                    <select class="form-select" id="bandwidth">
+                                        <option value="7800">7.8 kHz</option>
+                                        <option value="10400">10.4 kHz</option>
+                                        <option value="15600">15.6 kHz</option>
+                                        <option value="20800">20.8 kHz</option>
+                                        <option value="31250">31.25 kHz</option>
+                                        <option value="41700">41.7 kHz</option>
+                                        <option value="62500">62.5 kHz</option>
+                                        <option value="125000">125 kHz</option>
+                                        <option value="250000">250 kHz</option>
+                                        <option value="500000">500 kHz</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="spreading-factor" class="form-label">Spreading Factor</label>
+                                    <select class="form-select" id="spreading-factor">
+                                        <option value="6">SF6</option>
+                                        <option value="7">SF7</option>
+                                        <option value="8">SF8</option>
+                                        <option value="9">SF9</option>
+                                        <option value="10">SF10</option>
+                                        <option value="11">SF11</option>
+                                        <option value="12">SF12</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="coding-rate" class="form-label">Coding Rate</label>
+                                    <select class="form-select" id="coding-rate">
+                                        <option value="5">4/5</option>
+                                        <option value="6">4/6</option>
+                                        <option value="7">4/7</option>
+                                        <option value="8">4/8</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Apply Settings</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-info-circle"></i> Radio Status</h5>
+                        </div>
+                        <div class="card-body">
+                            <dl class="row">
+                                <dt class="col-sm-4">Current RSSI:</dt>
+                                <dd class="col-sm-8" id="current-rssi">-95 dBm</dd>
+                                
+                                <dt class="col-sm-4">SNR:</dt>
+                                <dd class="col-sm-8" id="current-snr">8.5 dB</dd>
+                                
+                                <dt class="col-sm-4">Packets TX:</dt>
+                                <dd class="col-sm-8" id="packets-tx">142</dd>
+                                
+                                <dt class="col-sm-4">Packets RX:</dt>
+                                <dd class="col-sm-8" id="packets-rx">87</dd>
+                                
+                                <dt class="col-sm-4">CRC Errors:</dt>
+                                <dd class="col-sm-8" id="crc-errors">3</dd>
+                                
+                                <dt class="col-sm-4">Last TX:</dt>
+                                <dd class="col-sm-8" id="last-tx">2 minutes ago</dd>
+                                
+                                <dt class="col-sm-4">Last RX:</dt>
+                                <dd class="col-sm-8" id="last-rx">45 seconds ago</dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- APRS Tab -->
+        <div id="aprs-tab" class="tab-content">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-person-badge"></i> APRS Configuration</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="aprs-config-form">
+                                <div class="mb-3">
+                                    <label for="callsign" class="form-label">Callsign</label>
+                                    <input type="text" class="form-control" id="callsign" placeholder="N0CALL">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="ssid" class="form-label">SSID</label>
+                                    <input type="number" class="form-control" id="ssid" min="0" max="15" value="1">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="beacon-interval" class="form-label">Beacon Interval (minutes)</label>
+                                    <input type="number" class="form-control" id="beacon-interval" min="1" max="60" value="10">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="beacon-text" class="form-label">Beacon Text</label>
+                                    <textarea class="form-control" id="beacon-text" rows="3" placeholder="LoRaTNCX APRS Beacon"></textarea>
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="auto-beacon">
+                                    <label class="form-check-label" for="auto-beacon">
+                                        Enable Auto Beacon
+                                    </label>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Save APRS Settings</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-send"></i> Send APRS Message</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="send-message-form">
+                                <div class="mb-3">
+                                    <label for="msg-callsign" class="form-label">To Callsign</label>
+                                    <input type="text" class="form-control" id="msg-callsign" placeholder="N0CALL">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="message-text" class="form-label">Message</label>
+                                    <textarea class="form-control" id="message-text" rows="3" maxlength="67" placeholder="Your message here..."></textarea>
+                                    <div class="form-text">
+                                        <span id="char-count">0</span>/67 characters
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-success">Send Message</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Configuration Tab -->
+        <div id="config-tab" class="tab-content">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-wifi"></i> WiFi Configuration</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="wifi-config-form">
+                                <div class="mb-3">
+                                    <label for="wifi-ssid-input" class="form-label">SSID</label>
+                                    <input type="text" class="form-control" id="wifi-ssid-input">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="wifi-password" class="form-label">Password</label>
+                                    <input type="password" class="form-control" id="wifi-password">
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="wifi-ap-mode">
+                                    <label class="form-check-label" for="wifi-ap-mode">
+                                        Enable Access Point Mode
+                                    </label>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Save WiFi Settings</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-gear"></i> System Configuration</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="system-config-form">
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="oled-enabled">
+                                    <label class="form-check-label" for="oled-enabled">
+                                        Enable OLED Display
+                                    </label>
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="gnss-enabled">
+                                    <label class="form-check-label" for="gnss-enabled">
+                                        Enable GNSS
+                                    </label>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="timezone" class="form-label">Timezone</label>
+                                    <select class="form-select" id="timezone">
+                                        <option value="UTC">UTC</option>
+                                        <option value="EST">Eastern Time</option>
+                                        <option value="CST">Central Time</option>
+                                        <option value="MST">Mountain Time</option>
+                                        <option value="PST">Pacific Time</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Save System Settings</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Tab -->
+        <div id="system-tab" class="tab-content">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-cpu"></i> System Information</h5>
+                        </div>
+                        <div class="card-body">
+                            <dl class="row">
+                                <dt class="col-sm-5">Firmware Version:</dt>
+                                <dd class="col-sm-7" id="firmware-version">1.0.0</dd>
+                                
+                                <dt class="col-sm-5">Uptime:</dt>
+                                <dd class="col-sm-7" id="uptime">2d 14h 32m</dd>
+                                
+                                <dt class="col-sm-5">Free Heap:</dt>
+                                <dd class="col-sm-7" id="free-heap">245KB</dd>
+                                
+                                <dt class="col-sm-5">Flash Usage:</dt>
+                                <dd class="col-sm-7" id="flash-usage">2.1MB / 16MB</dd>
+                                
+                                <dt class="col-sm-5">SPIFFS Usage:</dt>
+                                <dd class="col-sm-7" id="spiffs-usage">1.2MB / 9.3MB</dd>
+                                
+                                <dt class="col-sm-5">CPU Temperature:</dt>
+                                <dd class="col-sm-7" id="cpu-temp">42°C</dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-tools"></i> System Actions</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-warning" id="restart-btn">
+                                    <i class="bi bi-arrow-clockwise"></i> Restart Device
+                                </button>
+                                <button class="btn btn-info" id="factory-reset-btn">
+                                    <i class="bi bi-arrow-counterclockwise"></i> Factory Reset
+                                </button>
+                                <button class="btn btn-success" id="backup-config-btn">
+                                    <i class="bi bi-download"></i> Backup Configuration
+                                </button>
+                                <button class="btn btn-primary" id="restore-config-btn">
+                                    <i class="bi bi-upload"></i> Restore Configuration
+                                </button>
+                            </div>
+                            <hr>
+                            <h6>OTA Update</h6>
+                            <div class="mb-3">
+                                <input type="file" class="form-control" id="firmware-file" accept=".bin">
+                            </div>
+                            <button class="btn btn-danger" id="ota-update-btn">
+                                <i class="bi bi-cloud-upload"></i> Start OTA Update
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Log -->
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-journal-text"></i> System Log</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="system-log" class="bg-dark text-light p-3" style="height: 300px; overflow-y: auto; font-family: monospace;">
+                                <!-- Log entries will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Chart.js for graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom JS -->
+    <script src="app.js"></script>
+</body>
+</html>

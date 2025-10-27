@@ -1,0 +1,63 @@
+{
+  "build_time": "2024-10-27T12:00:00Z",
+  "version": "1.0.0",
+  "files": [
+    {
+      "name": "bootstrap.min.css",
+      "size": 232948
+    },
+    {
+      "name": "bootstrap.bundle.min.js",
+      "size": 80663
+    },
+    {
+      "name": "bootstrap-icons.min.css",
+      "size": 85875
+    },
+    {
+      "name": "chart.min.js",
+      "size": 183850
+    },
+    {
+      "name": "index.html",
+      "size": 25664
+    },
+    {
+      "name": "style.css",
+      "size": 4578
+    },
+    {
+      "name": "app.js",
+      "size": 20910
+    },
+    {
+      "name": "bootstrap.min.css.gz",
+      "size": 30858
+    },
+    {
+      "name": "bootstrap.bundle.min.js.gz",
+      "size": 23712
+    },
+    {
+      "name": "bootstrap-icons.min.css.gz",
+      "size": 13287
+    },
+    {
+      "name": "chart.min.js.gz",
+      "size": 57282
+    },
+    {
+      "name": "index.html.gz",
+      "size": 3414
+    },
+    {
+      "name": "style.css.gz",
+      "size": 1447
+    },
+    {
+      "name": "app.js.gz",
+      "size": 4719
+    }
+  ],
+  "total_size": 769207
+}

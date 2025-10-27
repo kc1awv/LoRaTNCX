@@ -16,6 +16,8 @@
 #include "DisplayManager.h"
 #include "ErrorHandler.h"
 #include "OTA.h"
+#include "WebSocketServer.h"
+#include <ESPAsyncWebServer.h>
 
 #ifndef WIFI_SSID
 #define WIFI_SSID "LoRaTNCX"
@@ -42,6 +44,9 @@ WiFiServer kissServer(TCP_KISS_PORT);
 WiFiServer nmeaServer(TCP_NMEA_PORT);
 WiFiClient kissClient;
 WiFiClient nmeaClient;
+
+// Web server for the interface
+AsyncWebServer webServer(WEB_SERVER_PORT);
 
 static unsigned long lastPpsCheck = 0;
 static int lastPpsState = -1;
@@ -1089,6 +1094,18 @@ void setupWiFi()
   Serial.printf("[NET] KISS server on port %d\n", TCP_KISS_PORT);
   Serial.printf("[NET] NMEA server on port %d\n", TCP_NMEA_PORT);
 
+  // Initialize WebSocket server for web interface
+  WebSocketServer::begin(webServer);
+  WebSocketServer::setRadio(&radio);
+  WebSocketServer::setGNSS(&gnss);
+  WebSocketServer::setKISS(&kiss);
+  WebSocketServer::setConfig(&config);
+  
+  // Start web server
+  webServer.begin();
+  Serial.printf("[NET] Web server started on port %d\n", WEB_SERVER_PORT);
+  Serial.println("[NET] Web interface available at http://[device-ip]/");
+
   if (displayAvailable)
   {
     delay(1000);
@@ -1530,6 +1547,9 @@ void loop()
   FEED_WATCHDOG();
 
   serviceTCP();
+
+  // Handle WebSocket server
+  WebSocketServer::handle();
 
   // Feed watchdog after network processing
   FEED_WATCHDOG();
