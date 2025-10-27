@@ -23,8 +23,8 @@ FEND CMD [DATA...] FEND
 
 To prevent confusion between data bytes and frame markers, the following substitutions are applied:
 
-| Original | Escaped Sequence | Description |
-|----------|------------------|-------------|
+| Original    | Escaped Sequence       | Description              |
+| ----------- | ---------------------- | ------------------------ |
 | 0xC0 (FEND) | 0xDB 0xDC (FESC+TFEND) | Frame End marker in data |
 | 0xDB (FESC) | 0xDB 0xDD (FESC+TFESC) | Escape character in data |
 
@@ -102,9 +102,9 @@ Configures LoRa operating frequency.
 - **Example**: 433.175 MHz = `C0 06 01 AE 47 D8 43 C0`
 
 **Regional Frequency Guidelines:**
-- ISM 433 MHz: 433.050 - 434.790 MHz (Europe, ITU Region 1)
-- ISM 868 MHz: 863.000 - 870.000 MHz (Europe, ITU Region 1) 
-- ISM 915 MHz: 902.000 - 928.000 MHz (North America, ITU Region 2)
+- ISM 433 MHz: 433.050 - 434.790 MHz (EMEA & Russia, APAC, ITU Regions 1 & 3)
+- ISM 868 MHz: 863.000 - 870.000 MHz (Europe / CEPT / ETSI) 
+- ISM 915 MHz: 902.000 - 928.000 MHz (The Americas, ITU Region 2)
 - Amateur bands: Check your license privileges and local band plans
 
 #### Set TX Power (0x06 0x02)
@@ -220,8 +220,8 @@ KISS frame: C0 06 01 AE 47 D8 43 C0
 TX power uses signed 8-bit integer format (two's complement).
 
 **Examples:**
-- +14 dBm: 0x0E
-- -3 dBm: 0xFD (253 decimal)
+- +14 dBm: `0x0E`
+- -3 dBm: `0xFD` (253 decimal)
 
 ## Programming Examples
 
