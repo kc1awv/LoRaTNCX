@@ -9,7 +9,7 @@ Before troubleshooting specific issues, ensure you understand the system's norma
 - OLED display shows status information and updates every 2 seconds
 - WiFi connects automatically or falls back to AP mode
 - Serial interface responds to `+++` configuration menu within 2 seconds
-- Web interface accessible at device IP address
+- Web interface accessible at device IP address - in ✨the future✨ (it's something to work towards!)
 
 ## Hardware Issues
 
