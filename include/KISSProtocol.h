@@ -40,6 +40,27 @@
 #define KISS_DEFAULT_TXTAIL       30    // 300ms (though obsolete)
 #define KISS_DEFAULT_FULLDUPLEX   0     // Half duplex
 
+// LoRa SetHardware Parameter IDs (used with KISS_CMD_SETHARDWARE)
+#define LORA_HW_FREQUENCY         0x00    // Frequency in Hz (4 bytes, little-endian)
+#define LORA_HW_TX_POWER          0x01    // TX Power in dBm (1 byte, signed)
+#define LORA_HW_BANDWIDTH         0x02    // Bandwidth index (1 byte)
+#define LORA_HW_SPREADING_FACTOR  0x03    // Spreading Factor 6-12 (1 byte)
+#define LORA_HW_CODING_RATE       0x04    // Coding Rate 5-8 (1 byte)
+#define LORA_HW_SYNC_WORD         0x05    // Sync Word (1 byte)
+#define LORA_HW_PREAMBLE_LENGTH   0x06    // Preamble Length (2 bytes)
+
+// LoRa Bandwidth Index Values
+#define LORA_BW_7_8_KHZ     0x00    // 7.8 kHz
+#define LORA_BW_10_4_KHZ    0x01    // 10.4 kHz  
+#define LORA_BW_15_6_KHZ    0x02    // 15.6 kHz
+#define LORA_BW_20_8_KHZ    0x03    // 20.8 kHz
+#define LORA_BW_31_25_KHZ   0x04    // 31.25 kHz
+#define LORA_BW_41_7_KHZ    0x05    // 41.7 kHz
+#define LORA_BW_62_5_KHZ    0x06    // 62.5 kHz
+#define LORA_BW_125_KHZ     0x07    // 125 kHz (default)
+#define LORA_BW_250_KHZ     0x08    // 250 kHz
+#define LORA_BW_500_KHZ     0x09    // 500 kHz
+
 // Buffer sizes
 #define KISS_MAX_FRAME_SIZE   512
 #define KISS_RX_BUFFER_SIZE   1024
@@ -68,6 +89,7 @@ public:
     // Command Frame Helpers
     bool encodeCommandFrame(uint8_t command, uint8_t parameter, uint8_t port, uint8_t* output, size_t* outputLen);
     bool processCommand(uint8_t command, uint8_t parameter, uint8_t port);
+    bool processSetHardwareCommand(const uint8_t* data, size_t length, uint8_t port);
     
     // Stream Processing (for serial interface)
     void processInputStream(uint8_t byte);
@@ -87,6 +109,10 @@ public:
     void setTxTail(uint8_t value) { txTail = value; }
     void setFullDuplex(bool value) { fullDuplex = value; }
     
+    // Hardware Control  
+    bool handleSetHardware(uint8_t parameter, const uint8_t* data, size_t dataLen);
+    void setLoRaRadio(class LoRaRadio* radio) { loraRadio = radio; }
+    
     // Status
     void printParameters();
     
@@ -97,6 +123,9 @@ private:
     uint8_t slotTime;       // Slot time (10ms units)
     uint8_t txTail;         // TX tail time (10ms units) - obsolete
     bool fullDuplex;        // Full duplex mode
+    
+    // Hardware reference
+    class LoRaRadio* loraRadio;  // Pointer to LoRa radio for hardware control
     
     // Stream processing state
     uint8_t rxBuffer[KISS_RX_BUFFER_SIZE];

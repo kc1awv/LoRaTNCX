@@ -49,7 +49,11 @@ public:
     
     // Initialization
     bool begin();
-    void setLoRaRadio(LoRaRadio* radio) { loraRadio = radio; }
+    void setLoRaRadio(LoRaRadio* radio) { 
+        loraRadio = radio; 
+        // Also update KISS protocol so SetHardware commands work
+        kissProtocol.setLoRaRadio(radio);
+    }
     
     // Main processing loop
     void update();

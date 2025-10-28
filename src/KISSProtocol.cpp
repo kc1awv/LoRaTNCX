@@ -5,7 +5,10 @@
  * @date October 28, 2025
  */
 
+#include <Arduino.h>
+#include "HardwareConfig.h"
 #include "KISSProtocol.h"
+#include "LoRaRadio.h"
 
 KISSProtocol::KISSProtocol() :
     txDelay(KISS_DEFAULT_TXDELAY),
@@ -13,6 +16,7 @@ KISSProtocol::KISSProtocol() :
     slotTime(KISS_DEFAULT_SLOTTIME),
     txTail(KISS_DEFAULT_TXTAIL),
     fullDuplex(KISS_DEFAULT_FULLDUPLEX),
+    loraRadio(nullptr),
     rxBufferIndex(0),
     inEscapeMode(false),
     frameComplete(false),
@@ -136,7 +140,9 @@ bool KISSProtocol::encodeCommandFrame(uint8_t command, uint8_t parameter, uint8_
 }
 
 bool KISSProtocol::processCommand(uint8_t command, uint8_t parameter, uint8_t port) {
+    #if DEBUG_KISS_VERBOSE
     Serial.printf("KISS: Processing command 0x%02X, param=0x%02X, port=%d\n", command, parameter, port);
+    #endif
     
     switch (command) {
         case KISS_CMD_TXDELAY:
@@ -165,8 +171,10 @@ bool KISSProtocol::processCommand(uint8_t command, uint8_t parameter, uint8_t po
             break;
             
         case KISS_CMD_SETHARDWARE:
-            Serial.printf("KISS: Hardware command 0x%02X - implementation specific\n", parameter);
-            // Hardware-specific implementation would go here
+            Serial.printf("KISS: Hardware command parameter 0x%02X\n", parameter);
+            // Handle hardware-specific commands (LoRa parameters)
+            // Note: For SetHardware, additional data may follow in the frame
+            handleSetHardware(parameter, nullptr, 0);  // Basic handling for now
             break;
             
         case KISS_CMD_RETURN:
@@ -180,6 +188,40 @@ bool KISSProtocol::processCommand(uint8_t command, uint8_t parameter, uint8_t po
     }
     
     return true;
+}
+
+bool KISSProtocol::processSetHardwareCommand(const uint8_t* data, size_t length, uint8_t port) {
+    #if DEBUG_KISS_VERBOSE
+    Serial.printf("KISS: Processing SetHardware command (port=%d, length=%d)\n", port, length);
+    #endif
+    
+    if (length < 1) {
+        #if DEBUG_KISS_VERBOSE
+        Serial.println("KISS: SetHardware command too short");
+        #endif
+        return false;
+    }
+    
+    uint8_t parameter = data[0];
+    const uint8_t* paramData = (length > 1) ? &data[1] : nullptr;
+    size_t paramDataLen = (length > 1) ? length - 1 : 0;
+    
+    #if DEBUG_KISS_VERBOSE
+    Serial.printf("KISS: SetHardware parameter=0x%02X, dataLen=%d\n", parameter, paramDataLen);
+    #endif
+    
+    // Call the existing handleSetHardware method with proper data
+    bool result = handleSetHardware(parameter, paramData, paramDataLen);
+    
+    #if DEBUG_KISS_VERBOSE
+    if (result) {
+        Serial.println("KISS: SetHardware command successful");
+    } else {
+        Serial.println("KISS: SetHardware command failed");
+    }
+    #endif
+    
+    return result;
 }
 
 void KISSProtocol::processInputStream(uint8_t byte) {
@@ -313,4 +355,88 @@ size_t KISSProtocol::unescapeData(const uint8_t* input, size_t inputLen, uint8_t
     }
     
     return outputIndex;
+}bool KISSProtocol::handleSetHardware(uint8_t parameter, const uint8_t* data, size_t dataLen) {
+    if (!loraRadio) {
+        Serial.println("KISS: No LoRa radio configured for hardware commands");
+        return false;
+    }
+    
+    switch (parameter) {
+        case LORA_HW_FREQUENCY:
+            if (dataLen >= 4) {
+                // Frequency in Hz, little-endian format
+                uint32_t freqHz = data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24);
+                float freqMHz = freqHz / 1000000.0f;
+                Serial.printf("KISS: Setting frequency to %.3f MHz\n", freqMHz);
+                return loraRadio->setFrequency(freqMHz);
+            }
+            Serial.println("KISS: Invalid frequency data length");
+            return false;
+            
+        case LORA_HW_TX_POWER:
+            if (dataLen >= 1) {
+                int8_t power = (int8_t)data[0];
+                Serial.printf("KISS: Setting TX power to %d dBm\n", power);
+                return loraRadio->setTxPower(power);
+            }
+            Serial.println("KISS: Invalid TX power data length");
+            return false;
+            
+        case LORA_HW_BANDWIDTH:
+            if (dataLen >= 1) {
+                uint8_t bwIndex = data[0];
+                float bandwidth;
+                switch (bwIndex) {
+                    case LORA_BW_7_8_KHZ:   bandwidth = 7.8f; break;
+                    case LORA_BW_10_4_KHZ:  bandwidth = 10.4f; break;
+                    case LORA_BW_15_6_KHZ:  bandwidth = 15.6f; break;
+                    case LORA_BW_20_8_KHZ:  bandwidth = 20.8f; break;
+                    case LORA_BW_31_25_KHZ: bandwidth = 31.25f; break;
+                    case LORA_BW_41_7_KHZ:  bandwidth = 41.7f; break;
+                    case LORA_BW_62_5_KHZ:  bandwidth = 62.5f; break;
+                    case LORA_BW_125_KHZ:   bandwidth = 125.0f; break;
+                    case LORA_BW_250_KHZ:   bandwidth = 250.0f; break;
+                    case LORA_BW_500_KHZ:   bandwidth = 500.0f; break;
+                    default:
+                        Serial.printf("KISS: Invalid bandwidth index %d\n", bwIndex);
+                        return false;
+                }
+                Serial.printf("KISS: Setting bandwidth to %.1f kHz\n", bandwidth);
+                return loraRadio->setBandwidth(bandwidth);
+            }
+            Serial.println("KISS: Invalid bandwidth data length");
+            return false;
+            
+        case LORA_HW_SPREADING_FACTOR:
+            if (dataLen >= 1) {
+                uint8_t sf = data[0];
+                if (sf >= 6 && sf <= 12) {
+                    Serial.printf("KISS: Setting spreading factor to SF%d\n", sf);
+                    return loraRadio->setSpreadingFactor(sf);
+                } else {
+                    Serial.printf("KISS: Invalid spreading factor %d (must be 6-12)\n", sf);
+                    return false;
+                }
+            }
+            Serial.println("KISS: Invalid spreading factor data length");
+            return false;
+            
+        case LORA_HW_CODING_RATE:
+            if (dataLen >= 1) {
+                uint8_t cr = data[0];
+                if (cr >= 5 && cr <= 8) {
+                    Serial.printf("KISS: Setting coding rate to 4/%d\n", cr);
+                    return loraRadio->setCodingRate(cr);
+                } else {
+                    Serial.printf("KISS: Invalid coding rate %d (must be 5-8)\n", cr);
+                    return false;
+                }
+            }
+            Serial.println("KISS: Invalid coding rate data length");
+            return false;
+            
+        default:
+            Serial.printf("KISS: Unknown hardware parameter 0x%02X\n", parameter);
+            return false;
+    }
 }

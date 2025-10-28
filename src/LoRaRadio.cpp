@@ -93,10 +93,14 @@ bool LoRaRadio::setFrequency(float frequency) {
     int state = radio->setFrequency(frequency);
     if (state == RADIOLIB_ERR_NONE) {
         currentFrequency = frequency;
+        #if DEBUG_RADIO_VERBOSE
         Serial.printf("Frequency set to %.1f MHz\n", frequency);
+        #endif
         return true;
     } else {
+        #if DEBUG_RADIO_VERBOSE
         Serial.printf("Failed to set frequency, code %d\n", state);
+        #endif
         return false;
     }
 }
@@ -111,10 +115,14 @@ bool LoRaRadio::setTxPower(int8_t power) {
     int state = radio->setOutputPower(power);
     if (state == RADIOLIB_ERR_NONE) {
         currentTxPower = power;
+        #if DEBUG_RADIO_VERBOSE
         Serial.printf("TX Power set to %d dBm\n", power);
+        #endif
         return true;
     } else {
+        #if DEBUG_RADIO_VERBOSE
         Serial.printf("Failed to set TX power, code %d\n", state);
+        #endif
         return false;
     }
 }
@@ -125,10 +133,14 @@ bool LoRaRadio::setBandwidth(float bandwidth) {
     int state = radio->setBandwidth(bandwidth);
     if (state == RADIOLIB_ERR_NONE) {
         currentBandwidth = bandwidth;
+        #if DEBUG_RADIO_VERBOSE
         Serial.printf("Bandwidth set to %.1f kHz\n", bandwidth);
+        #endif
         return true;
     } else {
+        #if DEBUG_RADIO_VERBOSE
         Serial.printf("Failed to set bandwidth, code %d\n", state);
+        #endif
         return false;
     }
 }
@@ -139,10 +151,14 @@ bool LoRaRadio::setSpreadingFactor(uint8_t sf) {
     int state = radio->setSpreadingFactor(sf);
     if (state == RADIOLIB_ERR_NONE) {
         currentSpreadingFactor = sf;
+        #if DEBUG_RADIO_VERBOSE
         Serial.printf("Spreading Factor set to %d\n", sf);
+        #endif
         return true;
     } else {
+        #if DEBUG_RADIO_VERBOSE
         Serial.printf("Failed to set spreading factor, code %d\n", state);
+        #endif
         return false;
     }
 }
@@ -153,10 +169,14 @@ bool LoRaRadio::setCodingRate(uint8_t cr) {
     int state = radio->setCodingRate(cr);
     if (state == RADIOLIB_ERR_NONE) {
         currentCodingRate = cr;
+        #if DEBUG_RADIO_VERBOSE
         Serial.printf("Coding Rate set to 4/%d\n", cr);
+        #endif
         return true;
     } else {
+        #if DEBUG_RADIO_VERBOSE
         Serial.printf("Failed to set coding rate, code %d\n", state);
+        #endif
         return false;
     }
 }

@@ -41,6 +41,12 @@ bool TNCManager::begin() {
         return false;
     }
     
+    // Connect LoRa radio to KISS protocol for hardware commands
+    if (loraRadio) {
+        kissProtocol.setLoRaRadio(loraRadio);
+        Serial.println("LoRa radio connected to KISS protocol");
+    }
+    
     // Initialize command parser
     if (!commandParser.begin()) {
         Serial.println("Failed to initialize command parser");
@@ -351,10 +357,16 @@ void TNCManager::processKissFrame(const uint8_t* data, size_t length, uint8_t po
         case KISS_CMD_SLOTTIME:
         case KISS_CMD_TXTAIL:
         case KISS_CMD_FULLDUPLEX:
-        case KISS_CMD_SETHARDWARE:
-            // Parameter commands
+            // Single parameter commands
             if (length > 0) {
                 kissProtocol.processCommand(command, data[0], port);
+            }
+            break;
+            
+        case KISS_CMD_SETHARDWARE:
+            // Hardware parameter commands - need full data payload
+            if (length > 0) {
+                kissProtocol.processSetHardwareCommand(data, length, port);
             }
             break;
             

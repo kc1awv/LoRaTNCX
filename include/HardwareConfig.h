@@ -44,6 +44,14 @@
 #define DISPLAY_ENABLED    true
 
 // ==========================================
+// DEBUG CONFIGURATION  
+// ==========================================
+// Control debug output for performance optimization
+#define DEBUG_KISS_VERBOSE     false  // Disable verbose KISS debug output
+#define DEBUG_RADIO_VERBOSE    false  // Disable verbose radio debug output
+#define DEBUG_COMMAND_VERBOSE  false  // Disable verbose command debug output
+
+// ==========================================
 // STATUS LED CONFIGURATION
 // ==========================================
 #define STATUS_LED_PIN     LED_BUILTIN  // Built-in LED (Pin 35)

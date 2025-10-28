@@ -80,6 +80,6 @@ void loop()
         lastBlink = millis();
     }
 
-    // Small delay to prevent overwhelming the system
-    delay(10);
+    // Yield to allow other tasks (much faster than delay)
+    yield();
 }
