@@ -17,15 +17,15 @@
 // ==========================================
 // LORA RADIO CONFIGURATION
 // ==========================================
-#define LORA_SS_PIN        SS        // SPI Slave Select (Pin 8)
-#define LORA_RST_PIN       RST_LoRa  // Reset pin (Pin 12)
-#define LORA_DIO0_PIN      DIO0      // DIO0/IRQ pin (Pin 14)
-#define LORA_BUSY_PIN      BUSY_LoRa // Busy pin (Pin 13)
+#define LORA_SS_PIN        8         // SPI Slave Select
+#define LORA_RST_PIN       12        // Reset pin
+#define LORA_DIO0_PIN      14        // DIO0/IRQ pin
+#define LORA_BUSY_PIN      13        // Busy pin
 
 // LoRa SPI configuration
-#define LORA_SCK_PIN       SCK       // SPI Clock (Pin 9)
-#define LORA_MOSI_PIN      MOSI      // SPI MOSI (Pin 10)
-#define LORA_MISO_PIN      MISO      // SPI MISO (Pin 11)
+#define LORA_SCK_PIN       9         // SPI Clock
+#define LORA_MOSI_PIN      10        // SPI MOSI
+#define LORA_MISO_PIN      11        // SPI MISO
 
 // LoRa Power Amplifier (PA) configuration
 #define LORA_PA_POWER_PIN  7         // PA power control
@@ -70,7 +70,7 @@
 // ==========================================
 // Using USB CDC for KISS interface (default Serial)
 #define KISS_SERIAL        Serial
-#define KISS_BAUD_RATE     115200      // Temporarily use 115200 for debugging
+#define KISS_BAUD_RATE     115200
 
 // Optional: Hardware serial for debugging
 #define DEBUG_SERIAL       Serial
