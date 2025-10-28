@@ -2,8 +2,8 @@
   "callsign": "KC1AWV",
   "node_name": "Node1",
   "radio_config": {
-    "frequency": 915.0,
-    "tx_power": 8,
+    "frequency": 916.0,
+    "tx_power": 0,
     "bandwidth": 125.0,
     "spreading_factor": 9,
     "coding_rate": 7,

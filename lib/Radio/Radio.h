@@ -78,6 +78,10 @@ private:
     unsigned long lastRxTime = 0;
     static const unsigned long RX_TIMEOUT_MS = 1000; // Consider channel free after 1s
     
+    // Reception state tracking (like old KISSLoRaTNC)
+    volatile bool packetReceived = false;
+    size_t receivedPacketSize = 0;
+    
     // Helper methods
     bool applyRadioConfig();
     bool checkChannelClear();

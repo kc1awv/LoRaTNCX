@@ -16,6 +16,17 @@ void KISS::pushSerialByte(uint8_t b)
 {
     stats.bytesRx++;
     updateStats();
+    
+    // DEBUG: Only show first few bytes to avoid spam (temporarily)
+    static int debugByteCount = 0;
+    if (debugByteCount < 20) {
+        Serial.printf("[KISS] [DEBUG] Received byte: 0x%02X (%c)\n", b, (b >= 32 && b <= 126) ? b : '.');
+        debugByteCount++;
+        if (debugByteCount == 20) {
+            Serial.println("[KISS] [DEBUG] (suppressing further byte debug messages)");
+        }
+    }
+    
     switch (rxState)
     {
     case WAIT_FEND:
@@ -94,12 +105,22 @@ void KISS::processFrameData()
     if (rxLen == 0)
         return;
 
+    // DEBUG: Always show KISS frame processing (temporarily)
+    Serial.printf("[KISS] [DEBUG] Processing frame: length=%d\n", rxLen);
+
     uint8_t frameType = rx[0] & 0x0F;
     uint8_t port = (rx[0] >> 4) & 0x0F;
+
+    // DEBUG: Always show frame type (temporarily)
+    Serial.printf("[KISS] [DEBUG] Frame type=%d, port=%d\n", frameType, port);
 
     if (frameType == DATA_FRAME)
     {
         stats.framesRx++;
+        
+        // DEBUG: Always show data frame processing (temporarily)
+        Serial.printf("[KISS] [DEBUG] Processing DATA_FRAME, payload length=%d\n", rxLen - 1);
+        
         if (onFrame && rxLen > 1)
         {
             onFrame(rx + 1, rxLen - 1);
@@ -108,6 +129,10 @@ void KISS::processFrameData()
     else
     {
         stats.commandsRx++;
+        
+        // DEBUG: Always show command processing (temporarily)
+        Serial.printf("[KISS] [DEBUG] Processing COMMAND frame type=%d\n", frameType);
+        
         if (onCommand)
         {
             if (rxLen > 1)

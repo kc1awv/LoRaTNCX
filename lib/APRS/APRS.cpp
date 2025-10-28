@@ -36,13 +36,17 @@ void APRSDriver::loadConfig()
 
     currentBeaconInterval = aprsConfig.beaconInterval;
 
+    #ifndef KISS_SERIAL_MODE
     Serial.printf("[APRS] Callsign: %s-%d\n", aprsConfig.callsign, aprsConfig.ssid);
     Serial.printf("[APRS] Beacon interval: %lu seconds\n", aprsConfig.beaconInterval);
     Serial.printf("[APRS] Smart beaconing: %s\n", aprsConfig.smartBeaconing ? "Enabled" : "Disabled");
+    #endif
 
     if (!isValidCallsign(aprsConfig.callsign))
     {
+        #ifndef KISS_SERIAL_MODE
         Serial.printf("[APRS] Warning: Invalid callsign '%s'\n", aprsConfig.callsign);
+        #endif
     }
 
     if (aprsConfig.ssid > 15)

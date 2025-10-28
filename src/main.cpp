@@ -350,9 +350,7 @@ void onKissCommandRx(uint8_t cmd, const uint8_t *data, size_t len)
       {
         #ifndef KISS_SERIAL_MODE
         Serial.printf("[KISS] Current radio config:\n");
-        #endif
         Serial.printf("  Frequency: %.3f MHz\n", radio.getFrequency());
-        #ifndef KISS_SERIAL_MODE
         Serial.printf("  TX Power: %d dBm\n", radio.getTxPower());
         Serial.printf("  Bandwidth: %.1f kHz\n", radio.getBandwidth());
         Serial.printf("  Spreading Factor: %d\n", radio.getSpreadingFactor());
@@ -1328,11 +1326,10 @@ void setup()
 
   delay(1000);
 
-  #ifndef KISS_SERIAL_MODE
+  // Always show critical startup messages for debugging
   Serial.println();
   Serial.println("===== SERIAL TEST START =====");
   Serial.println("If you can see this, serial communication is working!");
-  #endif
   Serial.flush();
   delay(200);
 
@@ -1344,15 +1341,12 @@ void setup()
     #endif
   }
 
-  #ifndef KISS_SERIAL_MODE
+  // Critical startup message
   Serial.println("[BOOT] Heltec KISS TNC starting...");
-  #endif
   Serial.flush();
 
-  #ifndef KISS_SERIAL_MODE
   Serial.println("[BOOT] Target: Heltec WiFi LoRa 32 V4 (ESP32-S3)");
   Serial.println("[BOOT] USB CDC Serial Interface Active");
-  #endif
 #if GNSS_ENABLE
   #ifndef KISS_SERIAL_MODE
   Serial.printf("[BOOT] GNSS support ENABLED (pins RX=%d, TX=%d)\n", GNSS_RX, GNSS_TX);
@@ -1369,6 +1363,7 @@ void setup()
   #endif
   Serial.flush();
 
+  Serial.println("[BOOT] Starting error handler...");
   // Initialize error handling system
   #ifndef KISS_SERIAL_MODE
   Serial.println("[BOOT] Initializing error handling system...");
@@ -1560,21 +1555,17 @@ void setup()
 
   #ifndef KISS_SERIAL_MODE
   Serial.println("[APRS] Initializing APRS driver...");
-  #endif
   Serial.flush();
   if (!aprs.begin(&radio, &gnss))
   {
-    #ifndef KISS_SERIAL_MODE
     Serial.println("[APRS] APRS driver initialization failed - continuing without APRS");
-    #endif
   }
   else
   {
-    #ifndef KISS_SERIAL_MODE
     Serial.println("[APRS] APRS driver initialized successfully");
-    #endif
   }
   Serial.flush();
+  #endif
 
   #ifndef KISS_SERIAL_MODE
   Serial.println("[BOOT] Setting up OLED display...");
@@ -1713,6 +1704,9 @@ void checkMenuActivation()
   while (Serial.available())
   {
     char c = Serial.read();
+    
+    // DEBUG: Show what character we're reading (temporarily)
+    Serial.printf("[MENU] [DEBUG] Read char: 0x%02X (%c)\n", (uint8_t)c, (c >= 32 && c <= 126) ? c : '.');
 
     if (millis() - lastMenuChar > MENU_TIMEOUT_MS)
     {
@@ -1801,6 +1795,9 @@ void loop()
 
   battery.poll();
 
+  // CRITICAL: Poll radio for received packets (was missing before!)
+  radio.poll();
+
   // Feed watchdog after battery polling
   FEED_WATCHDOG();
 
@@ -1857,6 +1854,24 @@ void loop()
 
   // Feed watchdog after network processing
   FEED_WATCHDOG();
+
+  // Process incoming KISS serial data
+  static unsigned long lastByteTime = 0;
+  static int byteCount = 0;
+  
+  while (Serial.available() > 0) {
+    uint8_t byte = Serial.read();
+    kiss.pushSerialByte(byte);
+    
+    byteCount++;
+    #ifndef KISS_SERIAL_MODE
+    if (millis() - lastByteTime > 1000) {  // Debug every second
+      Serial.printf("[DEBUG] Processed %d KISS bytes\n", byteCount);
+      lastByteTime = millis();
+      byteCount = 0;
+    }
+    #endif
+  }
 
   if (millis() - lastDisplayUpdate > DISPLAY_UPDATE_INTERVAL_MS)
   {

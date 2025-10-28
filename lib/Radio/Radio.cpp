@@ -8,6 +8,9 @@ bool RadioHAL::begin(RxCB cb)
     onRx = cb;
     instance = this;
 
+    // DEBUG: Always show radio initialization (temporarily)
+    Serial.println("[RADIO] [DEBUG] Initializing LoRa radio...");
+    
     #ifndef KISS_SERIAL_MODE
     Serial.println("[RADIO] Initializing LoRa radio...");
     #endif
@@ -75,12 +78,20 @@ bool RadioHAL::begin(RxCB cb)
     #ifndef KISS_SERIAL_MODE
     Serial.printf("[RADIO] CRC enable result: %d\n", crcResult);
     #endif
-    lora->setDio1Action(irqHandler);
+    // CRITICAL FIX: SX126x uses setPacketReceivedAction, not setDio1Action
+    lora->setPacketReceivedAction(irqHandler);
 
+    // DEBUG: Always show receive mode start (temporarily)
+    Serial.println("[RADIO] [DEBUG] Starting receive mode...");
+    
     #ifndef KISS_SERIAL_MODE
     Serial.println("[RADIO] Starting receive mode...");
     #endif
     int rxResult = lora->startReceive();
+    
+    // DEBUG: Always show receive result (temporarily)
+    Serial.printf("[RADIO] [DEBUG] Start receive result: %d\n", rxResult);
+    
     #ifndef KISS_SERIAL_MODE
     Serial.printf("[RADIO] Start receive result: %d\n", rxResult);
     #endif
@@ -276,26 +287,58 @@ bool RadioHAL::send(const uint8_t *buf, size_t len)
 
 void RadioHAL::irqHandler()
 {
-    if (!instance || !instance->lora || !instance->onRx)
+    if (!instance || !instance->lora)
         return;
 
-    size_t len = instance->lora->getPacketLength();
-    if (len == 0 || len > 512)
-        return;
-
-    static uint8_t buf[512];
-    int st = instance->lora->readData(buf, len);
-    if (st == RADIOLIB_ERR_NONE)
-    {
-        instance->lastRxTime = millis();
-        instance->channelBusy = true;
-
-        instance->onRx(buf, len, instance->lora->getRSSI(), instance->lora->getSNR());
-    }
+    // Flag-based reception approach like RadioLib SX126x examples
+    // Just set the flag in the interrupt, process in main loop
+    // Note: For SX126x, packet length will be retrieved during readData()
+    instance->packetReceived = true;
+    
+    // DEBUG: Always output interrupt trigger (temporarily)
+    Serial.println("[RADIO] [DEBUG] Interrupt triggered!");
 }
 
 void RadioHAL::poll()
 {
+    // Process received packets (like RadioLib SX126x examples)
+    if (packetReceived && onRx)
+    {
+        packetReceived = false;
+        
+        // DEBUG: Always output packet processing (temporarily)
+        Serial.println("[RADIO] [DEBUG] Processing received packet...");
+        
+        static uint8_t buf[512];
+        // For SX126x, readData() automatically determines packet length
+        int st = lora->readData(buf, 0);  // 0 = auto-detect length
+        if (st == RADIOLIB_ERR_NONE)
+        {
+            lastRxTime = millis();
+            channelBusy = true;
+            
+            // Get the actual packet length that was received
+            size_t packetLen = lora->getPacketLength();
+            
+            // DEBUG: Always output packet details (temporarily)
+            Serial.printf("[RADIO] [DEBUG] Packet received: length=%d, RSSI=%.1f, SNR=%.1f\n", 
+                         packetLen, lora->getRSSI(), lora->getSNR());
+            
+            onRx(buf, packetLen, lora->getRSSI(), lora->getSNR());
+        }
+        else
+        {
+            // DEBUG: Always output read errors (temporarily)
+            Serial.printf("[RADIO] [ERROR] Failed to read packet: %d\n", st);
+        }
+        
+        // CRITICAL: RadioLib SX126x examples show you MUST restart receive after each packet
+        int rxRestart = lora->startReceive();
+        if (rxRestart != RADIOLIB_ERR_NONE) {
+            Serial.printf("[RADIO] [ERROR] Failed to restart receive mode: %d\n", rxRestart);
+        }
+    }
+    
     if (channelBusy && (millis() - lastRxTime) > RX_TIMEOUT_MS)
     {
         channelBusy = false;
@@ -444,6 +487,17 @@ bool RadioHAL::applyRadioConfig()
             #endif
             break;
         }
+    }
+
+    // CRITICAL FIX: Restart receive mode after configuration (like old KISSLoRaTNC)
+    if (state == RADIOLIB_ERR_NONE) {
+        #ifndef KISS_SERIAL_MODE
+        Serial.println("[RADIO] Restarting receive mode after configuration...");
+        #endif
+        int rxResult = lora->startReceive();
+        #ifndef KISS_SERIAL_MODE
+        Serial.printf("[RADIO] Restart receive result: %d\n", rxResult);
+        #endif
     }
 
     return state == RADIOLIB_ERR_NONE;
