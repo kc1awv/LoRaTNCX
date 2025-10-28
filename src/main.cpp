@@ -161,16 +161,22 @@ void onKissFrameRx(const uint8_t *frame, size_t len)
   monitor.lastKissTime = millis();
   monitor.kissFrameCount++;
 
+#ifndef KISS_SERIAL_MODE
   Serial.printf("[RADIO] Attempting TX: %d bytes\n", len);
 
   Serial.print("[RADIO] Data: ");
   for (size_t i = 0; i < min(len, (size_t)16); i++)
   {
+    #ifndef KISS_SERIAL_MODE
     Serial.printf("%02X ", frame[i]);
+    #endif
   }
   if (len > 16)
+    #ifndef KISS_SERIAL_MODE
     Serial.print("...");
   Serial.println();
+    #endif
+#endif
 
   bool txResult = radio.send(frame, len);
   monitor.lastRadioDebug = "TX " + String(len) + " bytes: " + (txResult ? "SUCCESS" : "FAILED");
@@ -182,12 +188,16 @@ void onKissFrameRx(const uint8_t *frame, size_t len)
 
   if (!txResult)
   {
+#ifndef KISS_SERIAL_MODE
     Serial.printf("[RADIO] TX FAILED for frame of %d bytes\n", len);
     Serial.println("[RADIO] Possible causes: Radio not initialized, invalid config, or hardware issue");
+#endif
   }
   else
   {
+#ifndef KISS_SERIAL_MODE
     Serial.printf("[RADIO] TX SUCCESS: %d bytes transmitted\n", len);
+#endif
   }
 }
 
@@ -200,7 +210,9 @@ void onKissCommandRx(uint8_t cmd, const uint8_t *data, size_t len)
     {
       radio.setTxDelay(data[0]);
       config.getRadioConfig().txDelay = data[0];
+#ifndef KISS_SERIAL_MODE
       Serial.printf("[KISS] TX_DELAY set to %d (x10ms)\n", data[0]);
+#endif
     }
     break;
 
@@ -209,7 +221,9 @@ void onKissCommandRx(uint8_t cmd, const uint8_t *data, size_t len)
     {
       radio.setPersist(data[0]);
       config.getRadioConfig().persist = data[0];
+#ifndef KISS_SERIAL_MODE
       Serial.printf("[KISS] PERSISTENCE set to %d\n", data[0]);
+#endif
     }
     break;
 
@@ -218,7 +232,9 @@ void onKissCommandRx(uint8_t cmd, const uint8_t *data, size_t len)
     {
       radio.setSlotTime(data[0]);
       config.getRadioConfig().slotTime = data[0];
+      #ifndef KISS_SERIAL_MODE
       Serial.printf("[KISS] SLOT_TIME set to %d (x10ms)\n", data[0]);
+      #endif
     }
     break;
 
@@ -236,11 +252,15 @@ void onKissCommandRx(uint8_t cmd, const uint8_t *data, size_t len)
           if (radio.setFrequency(freq))
           {
             config.getRadioConfig().frequency = freq;
+            #ifndef KISS_SERIAL_MODE
             Serial.printf("[KISS] Frequency set to %.3f MHz\n", freq);
+            #endif
           }
           else
           {
+            #ifndef KISS_SERIAL_MODE
             Serial.printf("[KISS] Failed to set frequency %.3f MHz\n", freq);
+            #endif
           }
         }
         break;
@@ -252,11 +272,15 @@ void onKissCommandRx(uint8_t cmd, const uint8_t *data, size_t len)
           if (radio.setTxPower(power))
           {
             config.getRadioConfig().txPower = power;
+            #ifndef KISS_SERIAL_MODE
             Serial.printf("[KISS] TX power set to %d dBm\n", power);
+            #endif
           }
           else
           {
+            #ifndef KISS_SERIAL_MODE
             Serial.printf("[KISS] Failed to set TX power %d dBm\n", power);
+            #endif
           }
         }
         break;
@@ -269,11 +293,15 @@ void onKissCommandRx(uint8_t cmd, const uint8_t *data, size_t len)
           if (radio.setBandwidth(bw))
           {
             config.getRadioConfig().bandwidth = bw;
+            #ifndef KISS_SERIAL_MODE
             Serial.printf("[KISS] Bandwidth set to %.1f kHz\n", bw);
+            #endif
           }
           else
           {
+            #ifndef KISS_SERIAL_MODE
             Serial.printf("[KISS] Failed to set bandwidth %.1f kHz\n", bw);
+            #endif
           }
         }
         break;
@@ -285,11 +313,15 @@ void onKissCommandRx(uint8_t cmd, const uint8_t *data, size_t len)
           if (radio.setSpreadingFactor(sf))
           {
             config.getRadioConfig().spreadingFactor = sf;
+            #ifndef KISS_SERIAL_MODE
             Serial.printf("[KISS] Spreading factor set to %d\n", sf);
+            #endif
           }
           else
           {
+            #ifndef KISS_SERIAL_MODE
             Serial.printf("[KISS] Failed to set spreading factor %d\n", sf);
+            #endif
           }
         }
         break;
@@ -301,19 +333,26 @@ void onKissCommandRx(uint8_t cmd, const uint8_t *data, size_t len)
           if (radio.setCodingRate(cr))
           {
             config.getRadioConfig().codingRate = cr;
+            #ifndef KISS_SERIAL_MODE
             Serial.printf("[KISS] Coding rate set to 4/%d\n", cr);
+            #endif
           }
           else
           {
+            #ifndef KISS_SERIAL_MODE
             Serial.printf("[KISS] Failed to set coding rate 4/%d\n", cr);
+            #endif
           }
         }
         break;
 
       case 0x10:
       {
+        #ifndef KISS_SERIAL_MODE
         Serial.printf("[KISS] Current radio config:\n");
+        #endif
         Serial.printf("  Frequency: %.3f MHz\n", radio.getFrequency());
+        #ifndef KISS_SERIAL_MODE
         Serial.printf("  TX Power: %d dBm\n", radio.getTxPower());
         Serial.printf("  Bandwidth: %.1f kHz\n", radio.getBandwidth());
         Serial.printf("  Spreading Factor: %d\n", radio.getSpreadingFactor());
@@ -321,18 +360,23 @@ void onKissCommandRx(uint8_t cmd, const uint8_t *data, size_t len)
         Serial.printf("  TX Delay: %d x 10ms\n", radio.getTxDelay());
         Serial.printf("  Persistence: %d\n", radio.getPersist());
         Serial.printf("  Slot Time: %d x 10ms\n", radio.getSlotTime());
+        #endif
       }
       break;
 
       default:
+        #ifndef KISS_SERIAL_MODE
         Serial.printf("[KISS] Unknown hardware command: 0x%02X\n", hw_cmd);
+        #endif
         break;
       }
     }
     break;
 
   default:
+    #ifndef KISS_SERIAL_MODE
     Serial.printf("[KISS] Unknown command: 0x%02X\n", cmd);
+    #endif
     break;
   }
 }
@@ -342,7 +386,10 @@ void onRadioFrameRx(const uint8_t *frame, size_t len, int16_t rssi, float snr)
   monitor.lastRadioDebug = "RX " + String(len) + " bytes, RSSI: " + String(rssi) + " dBm, SNR: " + String(snr, 1) + " dB";
   monitor.lastRadioTime = millis();
   monitor.radioRxCount++;
+  
+#ifndef KISS_SERIAL_MODE
   Serial.printf("[RADIO] RX: %d bytes, RSSI: %d dBm, SNR: %.1f dB\n", len, rssi, snr);
+#endif
 
   // Mark relevant screens dirty due to radio activity
   displayManager.markDirty(DisplayManager::RADIO_CHANGED | DisplayManager::STATS_CHANGED);
@@ -742,7 +789,9 @@ void updatePowerScreen()
 void setupButton()
 {
   pinMode(USER_BTN, INPUT_PULLUP);
+  #ifndef KISS_SERIAL_MODE
   Serial.printf("[BTN] User button initialized on GPIO %d\n", USER_BTN);
+  #endif
 }
 
 void handleButton()
@@ -759,14 +808,18 @@ void handleButton()
       {
         buttonState.lastPressTime = now;
         buttonState.longPressHandled = false;
+        #ifndef KISS_SERIAL_MODE
         Serial.println("[BTN] Button pressed");
+        #endif
       }
       else if (currentState == HIGH && buttonState.lastState == LOW)
       {
         buttonState.lastReleaseTime = now;
         unsigned long pressDuration = now - buttonState.lastPressTime;
 
+        #ifndef KISS_SERIAL_MODE
         Serial.printf("[BTN] Button released after %lums\n", pressDuration);
+        #endif
 
         if (!buttonState.longPressHandled)
         {
@@ -804,7 +857,9 @@ void handleButton()
 
 void handleButtonShortPress()
 {
+  #ifndef KISS_SERIAL_MODE
   Serial.printf("[BTN] Short press - changing screen from %d", currentScreen);
+  #endif
 
   if (displayAvailable)
   {
@@ -837,7 +892,9 @@ void handleButtonShortPress()
   currentScreen = static_cast<DisplayScreen>(nextScreen);
   lastScreenChange = millis();
 
+  #ifndef KISS_SERIAL_MODE
   Serial.printf(" to %d\n", currentScreen);
+  #endif
 
   // Force immediate update for screen change
   displayManager.markDirty(DisplayManager::SCREEN_CHANGED);
@@ -894,13 +951,17 @@ void showLongPressProgress(float progress)
 
 void handleButtonLongPress()
 {
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[BTN] Long press detected");
+  #endif
 
   bool serialConnected = Serial && (Serial.availableForWrite() > 0);
 
   if (serialConnected)
   {
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[PWR] Power off disabled - serial connection detected");
+    #endif
 
     if (displayAvailable)
     {
@@ -915,7 +976,9 @@ void handleButtonLongPress()
   }
   else
   {
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[PWR] Initiating power off sequence");
+    #endif
 
     if (displayAvailable)
     {
@@ -933,7 +996,9 @@ void handleButtonLongPress()
       digitalWrite(VEXT_PIN, HIGH);
     }
 
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[PWR] Entering deep sleep...");
+    #endif
     Serial.flush();
 
     esp_sleep_enable_ext0_wakeup(GPIO_NUM_0, 0);
@@ -944,12 +1009,16 @@ void handleButtonLongPress()
 
 bool reinitializeDisplay()
 {
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[OLED] Reinitializing I2C and display...");
+  #endif
 
   // Power control
   pinMode(VEXT_PIN, OUTPUT);
   digitalWrite(VEXT_PIN, LOW);
+  #ifndef KISS_SERIAL_MODE
   Serial.printf("[OLED] Vext power enabled (pin %d = LOW)\r\n", VEXT_PIN);
+  #endif
   delay(300);
 
   // Reset sequence
@@ -958,16 +1027,22 @@ bool reinitializeDisplay()
   delay(100);
   digitalWrite(OLED_RST, HIGH);
   delay(200);
+  #ifndef KISS_SERIAL_MODE
   Serial.printf("[OLED] Reset sequence completed - V4 (pin %d)\r\n", OLED_RST);
+  #endif
 
   // I2C initialization
   Wire.begin(OLED_SDA, OLED_SCL);
+  #ifndef KISS_SERIAL_MODE
   Serial.printf("[OLED] Using Heltec V4 OLED pins: SDA=%d, SCL=%d\r\n", OLED_SDA, OLED_SCL);
+  #endif
   Wire.setClock(100000);
   delay(100);
 
   // Device detection
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[OLED] Checking for OLED at common addresses...");
+  #endif
   bool deviceFound = false;
   for (byte address : {0x3C, 0x3D})
   {
@@ -975,7 +1050,9 @@ bool reinitializeDisplay()
     byte result = Wire.endTransmission();
     if (result == 0)
     {
+      #ifndef KISS_SERIAL_MODE
       Serial.printf("[OLED] I2C device found at address 0x%02X\r\n", address);
+      #endif
       deviceFound = true;
     }
     delay(10);
@@ -983,14 +1060,20 @@ bool reinitializeDisplay()
 
   if (!deviceFound)
   {
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[OLED] WARNING: No OLED found at 0x3C or 0x3D!");
+    #endif
     return false;
   }
 
   // Display initialization
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[OLED] Initializing display...");
+  #endif
   bool initResult = display.init();
+  #ifndef KISS_SERIAL_MODE
   Serial.printf("[OLED] Display init result: %s\r\n", initResult ? "SUCCESS" : "FAILED");
+  #endif
 
   if (initResult)
   {
@@ -1009,7 +1092,9 @@ bool reinitializeDisplay()
     displayManager.init();
     
     RESOLVE_ERROR(ErrorHandler::ERROR_DISPLAY_INIT);
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[OLED] Display initialized successfully");
+    #endif
 
     delay(1000);
     return true;
@@ -1017,7 +1102,9 @@ bool reinitializeDisplay()
   else
   {
     HANDLE_ERROR(ErrorHandler::ERROR_DISPLAY_INIT, "Init result false");
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[OLED] Display initialization failed");
+    #endif
     return false;
   }
 }
@@ -1031,14 +1118,18 @@ void setupDisplay()
   else
   {
     displayAvailable = false;
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[OLED] Display setup failed - continuing without display");
+    #endif
   }
 }
 
 void shutdownGNSS()
 {
 #if GNSS_ENABLE
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[GNSS] Shutting down GNSS module...");
+  #endif
   
   // Stop the GNSS driver
   gnss.setEnabled(false);
@@ -1049,14 +1140,18 @@ void shutdownGNSS()
   digitalWrite(GNSS_RST, LOW);     // Hold in reset
   digitalWrite(GNSS_WAKE, LOW);    // Sleep mode
   
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[GNSS] GNSS module powered down");
+  #endif
 #endif
 }
 
 bool reinitializeGNSS()
 {
 #if GNSS_ENABLE
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[GNSS] Reinitializing GNSS module...");
+  #endif
   
   const auto& gnssCfg = config.getGNSSConfig();
   
@@ -1080,17 +1175,23 @@ bool reinitializeGNSS()
   // Initialize UART communication
   if (gnssCfg.verboseLogging)
   {
+#ifndef KISS_SERIAL_MODE
     Serial.printf("[GNSS] Starting UART at %lu baud (RX:%d, TX:%d)\n", 
                   gnssCfg.baudRate, GNSS_RX, GNSS_TX);
+#endif
   }
   
   gnss.begin(gnssCfg.baudRate, GNSS_RX, GNSS_TX);
   gnss.setEnabled(true);
   
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[GNSS] GNSS module reinitialized successfully");
+  #endif
   return true;
 #else
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[GNSS] GNSS support not compiled in");
+  #endif
   return false;
 #endif
 }
@@ -1101,7 +1202,9 @@ void setupWiFi()
 
   if (!wifiCfg.useAP && strlen(wifiCfg.sta_ssid) > 0)
   {
+    #ifndef KISS_SERIAL_MODE
     Serial.printf("[WIFI] Attempting STA connection to '%s'...\r\n", wifiCfg.sta_ssid);
+    #endif
     
     WiFi.mode(WIFI_STA);
     WiFi.begin(wifiCfg.sta_ssid, wifiCfg.sta_password);
@@ -1120,7 +1223,9 @@ void setupWiFi()
     while (WiFi.status() != WL_CONNECTED && millis() - startTime < 15000)
     {
       delay(500);
+      #ifndef KISS_SERIAL_MODE
       Serial.print(".");
+      #endif
 
       if (displayAvailable && (millis() - startTime) % 2000 < 500)
       {
@@ -1138,19 +1243,25 @@ void setupWiFi()
 
     if (WiFi.status() == WL_CONNECTED)
     {
+      #ifndef KISS_SERIAL_MODE
       Serial.printf("\r\n[WIFI] Connected! IP: %s\r\n", WiFi.localIP().toString().c_str());
       Serial.printf("[WIFI] Signal: %d dBm\r\n", WiFi.RSSI());
+      #endif
     }
     else
     {
+      #ifndef KISS_SERIAL_MODE
       Serial.println("\n[WIFI] STA connection timeout, falling back to AP mode");
+      #endif
       WiFi.disconnect();
     }
   }
 
   if (WiFi.status() != WL_CONNECTED)
   {
+    #ifndef KISS_SERIAL_MODE
     Serial.printf("[WIFI] Starting AP mode - SSID: '%s'\r\n", wifiCfg.ssid);
+    #endif
     WiFi.mode(WIFI_AP);
 
     if (displayAvailable)
@@ -1162,15 +1273,19 @@ void setupWiFi()
     }
 
     WiFi.softAP(wifiCfg.ssid, wifiCfg.password);
+    #ifndef KISS_SERIAL_MODE
     Serial.printf("[WIFI] AP started - IP: %s\r\n", WiFi.softAPIP().toString().c_str());
+    #endif
   }
 
   kissServer.begin();
   nmeaServer.begin();
   
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[NET] TCP servers started");
   Serial.printf("[NET] KISS server on port %d\n", TCP_KISS_PORT);
   Serial.printf("[NET] NMEA server on port %d\n", TCP_NMEA_PORT);
+  #endif
 
   // Initialize WebSocket server for web interface
   WebSocketServer::begin(webServer);
@@ -1182,8 +1297,10 @@ void setupWiFi()
   
   // Start web server
   webServer.begin();
+  #ifndef KISS_SERIAL_MODE
   Serial.printf("[NET] Web server started on port %d\n", WEB_SERVER_PORT);
   Serial.println("[NET] Web interface available at http://[device-ip]/");
+  #endif
 
   if (displayAvailable)
   {
@@ -1211,39 +1328,57 @@ void setup()
 
   delay(1000);
 
+  #ifndef KISS_SERIAL_MODE
   Serial.println();
   Serial.println("===== SERIAL TEST START =====");
   Serial.println("If you can see this, serial communication is working!");
+  #endif
   Serial.flush();
   delay(200);
 
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
   if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0)
   {
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[BOOT] Waking from deep sleep (button press)");
+    #endif
   }
 
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[BOOT] Heltec KISS TNC starting...");
+  #endif
   Serial.flush();
 
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[BOOT] Target: Heltec WiFi LoRa 32 V4 (ESP32-S3)");
   Serial.println("[BOOT] USB CDC Serial Interface Active");
+  #endif
 #if GNSS_ENABLE
+  #ifndef KISS_SERIAL_MODE
   Serial.printf("[BOOT] GNSS support ENABLED (pins RX=%d, TX=%d)\n", GNSS_RX, GNSS_TX);
+  #endif
 #else
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[BOOT] GNSS support DISABLED");
+  #endif
 #endif
 
+  #ifndef KISS_SERIAL_MODE
   Serial.printf("[BOOT] Free heap: %d bytes\n", ESP.getFreeHeap());
   Serial.printf("[BOOT] CPU frequency: %d MHz\n", ESP.getCpuFreqMHz());
+  #endif
   Serial.flush();
 
   // Initialize error handling system
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[BOOT] Initializing error handling system...");
+  #endif
   errorHandler.init();
   errorHandler.enableWatchdog(60000);  // 60 second watchdog - longer for initial setup
   
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[BOOT] Initializing configuration system...");
+  #endif
   Serial.flush();
 
   bool configOk = false;
@@ -1253,30 +1388,42 @@ void setup()
   }
   catch (...)
   {
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[BOOT] Exception during config initialization!");
+    #endif
     configOk = false;
   }
 
   if (!configOk)
   {
     HANDLE_ERROR(ErrorHandler::ERROR_CONFIG_LOAD, "Config initialization failed");
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[BOOT] Failed to initialize configuration, using defaults");
     Serial.println("[BOOT] This is not fatal - continuing with defaults...");
+    #endif
   }
   else
   {
     RESOLVE_ERROR(ErrorHandler::ERROR_CONFIG_LOAD);
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[BOOT] Configuration system initialized successfully");
+    #endif
   }
   Serial.flush();
 
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[RADIO] Loading configuration...");
+  #endif
   Serial.flush();
   radio.loadConfig();
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[RADIO] Configuration loaded successfully");
+  #endif
   Serial.flush();
 
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[RADIO] Initializing radio hardware...");
+  #endif
   Serial.flush();
 
   bool radioOk = false;
@@ -1286,7 +1433,9 @@ void setup()
   }
   catch (...)
   {
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[RADIO] Exception during radio initialization!");
+    #endif
     radioOk = false;
   }
   Serial.flush();
@@ -1294,43 +1443,61 @@ void setup()
   if (radioOk)
   {
     RESOLVE_ERROR(ErrorHandler::ERROR_RADIO_INIT);
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[RADIO] Radio initialized successfully");
+    #endif
     const auto &cfg = config.getRadioConfig();
+#ifndef KISS_SERIAL_MODE
     Serial.printf("[RADIO] Config: %.3f MHz, %d dBm, SF%d, BW%.1f kHz\n",
                   cfg.frequency, cfg.txPower, cfg.spreadingFactor, cfg.bandwidth);
+#endif
   }
   else
   {
     HANDLE_ERROR(ErrorHandler::ERROR_RADIO_INIT, "Hardware init failed");
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[RADIO] Radio initialization FAILED or SKIPPED!");
     Serial.println("[RADIO] Check hardware connections and SPI configuration");
     Serial.println("[RADIO] Continuing with radio disabled...");
+    #endif
   }
   Serial.flush();
 
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[KISS] Setting up KISS protocol handlers...");
+  #endif
   Serial.flush();
   kiss.setOnFrame(onKissFrameRx);
   kiss.setOnCommand(onKissCommandRx);
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[KISS] KISS protocol handlers configured");
+  #endif
   Serial.flush();
 
 #if GNSS_ENABLE
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[GNSS] Loading configuration...");
+  #endif
   gnss.loadConfig();
   GNSSConfig &gnssCfg = config.getGNSSConfig();
 
+  #ifndef KISS_SERIAL_MODE
   Serial.printf("[GNSS] Config: %s, Baud: %lu\n", gnssCfg.enabled ? "Enabled" : "Disabled", gnssCfg.baudRate);
+  #endif
   if (gnssCfg.verboseLogging)
   {
+#ifndef KISS_SERIAL_MODE
     Serial.printf("[GNSS] Routing: TCP:%s USB:%s\n",
                   gnssCfg.routeToTcp ? "Y" : "N",
                   gnssCfg.routeToUsb ? "Y" : "N");
+#endif
   }
 
   if (gnssCfg.enabled)
   {
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[GNSS] Initializing V4 GNSS module...");
+    #endif
 
     pinMode(VGNSS_CTRL, OUTPUT);
     digitalWrite(VGNSS_CTRL, LOW);
@@ -1350,103 +1517,151 @@ void setup()
 
     if (gnssCfg.verboseLogging)
     {
+      #ifndef KISS_SERIAL_MODE
       Serial.printf("[GNSS] Starting UART at %lu baud (RX:%d, TX:%d)\n", gnssCfg.baudRate, GNSS_RX, GNSS_TX);
+      #endif
     }
     gnss.begin(gnssCfg.baudRate, GNSS_RX, GNSS_TX);
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[GNSS] V4 GNSS module initialized successfully");
+    #endif
   }
   else
   {
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[GNSS] GNSS disabled - use config menu to enable");
+    #endif
   }
 #endif
 
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[BOOT] Setting up user button...");
+  #endif
   Serial.flush();
   setupButton();
 
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[BOOT] Initializing battery monitor...");
+  #endif
   Serial.flush();
   if (!battery.begin(&config))
   {
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[BOOT] Battery monitor initialization failed");
+    #endif
   }
   else
   {
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[BOOT] Battery monitor initialized successfully");
+    #endif
   }
   Serial.flush();
 
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[APRS] Initializing APRS driver...");
+  #endif
   Serial.flush();
   if (!aprs.begin(&radio, &gnss))
   {
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[APRS] APRS driver initialization failed - continuing without APRS");
+    #endif
   }
   else
   {
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[APRS] APRS driver initialized successfully");
+    #endif
   }
   Serial.flush();
 
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[BOOT] Setting up OLED display...");
+  #endif
   Serial.flush();
   setupDisplay();
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[BOOT] OLED display setup complete");
+  #endif
   Serial.flush();
 
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[BOOT] Setting up WiFi...");
+  #endif
   Serial.flush();
   setupWiFi();
 
   // Initialize OTA after WiFi is set up
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[BOOT] Initializing OTA Manager...");
+  #endif
   OTA.begin("LoRaTNCX", OTA_PORT);
   
   // Set OTA callbacks for status updates
   OTA.setStatusCallback([](OTAManager::UpdateStatus status, const String& message) {
+    #ifndef KISS_SERIAL_MODE
     Serial.printf("[OTA] Status: %s\n", message.c_str());
+    #endif
   });
   
   OTA.setProgressCallback([](const OTAManager::ProgressInfo& progress) {
     if (progress.percentage % 10 == 0) {  // Log every 10%
+#ifndef KISS_SERIAL_MODE
       Serial.printf("[OTA] Progress: %d%% (%zu/%zu bytes)\n", 
                    progress.percentage, progress.bytesReceived, progress.totalBytes);
+#endif
     }
   });
 
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[BOOT] ========================================");
+  #endif
 
   const auto &aprsConfig = config.getAPRSConfig();
   if (aprsConfig.mode == OperatingMode::APRS_TRACKER)
   {
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[BOOT] APRS Tracker Ready!");
     Serial.printf("[BOOT] Callsign: %s-%d\n", aprsConfig.callsign, aprsConfig.ssid);
     Serial.printf("[BOOT] Beacon Interval: %lu seconds\n", aprsConfig.beaconInterval);
+    #endif
     if (aprsConfig.smartBeaconing)
     {
+      #ifndef KISS_SERIAL_MODE
       Serial.println("[BOOT] Smart Beaconing: Enabled");
+      #endif
     }
   }
   else
   {
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[BOOT] LoRaTNCX Ready!");
+    #endif
   }
 
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[BOOT] ========================================");
   Serial.println("[BOOT] Interfaces:");
   Serial.println("[BOOT]   USB CDC: KISS protocol");
   Serial.println("[BOOT]   TCP 8001: KISS protocol");
+  #endif
+#ifndef KISS_SERIAL_MODE
   Serial.println("[BOOT]   TCP 10110: NMEA sentences");
   Serial.println("[BOOT]");
   Serial.println("[BOOT] Controls:");
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[BOOT]   Send '+++' to enter configuration menu");
   Serial.println("[BOOT]   Press user button to cycle OLED screens");
   Serial.println("[BOOT]   Hold user button 2s to power off (when serial disconnected)");
   Serial.println("[BOOT] ========================================");
+  #endif
   
   // Final watchdog feed before entering main loop
+  #ifndef KISS_SERIAL_MODE
   Serial.println("[BOOT] Setup complete, feeding watchdog before main loop");
+  #endif
+#endif
   FEED_WATCHDOG();
 }
 
@@ -1519,7 +1734,9 @@ void checkMenuActivation()
 
     if (menuBuffer == "+++")
     {
+      #ifndef KISS_SERIAL_MODE
       Serial.println("\n[CONFIG] Entering configuration menu...");
+      #endif
       config.showMenu();
       menuBuffer = "";
       return;
@@ -1551,7 +1768,9 @@ void loop()
 
   // Debug output for first loop iteration
   if (firstLoop) {
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[LOOP] First loop iteration started");
+    #endif
     firstLoop = false;
   }
 
@@ -1563,13 +1782,17 @@ void loop()
 
   if (millis() - lastHeartbeat > HEARTBEAT_INTERVAL_MS)
   {
+#ifndef KISS_SERIAL_MODE
     Serial.printf("[LOOP] System running - uptime: %lu seconds, free heap: %d\n",
                   millis() / 1000, ESP.getFreeHeap());
     
     // Report error status if any errors exist
     if (errorHandler.getTotalErrorCount() > 0) {
+      #ifndef KISS_SERIAL_MODE
       Serial.printf("[LOOP] %s\n", errorHandler.getErrorSummary().c_str());
+      #endif
     }
+#endif
     
     lastHeartbeat = millis();
   }
@@ -1612,7 +1835,9 @@ void loop()
       {
         if (ppsToggleCount > 0 && config.getGNSSConfig().verboseLogging)
         {
+          #ifndef KISS_SERIAL_MODE
           Serial.printf("[GNSS] [INFO] PPS active: %lu toggles in 5s\n", ppsToggleCount);
+          #endif
         }
         ppsToggleCount = 0;
         lastPpsCheck = millis();

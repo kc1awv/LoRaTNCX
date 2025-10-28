@@ -26,14 +26,18 @@ bool BatteryMonitor::begin(ConfigManager* config)
     bool debugEnabled = (configManager && configManager->getBatteryConfig().debugMessages);
     
     if (debugEnabled) {
+#ifndef KISS_SERIAL_MODE
         Serial.println("[BATTERY] Initializing battery monitor...");
+#endif
     }
 
     // Configure ADC_CTRL pin - must be HIGH to enable battery reading
     pinMode(ADC_CTRL_PIN, OUTPUT);
     digitalWrite(ADC_CTRL_PIN, HIGH);
     if (debugEnabled) {
+#ifndef KISS_SERIAL_MODE
         Serial.printf("[BATTERY] ADC_CTRL pin %d set HIGH\n", ADC_CTRL_PIN);
+#endif
     }
     delay(10);
 
@@ -48,15 +52,19 @@ bool BatteryMonitor::begin(ConfigManager* config)
     analogSetPinAttenuation(VBAT_PIN, ADC_11db);
 
     if (debugEnabled) {
+#ifndef KISS_SERIAL_MODE
         Serial.printf("[BATTERY] Using GPIO %d for battery voltage reading\n", VBAT_PIN);
         Serial.printf("[BATTERY] Voltage divider ratio: %.2f\n", VOLTAGE_DIVIDER);
+#endif
     }
 
     poll();
 
     initialized = true;
     if (debugEnabled) {
+#ifndef KISS_SERIAL_MODE
         Serial.printf("[BATTERY] Battery monitor initialized - Status: %s\n", getStatusString().c_str());
+#endif
     }
 
     return true;
@@ -94,7 +102,9 @@ void BatteryMonitor::poll()
         if (currentStatus.criticalLevel && currentStatus.state == DISCHARGING)
         {
             // Always show critical battery messages regardless of debug setting
+#ifndef KISS_SERIAL_MODE
             Serial.println("[BATTERY] CRITICAL LEVEL - Entering deep sleep to protect battery!");
+#endif
             enterDeepSleep();
         }
     }
@@ -108,10 +118,12 @@ void BatteryMonitor::poll()
     // Enhanced debug output (only if debug is enabled)
     bool debugEnabled = (configManager && configManager->getBatteryConfig().debugMessages);
     if (debugEnabled) {
+#ifndef KISS_SERIAL_MODE
         Serial.printf("[BATTERY] Raw ADC: %d, Battery: %.2fV, SoC: %d%%, State: %s%s\n", 
                       currentStatus.rawADC, currentStatus.voltage, 
                       currentStatus.stateOfCharge, getBatteryStateString().c_str(),
                       currentStatus.criticalLevel ? " [CRITICAL]" : "");
+#endif
     }
 }
 
@@ -219,16 +231,20 @@ bool BatteryMonitor::isCriticalLevel(uint16_t rawADC)
 
 void BatteryMonitor::enterDeepSleep()
 {
+#ifndef KISS_SERIAL_MODE
     Serial.println("[BATTERY] Preparing for deep sleep...");
     Serial.flush();
+#endif
     
     // TODO: Add any necessary cleanup here (save state, turn off peripherals, etc.)
     
     // Configure wake-up source (you may want to adjust this)
     esp_sleep_enable_timer_wakeup(60 * 1000000); // Wake up every 60 seconds to check battery
     
+#ifndef KISS_SERIAL_MODE
     Serial.println("[BATTERY] Entering deep sleep mode");
     Serial.flush();
+#endif
     
     esp_deep_sleep_start();
 }

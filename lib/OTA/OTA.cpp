@@ -34,7 +34,9 @@ void OTAManager::begin(const String& hostname_, uint16_t port)
     hostname = hostname_;
     
     if (!WiFi.isConnected()) {
+        #ifndef KISS_SERIAL_MODE
         Serial.println(F("[OTA] WiFi not connected - OTA initialization skipped"));
+        #endif
         return;
     }
     
@@ -54,7 +56,9 @@ void OTAManager::begin(const String& hostname_, uint16_t port)
     // Detect and configure PSRAM usage
     usePSRAM = psramFound() && ESP.getPsramSize() > 0;
     if (usePSRAM) {
+        #ifndef KISS_SERIAL_MODE
         Serial.printf("[OTA] PSRAM detected: %d bytes available\n", ESP.getPsramSize());
+        #endif
     }
     
     // Load preferences
@@ -70,10 +74,18 @@ void OTAManager::begin(const String& hostname_, uint16_t port)
     initialized = true;
     setStatus(UpdateStatus::IDLE, "OTA Manager initialized");
     
+    #ifndef KISS_SERIAL_MODE
     Serial.println(F("[OTA] OTA Manager initialized successfully"));
+    #endif
+    #ifndef KISS_SERIAL_MODE
     Serial.printf("[OTA] Hostname: %s\n", hostname.c_str());
+    #endif
+    #ifndef KISS_SERIAL_MODE
     Serial.printf("[OTA] Port: %d\n", port);
+    #endif
+    #ifndef KISS_SERIAL_MODE
     Serial.printf("[OTA] Current version: %s\n", getCurrentVersion().c_str());
+    #endif
 }
 
 void OTAManager::setPassword(const String& password_)
@@ -120,18 +132,24 @@ void OTAManager::checkForUpdates()
 {
     // Simplified version - just check if server URL is configured
     if (updateServerUrl.isEmpty()) {
+        #ifndef KISS_SERIAL_MODE
         Serial.println(F("[OTA] No update server configured"));
+        #endif
         return;
     }
     
+    #ifndef KISS_SERIAL_MODE
     Serial.println(F("[OTA] Manual update check - use web interface at /update"));
+    #endif
     setStatus(UpdateStatus::IDLE, "Use web interface for updates");
 }
 
 bool OTAManager::startUpdate(const UpdateInfo& updateInfo)
 {
     if (currentStatus != UpdateStatus::IDLE) {
+        #ifndef KISS_SERIAL_MODE
         Serial.println(F("[OTA] Update already in progress"));
+        #endif
         return false;
     }
     
@@ -162,13 +180,17 @@ bool OTAManager::startUpdate(const UpdateInfo& updateInfo)
     
     if (success) {
         setStatus(UpdateStatus::SUCCESS, "Update completed successfully");
+        #ifndef KISS_SERIAL_MODE
         Serial.println(F("[OTA] Update completed - restarting..."));
+        #endif
         delay(2000);
         ESP.restart();
     } else {
         currentRetries++;
         if (currentRetries < maxRetries) {
+            #ifndef KISS_SERIAL_MODE
             Serial.printf("[OTA] Update failed, retry %d/%d\n", currentRetries, maxRetries);
+            #endif
             delay(5000);
             return startUpdate(updateInfo);
         } else {
@@ -188,7 +210,9 @@ void OTAManager::abortUpdate()
         currentStatus == UpdateStatus::INSTALLING) {
         Update.abort();
         setStatus(UpdateStatus::IDLE, "Update aborted by user");
+        #ifndef KISS_SERIAL_MODE
         Serial.println(F("[OTA] Update aborted"));
+        #endif
     }
 }
 
@@ -204,8 +228,9 @@ void OTAManager::handleWebUpdate(WebServer& server)
             HTTPUpload& upload = server.upload();
             
             if (upload.status == UPLOAD_FILE_START) {
+                #ifndef KISS_SERIAL_MODE
                 Serial.printf("[OTA] Web update started: %s\n", upload.filename.c_str());
-                
+                #endif
                 setStatus(UpdateStatus::INSTALLING, "Installing update via web...");
                 progressInfo.startTime = millis();
                 
@@ -222,7 +247,9 @@ void OTAManager::handleWebUpdate(WebServer& server)
                 }
             } else if (upload.status == UPLOAD_FILE_END) {
                 if (Update.end(true)) {
+                    #ifndef KISS_SERIAL_MODE
                     Serial.printf("[OTA] Web update success: %u bytes\n", upload.totalSize);
+                    #endif
                     setStatus(UpdateStatus::SUCCESS, "Web update completed");
                 } else {
                     Update.printError(Serial);
@@ -818,8 +845,9 @@ void OTAManager::setupArduinoOTA()
 
 bool OTAManager::downloadUpdate(const String& url)
 {
+    #ifndef KISS_SERIAL_MODE
     Serial.printf("[OTA] Starting HTTP download from: %s\n", url.c_str());
-    
+    #endif
     httpClient.begin(url);
     httpClient.setTimeout(30000); // 30 second timeout
     
@@ -851,10 +879,14 @@ bool OTAManager::downloadUpdate(const String& url)
     bool useBuffer = usePSRAM && contentLength <= (ESP.getPsramSize() / 2);
     
     if (useBuffer) {
+        #ifndef KISS_SERIAL_MODE
         Serial.println(F("[OTA] Using PSRAM buffer for download"));
+        #endif
         return downloadToBufferAndInstall(url, contentLength);
     } else {
+        #ifndef KISS_SERIAL_MODE
         Serial.println(F("[OTA] Streaming download directly to flash"));
+        #endif
         return streamDownloadToFlash(contentLength);
     }
 }
@@ -904,9 +936,9 @@ bool OTAManager::downloadToBufferAndInstall(const String& url, size_t contentLen
         return false;
     }
     
+    #ifndef KISS_SERIAL_MODE
     Serial.printf("[OTA] Download complete: %d bytes\n", bytesRead);
-    
-    // Install from buffer
+    #endif
     bool result = installFromBuffer(downloadBuffer, downloadBufferSize);
     
     // Clean up
@@ -1016,27 +1048,35 @@ void OTAManager::onOTAStart()
 {
     String type = (ArduinoOTA.getCommand() == U_FLASH) ? "sketch" : "filesystem";
     setStatus(UpdateStatus::INSTALLING, "Installing " + type + "...");
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[OTA] Start updating " + type);
+    #endif
     progressInfo.startTime = millis();
 }
 
 void OTAManager::onOTAEnd()
 {
     setStatus(UpdateStatus::SUCCESS, "Arduino OTA update completed");
+    #ifndef KISS_SERIAL_MODE
     Serial.println(F("[OTA] Arduino OTA End"));
+    #endif
 }
 
 void OTAManager::onOTAProgress(unsigned int progress, unsigned int total)
 {
     updateProgress(progress, total);
+    #ifndef KISS_SERIAL_MODE
     Serial.printf("[OTA] Progress: %u%%\r", (progress / (total / 100)));
+    #endif
 }
 
 void OTAManager::onOTAError(ota_error_t error)
 {
     String errorMsg = "Arduino OTA Error: " + getOTAErrorString(error);
     setStatus(UpdateStatus::FAILED, errorMsg);
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[OTA] " + errorMsg);
+    #endif
 }
 
 String OTAManager::getOTAErrorString(ota_error_t error)
@@ -1054,10 +1094,9 @@ String OTAManager::getOTAErrorString(ota_error_t error)
 void OTAManager::performRollback()
 {
     setStatus(UpdateStatus::ROLLBACK, "Performing rollback...");
+    #ifndef KISS_SERIAL_MODE
     Serial.println(F("[OTA] Performing rollback to previous firmware"));
-    
-    // ESP32 automatic rollback - just restart
-    // The boot loader will automatically use the previous partition
+    #endif
     delay(2000);
     ESP.restart();
 }
@@ -1065,10 +1104,13 @@ void OTAManager::performRollback()
 bool OTAManager::validateUpdate()
 {
     // Basic validation - could be enhanced with checksum verification
+    #ifndef KISS_SERIAL_MODE
     Serial.println(F("[OTA] Validating update..."));
-    
+    #endif
     if (Update.hasError()) {
+        #ifndef KISS_SERIAL_MODE
         Serial.println(F("[OTA] Update has errors"));
+        #endif
         Update.printError(Serial);
         return false;
     }
@@ -1172,12 +1214,16 @@ bool OTAManager::checkRemoteUpdates(const String& manifestUrl)
         availableUpdate = remoteUpdate;
         updateAvailable = true;
         setStatus(UpdateStatus::IDLE, "Update available: " + remoteUpdate.version);
+        #ifndef KISS_SERIAL_MODE
         Serial.printf("[OTA] Update available: %s -> %s\n", currentVer.c_str(), remoteUpdate.version.c_str());
+        #endif
         return true;
     } else {
         updateAvailable = false;
         setStatus(UpdateStatus::IDLE, "No updates available");
+        #ifndef KISS_SERIAL_MODE
         Serial.println(F("[OTA] No updates available"));
+        #endif
         return false;
     }
 }
@@ -1232,7 +1278,9 @@ bool OTAManager::installFromBuffer(uint8_t* buffer, size_t size)
         return false;
     }
     
+    #ifndef KISS_SERIAL_MODE
     Serial.printf("[OTA] Buffer install complete: %d bytes\n", written);
+    #endif
     return true;
 }
 
@@ -1359,9 +1407,13 @@ uint8_t* OTAManager::allocatePSRAM(size_t size)
     
     uint8_t* ptr = (uint8_t*)ps_malloc(size);
     if (ptr) {
+        #ifndef KISS_SERIAL_MODE
         Serial.printf("[OTA] Allocated %d bytes in PSRAM\n", size);
+        #endif
     } else {
+        #ifndef KISS_SERIAL_MODE
         Serial.printf("[OTA] Failed to allocate %d bytes in PSRAM\n", size);
+        #endif
     }
     
     return ptr;
@@ -1371,7 +1423,9 @@ void OTAManager::deallocatePSRAM(uint8_t* ptr)
 {
     if (ptr) {
         free(ptr);
+        #ifndef KISS_SERIAL_MODE
         Serial.println(F("[OTA] Deallocated PSRAM"));
+        #endif
     }
 }
 
@@ -1383,7 +1437,9 @@ bool OTAManager::usePSRAMForDownloads()
 void OTAManager::logError(const String& error)
 {
     lastError = error;
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[OTA ERROR] " + error);
+    #endif
 }
 
 String OTAManager::getLastError()

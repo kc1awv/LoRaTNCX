@@ -10,15 +10,18 @@ void GNSSDriver::begin(uint32_t baud, int rxPin, int txPin)
     cfgRx = rxPin;
     cfgTx = txPin;
 
+    #ifndef KISS_SERIAL_MODE
     Serial.printf("[GNSS] Initializing UART: RX=%d, TX=%d, Baud=%lu\n", rxPin, txPin, baud);
-
+    #endif
     pinMode(rxPin, INPUT);
     pinMode(txPin, OUTPUT);
 
     if (config.getGNSSConfig().verboseLogging)
     {
         int rxState = digitalRead(rxPin);
+        #ifndef KISS_SERIAL_MODE
         Serial.printf("[GNSS] Initial RX pin %d state: %s\n", rxPin, rxState ? "HIGH" : "LOW");
+        #endif
     }
 
     uart->begin(cfgBaud, SERIAL_8N1, cfgRx, cfgTx);
@@ -27,7 +30,9 @@ void GNSSDriver::begin(uint32_t baud, int rxPin, int txPin)
 
     if (config.getGNSSConfig().verboseLogging)
     {
+        #ifndef KISS_SERIAL_MODE
         Serial.println("[GNSS] Testing for GNSS module response...");
+        #endif
     }
 
     lastValidGnssTime = millis();
@@ -42,7 +47,9 @@ void GNSSDriver::poll()
     {
         if (firstCheck)
         {
+            #ifndef KISS_SERIAL_MODE
             Serial.println("[GNSS] GNSS is disabled in configuration");
+            #endif
             firstCheck = false;
         }
         return;
@@ -53,8 +60,12 @@ void GNSSDriver::poll()
         GNSSConfig &cfg = config.getGNSSConfig();
         if (cfg.verboseLogging)
         {
+            #ifndef KISS_SERIAL_MODE
             Serial.println("[GNSS] GNSS enabled, polling for data...");
+            #endif
+            #ifndef KISS_SERIAL_MODE
             Serial.printf("[GNSS] UART: RX pin %d, TX pin %d, Baud %lu\n", cfgRx, cfgTx, cfgBaud);
+            #endif
         }
         firstCheck = false;
     }
@@ -79,7 +90,9 @@ void GNSSDriver::poll()
 
             if (config.getGNSSConfig().verboseLogging && millis() - lastDebugTime > 10000)
             {
+                #ifndef KISS_SERIAL_MODE
                 Serial.println("[GNSS] Received NMEA: " + last.substring(0, 40) + (last.length() > 40 ? "..." : ""));
+                #endif
                 lastDebugTime = millis();
             }
 
@@ -93,19 +106,22 @@ void GNSSDriver::poll()
 
     if (bytesRead == 0 && config.getGNSSConfig().verboseLogging && millis() - lastDebugTime > 15000)
     {
+        #ifndef KISS_SERIAL_MODE
         Serial.printf("[GNSS] No UART data received (RX:%d, TX:%d, Baud:%lu)\n", cfgRx, cfgTx, cfgBaud);
-
+        #endif
         int rxState = digitalRead(cfgRx);
+        #ifndef KISS_SERIAL_MODE
         Serial.printf("[GNSS] RX pin %d current state: %s\n", cfgRx, rxState ? "HIGH" : "LOW");
-
+        #endif
         static bool testedBauds = false;
         static unsigned long lastTestTime = 0;
         if ((!testedBauds || (millis() - lastTestTime > 60000)) && config.getGNSSConfig().verboseLogging)
         {
             testedBauds = true;
             lastTestTime = millis();
+            #ifndef KISS_SERIAL_MODE
             Serial.println("[GNSS] Testing alternative baud rates...");
-
+            #endif
             uint32_t testBauds[] = {9600, 4800, 38400, 115200};
             for (int i = 0; i < 3; i++)
             {
@@ -124,8 +140,10 @@ void GNSSDriver::poll()
                         testBytes++;
                         if (config.getGNSSConfig().verboseLogging)
                         {
+                            #ifndef KISS_SERIAL_MODE
                             Serial.printf("[GNSS] Baud %lu: got char 0x%02X ('%c')\n",
                                           testBauds[i], (uint8_t)c, isprint(c) ? c : '.');
+                            #endif
                         }
                     }
                 }
@@ -134,7 +152,9 @@ void GNSSDriver::poll()
                 {
                     if (config.getGNSSConfig().verboseLogging)
                     {
+                        #ifndef KISS_SERIAL_MODE
                         Serial.printf("[GNSS] Found data at baud rate %lu!\n", testBauds[i]);
+                        #endif
                     }
                     cfgBaud = testBauds[i];
                     return;
@@ -146,7 +166,9 @@ void GNSSDriver::poll()
             uart->begin(cfgBaud, SERIAL_8N1, cfgRx, cfgTx);
             if (config.getGNSSConfig().verboseLogging)
             {
+                #ifndef KISS_SERIAL_MODE
                 Serial.println("[GNSS] Restored original baud rate");
+                #endif
             }
         }
 
@@ -266,10 +288,14 @@ void GNSSDriver::routeToOutputs(const String &sentence)
 
     if (cfg.routeToUsb)
     {
+        #ifndef KISS_SERIAL_MODE
         Serial.print(sentence);
+        #endif
         if (!sentence.endsWith("\r\n"))
         {
+            #ifndef KISS_SERIAL_MODE
             Serial.print("\r\n");
+            #endif
         }
     }
 }
@@ -299,7 +325,9 @@ void GNSSDriver::synthesizeSentences()
 
     if (config.getGNSSConfig().verboseLogging)
     {
+        #ifndef KISS_SERIAL_MODE
         Serial.println("[GNSS] Synthesizing NMEA sentences (GNSS silent)");
+        #endif
     }
 
     routeToOutputs(gprmc);
@@ -426,9 +454,12 @@ uint8_t GNSSDriver::calculateNmeaChecksum(const String &sentence)
 
 void GNSSDriver::testGnssModule()
 {
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[GNSS] Testing GNSS module communication...");
-
+    #endif
+    #ifndef KISS_SERIAL_MODE
     Serial.printf("[GNSS] Test 1: Monitoring RX pin %d for 3 seconds...\n", cfgRx);
+    #endif
     int transitions = 0;
     int lastState = digitalRead(cfgRx);
     unsigned long start = millis();
@@ -444,10 +475,14 @@ void GNSSDriver::testGnssModule()
         delay(1);
     }
 
+    #ifndef KISS_SERIAL_MODE
     Serial.printf("[GNSS] RX pin transitions in 3s: %d %s\n",
                   transitions, transitions > 0 ? "(ACTIVITY DETECTED)" : "(NO ACTIVITY)");
+    #endif
 
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[GNSS] Test 2: Sending wake-up commands...");
+    #endif
     uart->println("$PMTK000*32");
     delay(100);
     uart->println("$PMTK314,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0*28");
@@ -455,7 +490,9 @@ void GNSSDriver::testGnssModule()
     uart->println("$PMTK220,1000*1F");
     delay(500);
 
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[GNSS] Test 3: Checking for module response...");
+    #endif
     int responseBytes = 0;
     start = millis();
 
@@ -465,26 +502,45 @@ void GNSSDriver::testGnssModule()
         {
             char c = uart->read();
             responseBytes++;
+            #ifndef KISS_SERIAL_MODE
             Serial.printf("[GNSS] Response byte %d: 0x%02X ('%c')\n",
                           responseBytes, (uint8_t)c, isprint(c) ? c : '.');
+            #endif
         }
     }
 
     if (responseBytes > 0)
     {
+        #ifndef KISS_SERIAL_MODE
         Serial.printf("[GNSS] Module responded with %d bytes!\n", responseBytes);
+        #endif
     }
     else
     {
 
+        #ifndef KISS_SERIAL_MODE
         Serial.println("[GNSS] Test 4: Hardware diagnostics...");
+        #endif
+        #ifndef KISS_SERIAL_MODE
         Serial.printf("[GNSS] UART pins - RX:%d TX:%d\n", cfgRx, cfgTx);
+        #endif
+        #ifndef KISS_SERIAL_MODE
         Serial.printf("[GNSS] Current RX state: %s\n", digitalRead(cfgRx) ? "HIGH" : "LOW");
-
+        #endif
+        #ifndef KISS_SERIAL_MODE
         Serial.println("[GNSS] Troubleshooting suggestions:");
+        #endif
+        #ifndef KISS_SERIAL_MODE
         Serial.println("[GNSS]   - Verify GNSS module is powered");
+        #endif
+        #ifndef KISS_SERIAL_MODE
         Serial.println("[GNSS]   - Check antenna connection");
+        #endif
+        #ifndef KISS_SERIAL_MODE
         Serial.println("[GNSS]   - Try different baud rates (4800, 38400)");
+        #endif
+        #ifndef KISS_SERIAL_MODE
         Serial.println("[GNSS]   - Verify correct board variant (V3 vs V4)");
+        #endif
     }
 }

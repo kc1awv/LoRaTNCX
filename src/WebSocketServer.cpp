@@ -25,7 +25,9 @@ void WebSocketServer::begin(AsyncWebServer& server) {
     
     // Initialize SPIFFS for web file serving
     if (!SPIFFS.begin(true)) {
+        #ifndef KISS_SERIAL_MODE
         Serial.println("[WS] Failed to mount SPIFFS");
+        #endif
         return;
     }
     
@@ -37,7 +39,9 @@ void WebSocketServer::begin(AsyncWebServer& server) {
     // Set up web file routes
     setupWebRoutes();
     
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[WS] WebSocket server initialized");
+    #endif
 }
 
 void WebSocketServer::handle() {
@@ -89,15 +93,19 @@ void WebSocketServer::onWebSocketEvent(AsyncWebSocket* server, AsyncWebSocketCli
                                       AwsEventType type, void* arg, uint8_t* data, size_t len) {
     switch (type) {
         case WS_EVT_CONNECT:
+#ifndef KISS_SERIAL_MODE
             Serial.printf("[WS] Client #%u connected from %s\n", client->id(), 
                          client->remoteIP().toString().c_str());
+#endif
             broadcastLogMessage("INFO", "Web client connected from " + client->remoteIP().toString());
             // Send initial status to new client
             handleStatusRequest(client, "all_status");
             break;
             
         case WS_EVT_DISCONNECT:
+            #ifndef KISS_SERIAL_MODE
             Serial.printf("[WS] Client #%u disconnected\n", client->id());
+            #endif
             broadcastLogMessage("INFO", "Web client disconnected (ID: " + String(client->id()) + ")");
             break;
             
@@ -121,7 +129,9 @@ void WebSocketServer::handleWebSocketMessage(AsyncWebSocketClient* client, const
     DeserializationError error = deserializeJson(doc, message);
     
     if (error) {
+        #ifndef KISS_SERIAL_MODE
         Serial.println("[WS] Failed to parse JSON message");
+        #endif
         sendError(client, "Invalid JSON format");
         return;
     }
@@ -358,17 +368,23 @@ void WebSocketServer::updateSystemConfig(JsonObject data) {
             bool success = reinitializeDisplay();
             if (success) {
                 displayAvailable = true;
+                #ifndef KISS_SERIAL_MODE
                 Serial.println("[OLED] Display enabled via web interface");
+                #endif
                 broadcastLogMessage("INFO", "OLED display enabled via web interface");
             } else {
+                #ifndef KISS_SERIAL_MODE
                 Serial.println("[OLED] Failed to enable display");
+                #endif
                 broadcastLogMessage("ERROR", "Failed to enable OLED display");
             }
         } else if (!enabled && displayAvailable) {
             // Disable display
             displayAvailable = false;
             display.displayOff();
+            #ifndef KISS_SERIAL_MODE
             Serial.println("[OLED] Display disabled via web interface");
+            #endif
             broadcastLogMessage("INFO", "OLED display disabled via web interface");
         }
     }
@@ -388,17 +404,23 @@ void WebSocketServer::updateSystemConfig(JsonObject data) {
                 // Enable GNSS with proper hardware reinitialization
                 bool success = reinitializeGNSS();
                 if (success) {
+                    #ifndef KISS_SERIAL_MODE
                     Serial.println("[GNSS] GNSS enabled via web interface");
+                    #endif
                     broadcastLogMessage("INFO", "GNSS enabled via web interface");
                 } else {
+                    #ifndef KISS_SERIAL_MODE
                     Serial.println("[GNSS] Failed to enable GNSS");
+                    #endif
                     broadcastLogMessage("ERROR", "Failed to enable GNSS");
                     gnssConfig.enabled = false;  // Revert config on failure
                 }
             } else {
                 // Disable GNSS with proper shutdown
                 shutdownGNSS();
+                #ifndef KISS_SERIAL_MODE
                 Serial.println("[GNSS] GNSS disabled via web interface");
+                #endif
                 broadcastLogMessage("INFO", "GNSS disabled via web interface");
             }
         }
@@ -407,7 +429,9 @@ void WebSocketServer::updateSystemConfig(JsonObject data) {
     // Update timezone (placeholder for future implementation)
     if (data["timezone"].is<String>()) {
         String timezone = data["timezone"].as<String>();
+        #ifndef KISS_SERIAL_MODE
         Serial.printf("[SYSTEM] Timezone set to: %s\n", timezone.c_str());
+        #endif
         broadcastLogMessage("INFO", "Timezone updated to: " + timezone);
         // TODO: Implement timezone storage in config
     }
@@ -417,13 +441,17 @@ void WebSocketServer::updateSystemConfig(JsonObject data) {
 }
 
 void WebSocketServer::handleRestart() {
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[WS] Restart command received");
+    #endif
     delay(1000); // Give time for response to be sent
     ESP.restart();
 }
 
 void WebSocketServer::handleFactoryReset() {
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[WS] Factory reset command received");
+    #endif
     if (configRef) {
         configRef->resetToDefaults();
         configRef->saveConfig();
@@ -441,7 +469,9 @@ void WebSocketServer::handleSendAPRSMessage(JsonObject data) {
     String text = data["text"].as<String>();
     
     // TODO: Implement APRS message sending via radio
+    #ifndef KISS_SERIAL_MODE
     Serial.printf("[WS] APRS message to %s: %s\n", to.c_str(), text.c_str());
+    #endif
 }
 
 void WebSocketServer::handleBackupConfig(AsyncWebSocketClient* client) {
@@ -729,7 +759,9 @@ void WebSocketServer::setupWebRoutes() {
         request->send(404, "text/plain", "File not found");
     });
     
+    #ifndef KISS_SERIAL_MODE
     Serial.println("[WS] Web routes configured");
+    #endif
 }
 
 bool WebSocketServer::handleFileRead(AsyncWebServerRequest* request, String path) {

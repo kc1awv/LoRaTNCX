@@ -531,7 +531,7 @@ class LoRaTNCXChat:
         print(f"{Style.BRIGHT}{Fore.CYAN}")
         print("╔══════════════════════════════════════╗")
         print("║         LoRaTNCX Chat v1.0           ║")
-        print("║    Amateur Radio Packet Chat        ║")
+        print("║    Amateur Radio Packet Chat         ║")
         print("╚══════════════════════════════════════╝")
         print(Style.RESET_ALL)
         
