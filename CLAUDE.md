@@ -84,7 +84,8 @@ test/          # Unit tests
 ### LoRa Radio
 - **Chip**: SX1262 (on Heltec V4)
 - **Frequency**: Configurable (amateur radio bands)
-- **Power**: Configurable output power
+- **Power**: Configurable output power (up to 20dBm with PA)
+- **Power Amplifier**: Requires proper PA pin initialization for TX
 - **Antenna**: External connector
 
 ## Current Project Structure
@@ -109,6 +110,7 @@ The project now includes proper pin definitions for the Heltec WiFi LoRa 32 V4:
 
 ### Key Pins:
 - **LoRa Radio (SX1262)**: RST=12, BUSY=13, DIO0=14, SS=8
+- **LoRa Power Amplifier**: PA_POWER=7, PA_EN=2, PA_TX_EN=46
 - **OLED Display**: SDA=17, SCL=18, RST=21
 - **GNSS Module (optional)**: VCTL=34, RX=38, TX=39, Wake=40, PPS=41, RST=42
 - **Status LED**: Pin 35
@@ -119,7 +121,7 @@ The project now includes proper pin definitions for the Heltec WiFi LoRa 32 V4:
 ## Build Status
 - **Last Successful Build**: October 28, 2025
 - **RAM Usage**: 3.5% (18,500 / 524,288 bytes)
-- **Flash Usage**: 3.9% (253,229 / 6,553,600 bytes)
+- **Flash Usage**: 3.9% (253,313 / 6,553,600 bytes)
 - **Build Time**: ~3 seconds
 
 ## Next Steps
@@ -137,6 +139,10 @@ The project now includes proper pin definitions for the Heltec WiFi LoRa 32 V4:
 - Document any hardware-specific configurations
 - Keep the README.md updated for users
 - Use proper Git commit messages
+- **CRITICAL**: Always initialize LoRa PA pins before radio operations
+  - PA_POWER_PIN (7): Set to ANALOG mode
+  - PA_EN_PIN (2): Set HIGH to enable PA
+  - PA_TX_EN_PIN (46): Set HIGH to enable TX
 
 ## Dependencies (To Be Added)
 - LoRa radio library (RadioLib or similar)

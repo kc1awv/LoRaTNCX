@@ -27,6 +27,11 @@
 #define LORA_MOSI_PIN      MOSI      // SPI MOSI (Pin 10)
 #define LORA_MISO_PIN      MISO      // SPI MISO (Pin 11)
 
+// LoRa Power Amplifier (PA) configuration
+#define LORA_PA_POWER_PIN  7         // PA power control
+#define LORA_PA_EN_PIN     2         // PA enable
+#define LORA_PA_TX_EN_PIN  46        // PA TX enable
+
 // ==========================================
 // DISPLAY CONFIGURATION
 // ==========================================
@@ -105,9 +110,11 @@
 // AVAILABLE GPIO PINS
 // ==========================================
 // These pins are available for future expansion:
-// GPIO 1, 2, 3, 4, 5, 6, 7, 15, 16, 19, 20
+// GPIO 1, 3, 4, 5, 6, 15, 16, 19, 20
 // 
 // Reserved/Used pins:
+// - Pin 2: LoRa PA enable
+// - Pin 7: LoRa PA power
 // - Pin 8: LoRa SS
 // - Pin 9: SPI SCK
 // - Pin 10: SPI MOSI
@@ -128,5 +135,6 @@
 // - Pin 42: GNSS reset
 // - Pin 43: UART TX
 // - Pin 44: UART RX
+// - Pin 46: LoRa PA TX enable
 
 #endif // HARDWARE_CONFIG_H

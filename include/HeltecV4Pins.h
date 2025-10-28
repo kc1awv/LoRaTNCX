@@ -30,6 +30,7 @@
 //
 // LoRa Radio (SX1262):
 // RST_LoRa = 12, BUSY_LoRa = 13, DIO0 = 14
+// LORA_PA_POWER = 7, LORA_PA_EN = 2, LORA_PA_TX_EN = 46
 //
 // GNSS Module (optional attachment):
 // VGNSS_CTL = 34, GNSS_RX = 38, GNSS_TX = 39
