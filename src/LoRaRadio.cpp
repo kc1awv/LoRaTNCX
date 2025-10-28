@@ -27,11 +27,24 @@ bool LoRaRadio::begin() {
     // Initialize PA pins first (critical for proper operation)
     initializePAPins();
     
-    // Create SPI instance
+    // Wait for PA pins to stabilize
+    delay(100);
+    
+    // Initialize SPI explicitly
+    Serial.println("Initializing SPI...");
+    SPI.begin(LORA_SCK_PIN, LORA_MISO_PIN, LORA_MOSI_PIN, LORA_SS_PIN);
     spi = &SPI;
     
+    // Wait for SPI initialization
+    delay(50);
+    
     // Create SX1262 instance with pin configuration
+    Serial.printf("Creating SX1262 instance: SS=%d, DIO0=%d, RST=%d, BUSY=%d\n", 
+                  LORA_SS_PIN, LORA_DIO0_PIN, LORA_RST_PIN, LORA_BUSY_PIN);
     radio = new SX1262(new Module(LORA_SS_PIN, LORA_DIO0_PIN, LORA_RST_PIN, LORA_BUSY_PIN, *spi));
+    
+    // Wait before initialization
+    delay(100);
     
     // Initialize the radio
     Serial.print("SX1262 initialization... ");

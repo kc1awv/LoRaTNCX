@@ -1,17 +1,16 @@
 #include <Arduino.h>
 #include "HardwareConfig.h"
 #include "LoRaRadio.h"
+#include "TNCManager.h"
 
 LoRaRadio loraRadio;
+TNCManager tncManager;
 
 void setup()
 {
-    // Initialize serial communication
+    // Initialize serial communication at KISS standard baud rate
     Serial.begin(KISS_BAUD_RATE);
     while (!Serial) delay(10);
-    
-    Serial.println("\n=== LoRaTNCX v2.0 - Heltec WiFi LoRa 32 V4 ===");
-    Serial.println("LoRa TNC with RadioLib Integration");
 
     // Initialize status LED
     pinMode(STATUS_LED_PIN, OUTPUT);
@@ -21,73 +20,54 @@ void setup()
     pinMode(POWER_CTRL_PIN, OUTPUT);
     digitalWrite(POWER_CTRL_PIN, POWER_ON);
     
-    // Initialize LoRa radio subsystem
-    Serial.println("\nInitializing LoRa radio...");
-    if (loraRadio.begin()) {
-        Serial.println("✓ LoRa radio initialized successfully!");
-        
-        // Send a test beacon
-        Serial.println("\nSending test beacon...");
-        String beacon = "LoRaTNCX v2.0 - System Online";
-        int result = loraRadio.transmit(beacon);
-        
-        if (result == RADIOLIB_ERR_NONE) {
-            Serial.println("✓ Test beacon transmitted successfully!");
-        } else {
-            Serial.printf("✗ Test beacon failed with code: %d\n", result);
-        }
-        
-        // Radio is ready for both TX and RX operations
-        Serial.println("\nRadio ready for TX/RX operations");
-        
-    } else {
-        Serial.println("✗ Failed to initialize LoRa radio!");
+    // Initialize LoRa radio subsystem first
+    Serial.println("Starting LoRa radio initialization...");
+    if (!loraRadio.begin()) {
+        Serial.println("WARNING: Failed to initialize LoRa radio!");
         Serial.println("Check hardware connections and configuration");
+        Serial.println("Continuing without LoRa radio for debugging...");
+        // Flash LED a few times to indicate warning
+        for (int i = 0; i < 5; i++) {
+            digitalWrite(STATUS_LED_PIN, LED_ON);
+            delay(200);
+            digitalWrite(STATUS_LED_PIN, LED_OFF);
+            delay(200);
+        }
+    } else {
+        Serial.println("LoRa radio initialized successfully!");
     }
-
-    // Print comprehensive pin configuration
-    Serial.println("\n=== Hardware Configuration ===");
-    Serial.printf("LoRa SS: %d, RST: %d, DIO0: %d, BUSY: %d\n",
-                  LORA_SS_PIN, LORA_RST_PIN, LORA_DIO0_PIN, LORA_BUSY_PIN);
-    Serial.printf("LoRa PA Power: %d, PA EN: %d, PA TX EN: %d\n",
-                  LORA_PA_POWER_PIN, LORA_PA_EN_PIN, LORA_PA_TX_EN_PIN);
-    Serial.printf("OLED SDA: %d, SCL: %d, RST: %d\n",
-                  OLED_SDA_PIN, OLED_SCL_PIN, OLED_RST_PIN);
-    Serial.printf("Status LED: %d, Power Control: %d\n",
-                  STATUS_LED_PIN, POWER_CTRL_PIN);
-    Serial.printf("GNSS VCTL: %d, RX: %d, TX: %d, Wake: %d, PPS: %d, RST: %d\n",
-                  GNSS_VCTL_PIN, GNSS_RX_PIN, GNSS_TX_PIN, GNSS_WAKE_PIN, GNSS_PPS_PIN, GNSS_RST_PIN);
-
-    Serial.println("\n=== LoRaTNCX Ready for Operation ===");
+    
+    // Initialize TNC Manager
+    if (!tncManager.begin()) {
+        Serial.println("FATAL: Failed to initialize TNC Manager!");
+        while (1) {
+            // Blink LED rapidly to indicate error
+            digitalWrite(STATUS_LED_PIN, LED_ON);
+            delay(50);
+            digitalWrite(STATUS_LED_PIN, LED_OFF);
+            delay(50);
+        }
+    }
+    
+    // Give TNC Manager reference to LoRa radio
+    tncManager.setLoRaRadio(&loraRadio);
+    
+    Serial.println();
+    Serial.println("=== LoRaTNCX v2.0 - TAPR TNC-2 Compatible ===");
+    Serial.println("Hardware: Heltec WiFi LoRa 32 V4 (ESP32-S3)");
+    Serial.println("LoRa Chip: SX1262, RadioLib: v7.4.0");
+    Serial.println("Type HELP for command list");
+    Serial.println();
+    Serial.print("cmd:");
+    
+    // System is now ready - TNC Manager will handle the interface
 }
 
 void loop()
 {
-    // Periodic test transmission every 30 seconds
-    static unsigned long lastTest = 0;
-    if (millis() - lastTest > 30000) {
-        String testMsg = "LoRaTNCX Beacon #" + String(millis() / 1000);
-        Serial.printf("\n[TX] Sending: %s\n", testMsg.c_str());
-        int result = loraRadio.transmit(testMsg);
-        if (result == RADIOLIB_ERR_NONE) {
-            Serial.println("[TX] Success!");
-        } else {
-            Serial.printf("[TX] Failed with code: %d\n", result);
-        }
-        lastTest = millis();
-    }
     
-    // Try to receive messages (with timeout)
-    uint8_t buffer[256];
-    int packetLength = loraRadio.receive(buffer, sizeof(buffer));
-    
-    if (packetLength > 0) {
-        // Successful reception
-        buffer[packetLength] = 0;  // Null-terminate
-        Serial.printf("\n[RX] Received: %s\n", (char*)buffer);
-        Serial.printf("[RX] RSSI: %.1f dBm, SNR: %.1f dB\n", 
-                     loraRadio.getLastRSSI(), loraRadio.getLastSNR());
-    }
+    // Main TNC processing loop
+    tncManager.update();
     
     // Blink status LED to show system is alive
     static unsigned long lastBlink = 0;
@@ -100,5 +80,6 @@ void loop()
         lastBlink = millis();
     }
 
-    delay(100);  // Slightly longer delay for receive polling
+    // Small delay to prevent overwhelming the system
+    delay(10);
 }

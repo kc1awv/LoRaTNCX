@@ -62,7 +62,7 @@
 // ==========================================
 // Using USB CDC for KISS interface (default Serial)
 #define KISS_SERIAL        Serial
-#define KISS_BAUD_RATE     115200
+#define KISS_BAUD_RATE     9600
 
 // Optional: Hardware serial for debugging
 #define DEBUG_SERIAL       Serial
