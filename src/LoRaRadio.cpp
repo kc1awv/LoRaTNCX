@@ -192,8 +192,8 @@ int LoRaRadio::receive(uint8_t* data, size_t maxLength) {
         Serial.printf("Received %d bytes, RSSI: %.1f dBm, SNR: %.1f dB\n", 
                       state, lastRSSI, lastSNR);
     } else if (state == RADIOLIB_ERR_RX_TIMEOUT) {
-        // Timeout - not necessarily an error
-        Serial.println("RX timeout");
+        // Timeout - not necessarily an error (normal when no radio activity)
+        // Serial.println("RX timeout");  // Commented out to reduce console spam
     } else {
         Serial.printf("Reception failed, code %d\n", state);
     }
