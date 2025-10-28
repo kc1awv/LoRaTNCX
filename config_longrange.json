@@ -1,0 +1,24 @@
+{
+  "station": {
+    "callsign": "LR1TEST",
+    "node_name": "Long Range Node",
+    "location": "Mountain Top"
+  },
+  "radio": {
+    "frequency": 433000000,
+    "tx_power": 20,
+    "bandwidth_index": 6,
+    "spreading_factor": 12,
+    "coding_rate": 8
+  },
+  "hello": {
+    "enabled": true,
+    "interval": 120,
+    "message_template": "Long range beacon from {node_name} ({callsign})"
+  },
+  "serial": {
+    "port": "/dev/ttyACM0",
+    "baudrate": 115200,
+    "timeout": 1
+  }
+}

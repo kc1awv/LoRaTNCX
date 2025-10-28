@@ -1,0 +1,24 @@
+{
+  "station": {
+    "callsign": "HS1TEST",
+    "node_name": "High Speed Node",
+    "location": "Urban Area"
+  },
+  "radio": {
+    "frequency": 915000000,
+    "tx_power": 17,
+    "bandwidth_index": 9,
+    "spreading_factor": 7,
+    "coding_rate": 5
+  },
+  "hello": {
+    "enabled": true,
+    "interval": 30,
+    "message_template": "High speed node {node_name} ({callsign}) online"
+  },
+  "serial": {
+    "port": "/dev/ttyACM0",
+    "baudrate": 115200,
+    "timeout": 1
+  }
+}

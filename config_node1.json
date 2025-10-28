@@ -1,0 +1,24 @@
+{
+  "station": {
+    "callsign": "KX1TEST",
+    "node_name": "Base Station",
+    "location": "Lab Bench"
+  },
+  "radio": {
+    "frequency": 433000000,
+    "tx_power": 14,
+    "bandwidth_index": 7,
+    "spreading_factor": 8,
+    "coding_rate": 5
+  },
+  "hello": {
+    "enabled": true,
+    "interval": 45,
+    "message_template": "CQ CQ from {node_name} ({callsign}) at {location}"
+  },
+  "serial": {
+    "port": "/dev/ttyACM0",
+    "baudrate": 115200,
+    "timeout": 1
+  }
+}
