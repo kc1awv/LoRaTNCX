@@ -47,9 +47,9 @@
 // DEBUG CONFIGURATION  
 // ==========================================
 // Control debug output for performance optimization
-#define DEBUG_KISS_VERBOSE     false  // Disable verbose KISS debug output
-#define DEBUG_RADIO_VERBOSE    false  // Disable verbose radio debug output
-#define DEBUG_COMMAND_VERBOSE  false  // Disable verbose command debug output
+#define DEBUG_KISS_VERBOSE     true   // Enable verbose KISS debug output for diagnosis
+#define DEBUG_RADIO_VERBOSE    true   // Enable verbose radio debug output for diagnosis
+#define DEBUG_COMMAND_VERBOSE  true   // Enable verbose command debug output for diagnosis
 
 // ==========================================
 // STATUS LED CONFIGURATION
@@ -70,7 +70,7 @@
 // ==========================================
 // Using USB CDC for KISS interface (default Serial)
 #define KISS_SERIAL        Serial
-#define KISS_BAUD_RATE     9600
+#define KISS_BAUD_RATE     115200      // Temporarily use 115200 for debugging
 
 // Optional: Hardware serial for debugging
 #define DEBUG_SERIAL       Serial
