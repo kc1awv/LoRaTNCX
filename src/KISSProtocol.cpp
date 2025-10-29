@@ -29,6 +29,7 @@ bool KISSProtocol::begin()
     slotTime = 10;      // 100ms default slot time
     txTail = 5;         // 50ms default TX tail
     fullDuplex = false; // Half duplex by default
+    exitRequested = false; // No exit request initially
 
     Serial.println("✓ KISS protocol initialized");
     Serial.println("Default parameters:");
@@ -104,6 +105,70 @@ bool KISSProtocol::processIncoming()
                 resetRxBuffer();
                 frameInProgress = false;
             }
+        }
+    }
+
+    return frameComplete;
+}
+
+bool KISSProtocol::processByte(uint8_t byte)
+{
+    bool frameComplete = false;
+
+    if (byte == FEND)
+    {
+        if (frameInProgress && rxIndex > 0)
+        {
+            // End of frame - process it
+            processFrame(rxBuffer, rxIndex);
+            frameComplete = true;
+        }
+        // Start new frame
+        resetRxBuffer();
+        frameInProgress = true;
+        escapeNext = false;
+    }
+    else if (frameInProgress)
+    {
+        if (escapeNext)
+        {
+            // Handle escaped characters
+            if (byte == TFEND)
+            {
+                byte = FEND;
+            }
+            else if (byte == TFESC)
+            {
+                byte = FESC;
+            }
+            else
+            {
+                // Invalid escape sequence
+                errors++;
+                resetRxBuffer();
+                frameInProgress = false;
+                return false;
+            }
+            escapeNext = false;
+        }
+        else if (byte == FESC)
+        {
+            // Escape next character
+            escapeNext = true;
+            return false;
+        }
+
+        // Add byte to buffer if there's room
+        if (rxIndex < KISS_RX_BUFFER_SIZE - 1)
+        {
+            rxBuffer[rxIndex++] = byte;
+        }
+        else
+        {
+            // Buffer overflow
+            errors++;
+            resetRxBuffer();
+            frameInProgress = false;
         }
     }
 
@@ -188,40 +253,41 @@ bool KISSProtocol::processCommand(uint8_t command, uint8_t parameter)
     {
     case CMD_TXDELAY:
         txDelay = parameter;
-        Serial.printf("KISS: TX Delay set to %d (%.1f ms)\n", txDelay, txDelay * 10.0);
+        // Silent operation - no messages in KISS mode
         break;
 
     case CMD_P:
         persistence = parameter;
-        Serial.printf("KISS: Persistence set to %d (%.1f%%)\n", persistence, (persistence / 255.0) * 100.0);
+        // Silent operation - no messages in KISS mode
         break;
 
     case CMD_SLOTTIME:
         slotTime = parameter;
-        Serial.printf("KISS: Slot Time set to %d (%.1f ms)\n", slotTime, slotTime * 10.0);
+        // Silent operation - no messages in KISS mode
         break;
 
     case CMD_TXTAIL:
         txTail = parameter;
-        Serial.printf("KISS: TX Tail set to %d (%.1f ms)\n", txTail, txTail * 10.0);
+        // Silent operation - no messages in KISS mode
         break;
 
     case CMD_FULLDUPLEX:
         fullDuplex = (parameter != 0);
-        Serial.printf("KISS: Full Duplex set to %s\n", fullDuplex ? "Yes" : "No");
+        // Silent operation - no messages in KISS mode
         break;
 
     case CMD_SETHARDWARE:
-        Serial.printf("KISS: Set Hardware command (parameter: 0x%02X)\n", parameter);
         // Hardware-specific commands can be implemented here
+        // Silent operation - no messages in KISS mode
         break;
 
     case CMD_RETURN:
-        Serial.println("KISS: Return to command mode");
+        // Silent operation - no messages in KISS mode
+        exitRequested = true;
         break;
 
     default:
-        Serial.printf("KISS: Unknown command 0x%02X\n", command);
+        // Silent operation - no messages in KISS mode
         handled = false;
         errors++;
         break;
@@ -295,4 +361,14 @@ void KISSProtocol::resetRxBuffer()
     rxIndex = 0;
     frameInProgress = false;
     escapeNext = false;
+}
+
+bool KISSProtocol::isExitRequested()
+{
+    return exitRequested;
+}
+
+void KISSProtocol::clearExitRequest()
+{
+    exitRequested = false;
 }

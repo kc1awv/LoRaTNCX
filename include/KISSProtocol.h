@@ -56,6 +56,13 @@ public:
     bool processIncoming();
 
     /**
+     * @brief Process a single byte for KISS frame assembly
+     * @param byte Byte to process
+     * @return true if complete frame received
+     */
+    bool processByte(uint8_t byte);
+
+    /**
      * @brief Check if a complete KISS frame is available
      * @return true if frame available
      */
@@ -99,6 +106,17 @@ public:
      */
     String getStatus();
 
+    /**
+     * @brief Check if exit from KISS mode has been requested
+     * @return true if exit requested
+     */
+    bool isExitRequested();
+
+    /**
+     * @brief Clear the exit request flag
+     */
+    void clearExitRequest();
+
 private:
     uint8_t rxBuffer[KISS_RX_BUFFER_SIZE]; // Receive buffer
     size_t rxIndex;                        // Current receive index
@@ -120,6 +138,7 @@ private:
     uint8_t slotTime;    // Slot time parameter
     uint8_t txTail;      // TX tail parameter
     bool fullDuplex;     // Full duplex mode
+    bool exitRequested;  // Exit KISS mode requested
 
     /**
      * @brief Process a complete KISS frame
