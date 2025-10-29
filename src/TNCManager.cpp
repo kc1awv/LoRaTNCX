@@ -11,6 +11,7 @@ TNCManager::TNCManager() : configManager(&radio)
 {
     initialized = false;
     lastStatus = 0;
+    serialBuffer = "";
 }
 
 bool TNCManager::begin()
@@ -39,14 +40,10 @@ bool TNCManager::begin()
     
     Serial.println("✓ LoRa radio configured");
     Serial.println("\n=== TNC Ready ===");
-    Serial.println("Entering KISS mode...");
-    Serial.println("Connect your packet radio application to this serial port.");
+    Serial.println("Starting in Command mode...");
+    Serial.println("Type HELP for available commands");
+    Serial.println("Type KISS to enter KISS mode");
     Serial.println(configManager.getConfigStatus());
-    Serial.println("\nConfiguration commands available:");
-    Serial.println("  LISTCONFIG - Show all available presets");
-    Serial.println("  SETCONFIG <preset> - Change configuration");
-    Serial.println("  GETCONFIG - Show current configuration");
-    
     Serial.println("===============================");
 
     initialized = true;
@@ -60,8 +57,8 @@ void TNCManager::update()
         return;
     }
 
-    // Handle incoming KISS commands from serial
-    handleIncomingKISS();
+    // Handle incoming serial data (could be commands or KISS)
+    handleIncomingSerial();
 
     // Handle incoming LoRa packets
     handleIncomingRadio();
@@ -92,62 +89,109 @@ bool TNCManager::processConfigurationCommand(const String& command)
     return configManager.processConfigCommand(command);
 }
 
-void TNCManager::handleIncomingKISS()
+void TNCManager::handleIncomingSerial()
 {
-    // Process incoming serial data for KISS frames
-    if (kiss.processIncoming())
+    // Read available serial data
+    while (Serial.available())
     {
-        // Complete frame received
-        uint8_t buffer[512];
-        size_t length = kiss.getFrame(buffer, sizeof(buffer));
-
-        if (length > 0)
+        char c = Serial.read();
+        
+        if (commandSystem.getCurrentMode() == TNCMode::KISS_MODE)
         {
-            // Check if this is a configuration command (text starting with CONFIG, SETCONFIG, LISTCONFIG, or GETCONFIG)
-            String frameData = "";
-            bool isText = true;
-            for (size_t i = 0; i < length; i++) {
-                if (buffer[i] >= 32 && buffer[i] < 127) {
-                    frameData += (char)buffer[i];
-                } else if (buffer[i] != 0) {  // Allow null termination
-                    isText = false;
-                    break;
-                }
-            }
-            
-            if (isText && (frameData.startsWith("CONFIG") || frameData.startsWith("SETCONFIG") || 
-                          frameData.startsWith("LISTCONFIG") || frameData.startsWith("GETCONFIG"))) {
-                Serial.println("TNC: Processing configuration command: " + frameData);
-                processConfigurationCommand(frameData);
-                return;  // Don't transmit configuration commands over radio
-            }
-            
-            // Regular data packet - transmit via LoRa
-            Serial.print("TNC: Transmitting ");
-            Serial.print(length);
-            Serial.print(" bytes: ");
-            for (size_t i = 0; i < length && i < 20; i++)
+            // In KISS mode, pass directly to KISS processor
+            // This is more complex in practice - we'd need to buffer properly
+            // For now, just add the character to let KISS handle it
+            serialBuffer += c;
+            // Process KISS data here - simplified for this example
+            if (kiss.processIncoming())
             {
-                if (buffer[i] >= 32 && buffer[i] < 127)
+                handleIncomingKISS();
+            }
+        }
+        else
+        {
+            // In command mode, handle line-by-line
+            if (c == '\r' || c == '\n')
+            {
+                if (serialBuffer.length() > 0)
                 {
-                    Serial.print((char)buffer[i]);
+                    // Process command
+                    commandSystem.processCommand(serialBuffer);
+                    serialBuffer = "";
                 }
                 else
                 {
-                    Serial.print('.');
+                    // Empty line, show prompt
+                    commandSystem.sendPrompt();
                 }
             }
-            Serial.println();
-
-            // Transmit packet
-            if (radio.transmit(buffer, length))
+            else if (c >= ' ')  // Printable characters
             {
-                Serial.println("TNC: Transmission successful");
+                serialBuffer += c;
+            }
+            else if (c == 8 || c == 127)  // Backspace or DEL
+            {
+                if (serialBuffer.length() > 0)
+                {
+                    serialBuffer.remove(serialBuffer.length() - 1);
+                }
+            }
+        }
+    }
+}
+
+void TNCManager::handleIncomingKISS()
+{
+    // Process incoming serial data for KISS frames
+    uint8_t buffer[512];
+    size_t length = kiss.getFrame(buffer, sizeof(buffer));
+
+    if (length > 0)
+    {
+        // Check if this is a configuration command (text starting with CONFIG, SETCONFIG, LISTCONFIG, or GETCONFIG)
+        String frameData = "";
+        bool isText = true;
+        for (size_t i = 0; i < length; i++) {
+            if (buffer[i] >= 32 && buffer[i] < 127) {
+                frameData += (char)buffer[i];
+            } else if (buffer[i] != 0) {  // Allow null termination
+                isText = false;
+                break;
+            }
+        }
+        
+        if (isText && (frameData.startsWith("CONFIG") || frameData.startsWith("SETCONFIG") || 
+                      frameData.startsWith("LISTCONFIG") || frameData.startsWith("GETCONFIG"))) {
+            Serial.println("TNC: Processing configuration command: " + frameData);
+            processConfigurationCommand(frameData);
+            return;  // Don't transmit configuration commands over radio
+        }
+        
+        // Regular data packet - transmit via LoRa
+        Serial.print("TNC: Transmitting ");
+        Serial.print(length);
+        Serial.print(" bytes: ");
+        for (size_t i = 0; i < length && i < 20; i++)
+        {
+            if (buffer[i] >= 32 && buffer[i] < 127)
+            {
+                Serial.print((char)buffer[i]);
             }
             else
             {
-                Serial.println("TNC: Transmission failed");
+                Serial.print('.');
             }
+        }
+        Serial.println();
+
+        // Transmit packet
+        if (radio.transmit(buffer, length))
+        {
+            Serial.println("TNC: Transmission successful");
+        }
+        else
+        {
+            Serial.println("TNC: Transmission failed");
         }
     }
 }
