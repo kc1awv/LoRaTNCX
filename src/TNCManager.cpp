@@ -39,6 +39,11 @@ bool TNCManager::begin()
     }
     
     Serial.println("✓ LoRa radio configured");
+    
+    // Connect radio to command system for hardware integration
+    commandSystem.setRadio(&radio);
+    Serial.println("✓ Command system radio integration enabled");
+    
     Serial.println("\n=== TNC Ready ===");
     Serial.println("Starting in Command mode...");
     Serial.println("Type HELP for available commands");
@@ -206,6 +211,17 @@ void TNCManager::handleIncomingRadio()
 
         if (length > 0)
         {
+            // Convert to string for processing
+            String packet = "";
+            for (size_t i = 0; i < length; i++)
+            {
+                packet += (char)buffer[i];
+            }
+            
+            // Get signal quality
+            float rssi = radio.getRSSI();
+            float snr = radio.getSNR();
+            
             Serial.print("TNC: Received ");
             Serial.print(length);
             Serial.print(" bytes via LoRa: ");
@@ -221,10 +237,13 @@ void TNCManager::handleIncomingRadio()
                 }
             }
             Serial.print(" (RSSI: ");
-            Serial.print(radio.getRSSI(), 1);
+            Serial.print(rssi, 1);
             Serial.print(" dBm, SNR: ");
-            Serial.print(radio.getSNR(), 1);
+            Serial.print(snr, 1);
             Serial.println(" dB)");
+
+            // Process packet for connection management and protocol handling
+            commandSystem.processReceivedPacket(packet, rssi, snr);
 
             // Send received packet to host via KISS
             kiss.sendData(buffer, length);

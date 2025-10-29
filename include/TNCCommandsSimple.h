@@ -12,6 +12,9 @@
 
 #include <Arduino.h>
 
+// Forward declaration to avoid circular includes
+class LoRaRadio;
+
 // Command execution return codes
 enum class TNCCommandResult {
     SUCCESS,
@@ -46,15 +49,30 @@ public:
     TNCMode getMode() const { return currentMode; }
     TNCMode getCurrentMode() const { return currentMode; }  // Add alias for compatibility
     String getModeString() const;
+    bool isInConverseMode() const;
+    bool sendChatMessage(const String& message);
     
     // Response handling
     void sendResponse(const String& response);
     void sendPrompt();
+    
+    // Hardware integration
+    void setRadio(LoRaRadio* radioPtr);
+    
+    // Configuration management
+    bool loadConfigurationFromFlash();
+    bool saveConfigurationToFlash();
+    
+    // Packet processing (called from main loop)
+    void processReceivedPacket(const String& packet, float rssi, float snr);
 
 private:
     TNCMode currentMode;
     bool echoEnabled;
     bool promptEnabled;
+    
+    // Hardware reference
+    LoRaRadio* radio;
     
     // Configuration storage (Arduino-compatible)
     struct TNCConfig {
@@ -132,6 +150,63 @@ private:
         float lastSNR;
         unsigned long uptime;
     } stats;
+    
+    // Routing table structures
+    struct RouteEntry {
+        String destination;  // Callsign of destination
+        String nextHop;      // Next hop callsign
+        uint8_t hops;        // Number of hops to destination
+        float quality;       // Link quality (0.0-1.0)
+        unsigned long lastUsed;  // Last time route was used
+        unsigned long lastUpdated; // Last time route was updated
+        bool isActive;       // Route is currently valid
+    };
+    
+    static const int MAX_ROUTES = 32;
+    RouteEntry routingTable[MAX_ROUTES];
+    int routeCount;
+    
+    // Node/station tracking structures
+    struct NodeEntry {
+        String callsign;     // Station callsign
+        uint8_t ssid;        // SSID if applicable
+        float lastRSSI;      // Last received RSSI
+        float lastSNR;       // Last received SNR
+        unsigned long lastHeard;  // Last time heard
+        unsigned long firstHeard; // First time heard
+        uint32_t packetCount;     // Number of packets heard
+        String lastPacket;   // Last packet content (truncated)
+        bool isBeacon;       // Last packet was a beacon
+    };
+    
+    static const int MAX_NODES = 64;
+    NodeEntry nodeTable[MAX_NODES];
+    int nodeCount;
+    
+    // Connection state management
+    enum ConnectionState {
+        DISCONNECTED,
+        CONNECTING,
+        CONNECTED,
+        DISCONNECTING
+    };
+    
+    struct ConnectionInfo {
+        String remoteCall;       // Remote station callsign
+        uint8_t remoteSSID;      // Remote station SSID
+        ConnectionState state;   // Current connection state
+        unsigned long connectTime;    // Time connection established
+        unsigned long lastActivity;  // Last packet exchange
+        uint8_t vs;              // Send sequence number (V(S))
+        uint8_t vr;              // Receive sequence number (V(R))
+        uint8_t va;              // Acknowledge sequence number (V(A))
+        uint8_t retryCount;      // Current retry count
+        bool pollBit;            // P/F bit state
+    };
+    
+    static const int MAX_CONNECTIONS = 4;
+    ConnectionInfo connections[MAX_CONNECTIONS];
+    int activeConnections;
     
     // Command parsing
     int parseCommandLine(const String& line, String args[], int maxArgs);
@@ -252,6 +327,16 @@ private:
     // Utility functions
     String formatTime(unsigned long ms);
     String formatBytes(size_t bytes);
+    TNCCommandResult transmitBeacon();
+    void updateNodeTable(const String& callsign, uint8_t ssid, float rssi, float snr, const String& packet, bool isBeacon);
+    bool shouldDigipeat(const String& path);
+    String processDigipeatPath(const String& path);
+    bool shouldProcessHop(const String& hop);
+    bool sendDisconnectFrame(int connectionIndex);
+    void processIncomingFrame(const String& frame, float rssi, float snr);
+    void parseCallsign(const String& callsignWithSSID, String& callsign, uint8_t& ssid);
+    int findConnection(const String& remoteCall, uint8_t remoteSSID);
+    bool sendUAFrame(const String& remoteCall, uint8_t remoteSSID);
 };
 
 // Command mode constants

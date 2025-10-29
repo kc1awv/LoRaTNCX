@@ -106,6 +106,84 @@ public:
      * @return Status string
      */
     String getStatus();
+    
+    /**
+     * @brief Set frequency (requires radio reinitialization)
+     * @param frequency Frequency in MHz
+     * @return true if successful, false otherwise
+     */
+    bool setFrequency(float frequency);
+    
+    /**
+     * @brief Set TX power (requires radio reinitialization)  
+     * @param power TX power in dBm
+     * @return true if successful, false otherwise
+     */
+    bool setTxPower(int8_t power);
+    
+    /**
+     * @brief Set spreading factor (requires radio reinitialization)
+     * @param sf Spreading factor (5-12)
+     * @return true if successful, false otherwise
+     */
+    bool setSpreadingFactor(uint8_t sf);
+    
+    /**
+     * @brief Set bandwidth (requires radio reinitialization)
+     * @param bw Bandwidth in kHz  
+     * @return true if successful, false otherwise
+     */
+    bool setBandwidth(float bw);
+    
+    /**
+     * @brief Set coding rate (requires radio reinitialization)
+     * @param cr Coding rate (5-8, representing 4/5 to 4/8)
+     * @return true if successful, false otherwise
+     */
+    bool setCodingRate(uint8_t cr);
+    
+    /**
+     * @brief Set sync word (requires radio reinitialization)
+     * @param syncWord Sync word (0x00-0xFF)
+     * @return true if successful, false otherwise
+     */
+    bool setSyncWord(uint8_t syncWord);
+    
+    /**
+     * @brief Get current frequency
+     * @return Current frequency in MHz
+     */
+    float getFrequency() const;
+    
+    /**
+     * @brief Get current TX power
+     * @return Current TX power in dBm
+     */
+    int8_t getTxPower() const;
+    
+    /**
+     * @brief Get current spreading factor
+     * @return Current spreading factor
+     */
+    uint8_t getSpreadingFactor() const;
+    
+    /**
+     * @brief Get current bandwidth
+     * @return Current bandwidth in kHz
+     */
+    float getBandwidth() const;
+    
+    /**
+     * @brief Get current coding rate
+     * @return Current coding rate
+     */
+    uint8_t getCodingRate() const;
+    
+    /**
+     * @brief Get current sync word
+     * @return Current sync word
+     */
+    uint8_t getSyncWord() const;
 
 private:
     SX1262 *radio;         // RadioLib SX1262 instance pointer
@@ -114,6 +192,14 @@ private:
     unsigned long rxCount; // Reception counter
     float lastRSSI;        // Last RSSI reading
     float lastSNR;         // Last SNR reading
+    
+    // Current radio parameters
+    float currentFrequency;
+    int8_t currentTxPower;
+    uint8_t currentSpreadingFactor;
+    float currentBandwidth;
+    uint8_t currentCodingRate;
+    uint8_t currentSyncWord;
 
     /**
      * @brief Configure PA control pins and modes
