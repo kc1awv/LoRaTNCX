@@ -58,22 +58,66 @@ private:
     
     // Configuration storage (Arduino-compatible)
     struct TNCConfig {
+        // Station configuration
         String myCall;
+        uint8_t mySSID;
+        String beaconText;
+        bool idEnabled;
+        bool cwidEnabled;
+        float latitude;
+        float longitude;
+        int altitude;
+        String gridSquare;
+        String licenseClass;
+        
+        // Radio parameters
         float frequency;
         int8_t txPower;
         uint8_t spreadingFactor;
         float bandwidth;
         uint8_t codingRate;
         uint16_t syncWord;
+        uint8_t preambleLength;
+        bool paControl;
+        
+        // Protocol stack
         uint16_t txDelay;
+        uint16_t txTail;
+        uint8_t persist;
         uint16_t slotTime;
         uint16_t respTime;
         uint8_t maxFrame;
         uint16_t frack;
+        uint8_t retry;
+        
+        // Operating modes
+        bool echoEnabled;
+        bool promptEnabled;
+        bool monitorEnabled;
+        
+        // Beacon and digi
         bool beaconEnabled;
         uint16_t beaconInterval;
         bool digiEnabled;
         uint8_t digiPath;
+        
+        // Amateur radio
+        String band;
+        String region;
+        bool emergencyMode;
+        bool aprsEnabled;
+        String aprsSymbol;
+        
+        // Network
+        String unprotoAddr;
+        String unprotoPath;
+        bool uidWait;
+        bool mconEnabled;
+        uint8_t maxUsers;
+        bool flowControl;
+        
+        // System
+        uint8_t debugLevel;
         bool autoSave;
     } config;
     
@@ -138,6 +182,72 @@ private:
     TNCCommandResult handleCAL(const String args[], int argCount);
     TNCCommandResult handleDIAG(const String args[], int argCount);
     TNCCommandResult handlePING(const String args[], int argCount);
+    
+    // Station configuration commands
+    TNCCommandResult handleMYSSID(const String args[], int argCount);
+    TNCCommandResult handleBCON(const String args[], int argCount);
+    TNCCommandResult handleBTEXT(const String args[], int argCount);
+    TNCCommandResult handleID(const String args[], int argCount);
+    TNCCommandResult handleCWID(const String args[], int argCount);
+    TNCCommandResult handleLOCATION(const String args[], int argCount);
+    TNCCommandResult handleGRID(const String args[], int argCount);
+    TNCCommandResult handleLICENSE(const String args[], int argCount);
+    
+    // Extended radio parameter commands
+    TNCCommandResult handlePREAMBLE(const String args[], int argCount);
+    TNCCommandResult handlePRESET(const String args[], int argCount);
+    TNCCommandResult handlePACTL(const String args[], int argCount);
+    
+    // Protocol stack commands
+    TNCCommandResult handleTXTAIL(const String args[], int argCount);
+    TNCCommandResult handlePERSIST(const String args[], int argCount);
+    TNCCommandResult handleRETRY(const String args[], int argCount);
+    
+    // Operating mode commands
+    TNCCommandResult handleTERMINAL(const String args[], int argCount);
+    TNCCommandResult handleTRANSPARENT(const String args[], int argCount);
+    TNCCommandResult handleECHO(const String args[], int argCount);
+    TNCCommandResult handlePROMPT(const String args[], int argCount);
+    TNCCommandResult handleCONNECT(const String args[], int argCount);
+    TNCCommandResult handleDISCONNECT(const String args[], int argCount);
+    
+    // Extended monitoring commands
+    TNCCommandResult handleMONITOR(const String args[], int argCount);
+    TNCCommandResult handleMHEARD(const String args[], int argCount);
+    TNCCommandResult handleTEMPERATURE(const String args[], int argCount);
+    TNCCommandResult handleVOLTAGE(const String args[], int argCount);
+    TNCCommandResult handleMEMORY(const String args[], int argCount);
+    TNCCommandResult handleUPTIME(const String args[], int argCount);
+    
+    // LoRa-specific commands
+    TNCCommandResult handleLORASTAT(const String args[], int argCount);
+    TNCCommandResult handleTOA(const String args[], int argCount);
+    TNCCommandResult handleRANGE(const String args[], int argCount);
+    TNCCommandResult handleLINKTEST(const String args[], int argCount);
+    TNCCommandResult handleSENSITIVITY(const String args[], int argCount);
+    
+    // Amateur radio specific commands
+    TNCCommandResult handleBAND(const String args[], int argCount);
+    TNCCommandResult handleREGION(const String args[], int argCount);
+    TNCCommandResult handleCOMPLIANCE(const String args[], int argCount);
+    TNCCommandResult handleEMERGENCY(const String args[], int argCount);
+    TNCCommandResult handleAPRS(const String args[], int argCount);
+    
+    // Network and routing commands
+    TNCCommandResult handleUNPROTO(const String args[], int argCount);
+    TNCCommandResult handleUIDWAIT(const String args[], int argCount);
+    TNCCommandResult handleUIDFRAME(const String args[], int argCount);
+    TNCCommandResult handleMCON(const String args[], int argCount);
+    TNCCommandResult handleUSERS(const String args[], int argCount);
+    TNCCommandResult handleFLOW(const String args[], int argCount);
+    
+    // System configuration commands
+    TNCCommandResult handleDEFAULT(const String args[], int argCount);
+    TNCCommandResult handleQUIT(const String args[], int argCount);
+    TNCCommandResult handleCALIBRATE(const String args[], int argCount);
+    TNCCommandResult handleSELFTEST(const String args[], int argCount);
+    TNCCommandResult handleDEBUG(const String args[], int argCount);
+    TNCCommandResult handleSIMPLEX(const String args[], int argCount);
     
     // Utility functions
     String formatTime(unsigned long ms);

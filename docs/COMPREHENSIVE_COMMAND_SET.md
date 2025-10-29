@@ -41,13 +41,14 @@ Control LoRa radio settings and RF parameters:
 ### 3. Protocol Stack Commands
 Configure packet protocol parameters:
 
+**Note**: LoRa radios are inherently simplex (half-duplex) devices - they can either transmit OR receive at any given time, but not both simultaneously. This affects protocol timing and collision avoidance strategies.
+
 | Command    | Parameters | Function                     | Example        |
 | ---------- | ---------- | ---------------------------- | -------------- |
 | `TXDELAY`  | [0-255]    | TX key-up delay (10ms units) | `TXDELAY 30`   |
 | `TXTAIL`   | [0-255]    | TX tail time (10ms units)    | `TXTAIL 5`     |
 | `PERSIST`  | [0-255]    | Persistence parameter P      | `PERSIST 63`   |
 | `SLOTTIME` | [0-255]    | Slot time (10ms units)       | `SLOTTIME 10`  |
-| `DUPLEX`   | [ON\|OFF]  | Full/half duplex mode        | `DUPLEX OFF`   |
 | `MAXFRAME` | [bytes]    | Maximum frame size           | `MAXFRAME 255` |
 | `RETRY`    | [count]    | Retry attempts               | `RETRY 10`     |
 | `FRACK`    | [seconds]  | Frame acknowledgment timeout | `FRACK 3`      |
@@ -99,6 +100,7 @@ Advanced LoRa radio management and optimization:
 | `RFTEST`      | [mode]             | RF test modes                 | `RFTEST CW`            |
 | `SPECTRUM`    | -                  | Spectrum analysis             | `SPECTRUM`             |
 | `HOPSCAN`     | -                  | Frequency hopping scan        | `HOPSCAN`              |
+| `SIMPLEX`     | -                  | Show LoRa simplex operation   | `SIMPLEX`              |
 
 ### 7. Amateur Radio Specific Commands
 Amateur radio band plans and regulatory compliance:
