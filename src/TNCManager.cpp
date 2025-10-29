@@ -163,7 +163,7 @@ void TNCManager::handleIncomingSerial()
                     if (byte == 0x0D) // CR
                     {
                         // Complete "ESC @ k CR" sequence - enter KISS mode command
-                        Serial.println("Entering KISS mode via ESC@k command");
+                        // No message - KISS mode must be silent
                         commandSystem.setMode(TNCMode::KISS_MODE);
                         serialBuffer = "";
                         initState = 0;
@@ -189,7 +189,7 @@ void TNCManager::handleIncomingSerial()
             if (byte == 0x1B) // ESC
             {
                 commandSystem.setMode(TNCMode::COMMAND_MODE);
-                Serial.println("Exiting KISS mode - returned to command mode");
+                // No message in KISS mode - must be silent
                 serialBuffer = "";
                 return;
             }
@@ -206,7 +206,7 @@ void TNCManager::handleIncomingSerial()
             {
                 commandSystem.setMode(TNCMode::COMMAND_MODE);
                 kiss.clearExitRequest();
-                Serial.println("Exited KISS mode via CMD_RETURN - returned to command mode");
+                // No message in KISS mode - must be silent
                 serialBuffer = "";
                 return;
             }
@@ -273,30 +273,42 @@ void TNCManager::handleIncomingKISS()
         }
         
         // Regular data packet - transmit via LoRa
-        Serial.print("TNC: Transmitting ");
-        Serial.print(length);
-        Serial.print(" bytes: ");
-        for (size_t i = 0; i < length && i < 20; i++)
+        // Only show debug output in command mode (not KISS mode)
+        if (commandSystem.getCurrentMode() != TNCMode::KISS_MODE)
         {
-            if (buffer[i] >= 32 && buffer[i] < 127)
+            Serial.print("TNC: Transmitting ");
+            Serial.print(length);
+            Serial.print(" bytes: ");
+            for (size_t i = 0; i < length && i < 20; i++)
             {
-                Serial.print((char)buffer[i]);
+                if (buffer[i] >= 32 && buffer[i] < 127)
+                {
+                    Serial.print((char)buffer[i]);
+                }
+                else
+                {
+                    Serial.print('.');
+                }
             }
-            else
-            {
-                Serial.print('.');
-            }
+            Serial.println();
         }
-        Serial.println();
 
         // Transmit packet
         if (radio.transmit(buffer, length))
         {
-            Serial.println("TNC: Transmission successful");
+            // Only show debug output in command mode (not KISS mode)
+            if (commandSystem.getCurrentMode() != TNCMode::KISS_MODE)
+            {
+                Serial.println("TNC: Transmission successful");
+            }
         }
         else
         {
-            Serial.println("TNC: Transmission failed");
+            // Only show debug output in command mode (not KISS mode)
+            if (commandSystem.getCurrentMode() != TNCMode::KISS_MODE)
+            {
+                Serial.println("TNC: Transmission failed");
+            }
         }
     }
 }

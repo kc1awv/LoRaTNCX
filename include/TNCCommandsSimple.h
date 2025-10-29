@@ -18,6 +18,7 @@ class LoRaRadio;
 // Command execution return codes
 enum class TNCCommandResult {
     SUCCESS,
+    SUCCESS_SILENT,     // Success but don't send response (for KISS mode entry)
     ERROR_UNKNOWN_COMMAND,
     ERROR_INVALID_PARAMETER,
     ERROR_SYSTEM_ERROR,

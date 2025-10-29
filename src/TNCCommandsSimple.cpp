@@ -212,8 +212,8 @@ TNCCommandResult SimpleTNCCommands::processCommand(const String& commandLine) {
     }
     
     // Regular command mode processing
-    // Echo command if enabled
-    if (echoEnabled) {
+    // Echo command if enabled (but not for KISS command which should be silent)
+    if (echoEnabled && commandLine != "KISS") {
         sendResponse(commandLine);
     }
     
@@ -248,7 +248,7 @@ TNCCommandResult SimpleTNCCommands::processCommand(const String& commandLine) {
         result = handleMYCALL(cmdArgs, cmdArgCount);
     } else if (command == "KISS") {
         setMode(TNCMode::KISS_MODE);
-        result = TNCCommandResult::SUCCESS;
+        result = TNCCommandResult::SUCCESS_SILENT;
     } else if (command == "CMD") {
         setMode(TNCMode::COMMAND_MODE);
         result = TNCCommandResult::SUCCESS;
@@ -439,6 +439,9 @@ TNCCommandResult SimpleTNCCommands::processCommand(const String& commandLine) {
         case TNCCommandResult::SUCCESS:
             sendResponse(TNC_OK_RESPONSE);
             break;
+        case TNCCommandResult::SUCCESS_SILENT:
+            // No response - silent success (used for KISS mode entry)
+            break;
         case TNCCommandResult::ERROR_UNKNOWN_COMMAND:
             sendResponse(String(TNC_ERROR_RESPONSE) + " - Unknown command: " + command);
             break;
@@ -454,10 +457,15 @@ TNCCommandResult SimpleTNCCommands::processCommand(const String& commandLine) {
 }
 
 void SimpleTNCCommands::setMode(TNCMode mode) {
+    TNCMode previousMode = currentMode;
     currentMode = mode;
     
-    String modeStr = getModeString();
-    sendResponse("Entering " + modeStr + " mode");
+    // Only send mode change message when NOT entering KISS mode
+    // AND when NOT exiting KISS mode (KISS mode must be completely silent)
+    if (mode != TNCMode::KISS_MODE && previousMode != TNCMode::KISS_MODE) {
+        String modeStr = getModeString();
+        sendResponse("Entering " + modeStr + " mode");
+    }
     
     // Configure interface based on mode
     switch (mode) {
@@ -473,7 +481,8 @@ void SimpleTNCCommands::setMode(TNCMode mode) {
             break;
     }
     
-    if (promptEnabled) {
+    // Only send prompt when NOT coming from KISS mode (to maintain silence)
+    if (promptEnabled && previousMode != TNCMode::KISS_MODE) {
         sendPrompt();
     }
 }

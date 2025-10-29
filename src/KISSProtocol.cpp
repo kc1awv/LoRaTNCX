@@ -253,41 +253,41 @@ bool KISSProtocol::processCommand(uint8_t command, uint8_t parameter)
     {
     case CMD_TXDELAY:
         txDelay = parameter;
-        Serial.printf("KISS: TX Delay set to %d (%.1f ms)\n", txDelay, txDelay * 10.0);
+        // Silent operation - no messages in KISS mode
         break;
 
     case CMD_P:
         persistence = parameter;
-        Serial.printf("KISS: Persistence set to %d (%.1f%%)\n", persistence, (persistence / 255.0) * 100.0);
+        // Silent operation - no messages in KISS mode
         break;
 
     case CMD_SLOTTIME:
         slotTime = parameter;
-        Serial.printf("KISS: Slot Time set to %d (%.1f ms)\n", slotTime, slotTime * 10.0);
+        // Silent operation - no messages in KISS mode
         break;
 
     case CMD_TXTAIL:
         txTail = parameter;
-        Serial.printf("KISS: TX Tail set to %d (%.1f ms)\n", txTail, txTail * 10.0);
+        // Silent operation - no messages in KISS mode
         break;
 
     case CMD_FULLDUPLEX:
         fullDuplex = (parameter != 0);
-        Serial.printf("KISS: Full Duplex set to %s\n", fullDuplex ? "Yes" : "No");
+        // Silent operation - no messages in KISS mode
         break;
 
     case CMD_SETHARDWARE:
-        Serial.printf("KISS: Set Hardware command (parameter: 0x%02X)\n", parameter);
         // Hardware-specific commands can be implemented here
+        // Silent operation - no messages in KISS mode
         break;
 
     case CMD_RETURN:
-        Serial.println("KISS: Return to command mode requested");
+        // Silent operation - no messages in KISS mode
         exitRequested = true;
         break;
 
     default:
-        Serial.printf("KISS: Unknown command 0x%02X\n", command);
+        // Silent operation - no messages in KISS mode
         handled = false;
         errors++;
         break;
