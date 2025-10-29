@@ -3,7 +3,7 @@
  * @brief Hardware configuration for LoRaTNCX project
  * @author LoRaTNCX Project
  * @date October 28, 2025
- * 
+ *
  * This file defines the hardware configuration and pin assignments
  * specifically for the LoRa TNC application on Heltec WiFi LoRa 32 V4
  */
@@ -17,109 +17,109 @@
 // ==========================================
 // LORA RADIO CONFIGURATION
 // ==========================================
-#define LORA_SS_PIN        8         // SPI Slave Select
-#define LORA_RST_PIN       12        // Reset pin
-#define LORA_DIO0_PIN      14        // DIO0/IRQ pin
-#define LORA_BUSY_PIN      13        // Busy pin
+#define LORA_SS_PIN 8    // SPI Slave Select
+#define LORA_RST_PIN 12  // Reset pin
+#define LORA_DIO0_PIN 14 // DIO0/IRQ pin
+#define LORA_BUSY_PIN 13 // Busy pin
 
 // LoRa SPI configuration
-#define LORA_SCK_PIN       9         // SPI Clock
-#define LORA_MOSI_PIN      10        // SPI MOSI
-#define LORA_MISO_PIN      11        // SPI MISO
+#define LORA_SCK_PIN 9   // SPI Clock
+#define LORA_MOSI_PIN 10 // SPI MOSI
+#define LORA_MISO_PIN 11 // SPI MISO
 
 // LoRa Power Amplifier (PA) configuration
-#define LORA_PA_POWER_PIN  7         // PA power control
-#define LORA_PA_EN_PIN     2         // PA enable
-#define LORA_PA_TX_EN_PIN  46        // PA TX enable
+#define LORA_PA_POWER_PIN 7  // PA power control
+#define LORA_PA_EN_PIN 2     // PA enable
+#define LORA_PA_TX_EN_PIN 46 // PA TX enable
 
 // ==========================================
 // DISPLAY CONFIGURATION
 // ==========================================
-#define OLED_SDA_PIN       SDA_OLED  // OLED I2C Data (Pin 17)
-#define OLED_SCL_PIN       SCL_OLED  // OLED I2C Clock (Pin 18)
-#define OLED_RST_PIN       RST_OLED  // OLED Reset (Pin 21)
-#define OLED_ADDRESS       0x3C      // Standard OLED I2C address
+#define OLED_SDA_PIN SDA_OLED // OLED I2C Data (Pin 17)
+#define OLED_SCL_PIN SCL_OLED // OLED I2C Clock (Pin 18)
+#define OLED_RST_PIN RST_OLED // OLED Reset (Pin 21)
+#define OLED_ADDRESS 0x3C     // Standard OLED I2C address
 
 // Enable/disable display
-#define DISPLAY_ENABLED    true
+#define DISPLAY_ENABLED true
 
 // ==========================================
-// DEBUG CONFIGURATION  
+// DEBUG CONFIGURATION
 // ==========================================
 // Control debug output for performance optimization
-#define DEBUG_KISS_VERBOSE     true   // Enable verbose KISS debug output for diagnosis
-#define DEBUG_RADIO_VERBOSE    true   // Enable verbose radio debug output for diagnosis
-#define DEBUG_COMMAND_VERBOSE  true   // Enable verbose command debug output for diagnosis
+#define DEBUG_KISS_VERBOSE true    // Enable verbose KISS debug output for diagnosis
+#define DEBUG_RADIO_VERBOSE true   // Enable verbose radio debug output for diagnosis
+#define DEBUG_COMMAND_VERBOSE true // Enable verbose command debug output for diagnosis
 
 // ==========================================
 // STATUS LED CONFIGURATION
 // ==========================================
-#define STATUS_LED_PIN     LED_BUILTIN  // Built-in LED (Pin 35)
-#define LED_ON             HIGH
-#define LED_OFF            LOW
+#define STATUS_LED_PIN LED_BUILTIN // Built-in LED (Pin 35)
+#define LED_ON HIGH
+#define LED_OFF LOW
 
 // ==========================================
 // POWER MANAGEMENT
 // ==========================================
-#define POWER_CTRL_PIN     Vext      // External power control (Pin 36)
-#define POWER_ON           LOW       // Active low
-#define POWER_OFF          HIGH
+#define POWER_CTRL_PIN Vext // External power control (Pin 36)
+#define POWER_ON LOW        // Active low
+#define POWER_OFF HIGH
 
 // ==========================================
 // KISS TNC INTERFACE
 // ==========================================
 // Using USB CDC for KISS interface (default Serial)
-#define KISS_SERIAL        Serial
-#define KISS_BAUD_RATE     115200
+#define KISS_SERIAL Serial
+#define KISS_BAUD_RATE 115200
 
 // Optional: Hardware serial for debugging
-#define DEBUG_SERIAL       Serial
-#define DEBUG_BAUD_RATE    115200
+#define DEBUG_SERIAL Serial
+#define DEBUG_BAUD_RATE 115200
 
 // ==========================================
 // RADIO CONFIGURATION DEFAULTS
 // ==========================================
-#define DEFAULT_FREQUENCY     915.0     // MHz (adjust for your region)
-#define DEFAULT_TX_POWER      1         // dBm
-#define DEFAULT_BANDWIDTH     125.0     // kHz
-#define DEFAULT_SPREADING_FACTOR  7     // SF7
-#define DEFAULT_CODING_RATE   5         // 4/5
+#define DEFAULT_FREQUENCY 915.0    // MHz (adjust for your region)
+#define DEFAULT_TX_POWER 1         // dBm
+#define DEFAULT_BANDWIDTH 125.0    // kHz
+#define DEFAULT_SPREADING_FACTOR 7 // SF7
+#define DEFAULT_CODING_RATE 5      // 4/5
 
 // ==========================================
 // TNC CONFIGURATION
 // ==========================================
-#define TNC_CALLSIGN       "NOCALL"    // Default callsign
-#define TNC_SSID           0           // Default SSID
-#define TNC_MAX_PACKET_SIZE 256        // Maximum packet size
-#define TNC_BUFFER_SIZE    512         // Buffer size for packets
+#define TNC_CALLSIGN "NOCALL"   // Default callsign
+#define TNC_SSID 0              // Default SSID
+#define TNC_MAX_PACKET_SIZE 256 // Maximum packet size
+#define TNC_BUFFER_SIZE 512     // Buffer size for packets
 
 // ==========================================
 // TIMING CONFIGURATION
 // ==========================================
-#define LORA_RX_TIMEOUT    30000       // LoRa RX timeout (ms)
-#define STATUS_LED_BLINK   500         // Status LED blink rate (ms)
-#define DISPLAY_UPDATE     1000        // Display update rate (ms)
+#define LORA_RX_TIMEOUT 30000 // LoRa RX timeout (ms)
+#define STATUS_LED_BLINK 500  // Status LED blink rate (ms)
+#define DISPLAY_UPDATE 1000   // Display update rate (ms)
 
 // ==========================================
 // GNSS MODULE CONFIGURATION
 // ==========================================
-#define GNSS_VCTL_PIN      34          // GNSS power control (VGNSS Ctl)
-#define GNSS_RX_PIN        38          // GNSS UART RX
-#define GNSS_TX_PIN        39          // GNSS UART TX
-#define GNSS_WAKE_PIN      40          // GNSS wake/enable
-#define GNSS_PPS_PIN       41          // GNSS pulse per second
-#define GNSS_RST_PIN       42          // GNSS reset
+#define GNSS_VCTL_PIN 34 // GNSS power control (VGNSS Ctl)
+#define GNSS_RX_PIN 38   // GNSS UART RX
+#define GNSS_TX_PIN 39   // GNSS UART TX
+#define GNSS_WAKE_PIN 40 // GNSS wake/enable
+#define GNSS_PPS_PIN 41  // GNSS pulse per second
+#define GNSS_RST_PIN 42  // GNSS reset
 
 // GNSS Serial configuration (if using Hardware Serial)
-#define GNSS_BAUD_RATE     9600        // Standard GNSS baud rate
-#define GNSS_ENABLED       false       // Enable/disable GNSS by default
+#define GNSS_BAUD_RATE 9600 // Standard GNSS baud rate
+#define GNSS_ENABLED false  // Enable/disable GNSS by default
 
 // ==========================================
 // AVAILABLE GPIO PINS
 // ==========================================
 // These pins are available for future expansion:
 // GPIO 1, 3, 4, 5, 6, 15, 16, 19, 20
-// 
+//
 // Reserved/Used pins:
 // - Pin 2: LoRa PA enable
 // - Pin 7: LoRa PA power

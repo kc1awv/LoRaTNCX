@@ -23,7 +23,7 @@
       ]
     ],
     "mcu": "esp32s3",
-    "variant": "heltec_wifi_lora_32_V3"
+    "variant": "esp32s3"
   },
   "connectivity": [
     "wifi",
