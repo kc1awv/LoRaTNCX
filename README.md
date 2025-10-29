@@ -38,9 +38,13 @@ Contributions welcome! Seriously, don't be shy. This is amateur radio, not life-
 - Wetware acknowledgment: If your brain actually wrote the code without AI assistance, note that too (I promise we'll all be impressed)
 - Experimentation encouraged: Try new AI coding approaches, test different LLMs, see what works best
 
-#### The Truth About AI Detection: Yes, we can usually tell when code was AI-generated. But this isn't a "you don't know how to code" shaming session - it's all experimental! We're all learning how to work with AI tools, not pretend they don't exist. The goal is building cool stuff and learning along the way.
+#### The Truth About AI Detection:
 
-#### Bottom Line: Whether your code came from your brain, Claude's neural networks, or a fever dream induced by too much coffee and RF exposure, we want to see it. Just be honest about your process, explain your thinking, and let's build something awesome together.
+Yes, we can usually tell when code was AI-generated. But this isn't a "you don't know how to code" shaming session - it's all experimental! We're all learning how to work with AI tools, not pretend they don't exist. The goal is building cool stuff and learning along the way.
+
+#### Bottom Line:
+
+Whether your code came from your brain, Claude's neural networks, or a fever dream induced by too much coffee and RF exposure, we want to see it. Just be honest about your process, explain your thinking, and let's build something awesome together.
 
 ## The Technical Challenge
 
