@@ -99,23 +99,123 @@ void TNCManager::handleIncomingSerial()
     // Read available serial data
     while (Serial.available())
     {
-        char c = Serial.read();
+        uint8_t byte = Serial.read();
+        
+        // Handle special initialization sequences before KISS auto-detection
+        if (commandSystem.getCurrentMode() != TNCMode::KISS_MODE)
+        {
+            // Handle common TNC initialization sequences
+            static uint8_t initState = 0;
+            static uint32_t lastInitByte = 0;
+            
+            // Reset init state if too much time has passed
+            if (millis() - lastInitByte > 1000)
+            {
+                initState = 0;
+            }
+            lastInitByte = millis();
+            
+            // State machine for ESC @ k CR sequence
+            bool skipNormalProcessing = false;
+            
+            switch (initState)
+            {
+                case 0: // Waiting for ESC or KISS
+                    if (byte == 0x1B) // ESC
+                    {
+                        initState = 1;
+                        skipNormalProcessing = true;
+                    }
+                    else if (byte == 0xC0) // KISS frame start
+                    {
+                        // Auto-switch to KISS mode
+                        commandSystem.setMode(TNCMode::KISS_MODE);
+                        serialBuffer = "";
+                        initState = 0;
+                    }
+                    break;
+                    
+                case 1: // Got ESC, expecting @
+                    if (byte == 0x40) // @
+                    {
+                        initState = 2;
+                        skipNormalProcessing = true;
+                    }
+                    else
+                    {
+                        initState = 0; // Reset on unexpected byte
+                    }
+                    break;
+                    
+                case 2: // Got ESC @, expecting k
+                    if (byte == 0x6B) // k
+                    {
+                        initState = 3;
+                        skipNormalProcessing = true;
+                    }
+                    else
+                    {
+                        initState = 0; // Reset on unexpected byte
+                    }
+                    break;
+                    
+                case 3: // Got ESC @ k, expecting CR
+                    if (byte == 0x0D) // CR
+                    {
+                        // Complete "ESC @ k CR" sequence - enter KISS mode command
+                        Serial.println("Entering KISS mode via ESC@k command");
+                        commandSystem.setMode(TNCMode::KISS_MODE);
+                        serialBuffer = "";
+                        initState = 0;
+                        return;
+                    }
+                    else
+                    {
+                        initState = 0; // Reset on unexpected byte
+                    }
+                    break;
+            }
+            
+            // If we're processing an init sequence, skip normal command handling
+            if (skipNormalProcessing)
+            {
+                continue;
+            }
+        }
         
         if (commandSystem.getCurrentMode() == TNCMode::KISS_MODE)
         {
-            // In KISS mode, pass directly to KISS processor
-            // This is more complex in practice - we'd need to buffer properly
-            // For now, just add the character to let KISS handle it
-            serialBuffer += c;
-            // Process KISS data here - simplified for this example
-            if (kiss.processIncoming())
+            // Check for ESC character to exit KISS mode (TAPR TNC2 standard)
+            if (byte == 0x1B) // ESC
+            {
+                commandSystem.setMode(TNCMode::COMMAND_MODE);
+                Serial.println("Exiting KISS mode - returned to command mode");
+                serialBuffer = "";
+                return;
+            }
+            
+            // In KISS mode, process bytes directly through KISS protocol
+            // The KISS protocol will handle frame assembly and parsing
+            if (kiss.processByte(byte))
             {
                 handleIncomingKISS();
+            }
+            
+            // Check if KISS protocol requested exit (CMD_RETURN 0xFF)
+            if (kiss.isExitRequested())
+            {
+                commandSystem.setMode(TNCMode::COMMAND_MODE);
+                kiss.clearExitRequest();
+                Serial.println("Exited KISS mode via CMD_RETURN - returned to command mode");
+                serialBuffer = "";
+                return;
             }
         }
         else
         {
-            // In command mode, handle line-by-line
+            // In command mode, handle line-by-line text commands
+            char c = (char)byte;
+            
             if (c == '\r' || c == '\n')
             {
                 if (serialBuffer.length() > 0)
