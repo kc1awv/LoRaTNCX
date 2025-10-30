@@ -7,11 +7,14 @@
 
 #include "TNCManager.h"
 
-TNCManager::TNCManager() : configManager(&radio), display()
+TNCManager::TNCManager() : configManager(&radio), display(), batteryMonitor()
 {
     initialized = false;
     lastStatus = 0;
     serialBuffer = "";
+    lastBatteryVoltage = 0.0f;
+    lastBatteryPercent = 0;
+    lastBatterySample = 0;
 }
 
 bool TNCManager::begin()
@@ -22,6 +25,11 @@ bool TNCManager::begin()
     {
         display.showBootScreen();
     }
+
+    batteryMonitor.begin();
+    lastBatteryVoltage = batteryMonitor.readVoltage();
+    lastBatteryPercent = batteryMonitor.computePercentage(lastBatteryVoltage);
+    lastBatterySample = millis();
 
     initialized = false;
     lastStatus = 0;
@@ -58,7 +66,7 @@ bool TNCManager::begin()
 
     initialized = true;
 
-    display.updateStatus(commandSystem.getCurrentMode(), radio.getTxCount(), radio.getRxCount());
+    display.updateStatus(commandSystem.getCurrentMode(), radio.getTxCount(), radio.getRxCount(), lastBatteryVoltage, lastBatteryPercent);
     return true;
 }
 
@@ -82,7 +90,14 @@ void TNCManager::update()
         lastStatus = millis();
     }
 
-    display.updateStatus(commandSystem.getCurrentMode(), radio.getTxCount(), radio.getRxCount());
+    if (millis() - lastBatterySample >= BATTERY_SAMPLE_INTERVAL)
+    {
+        lastBatteryVoltage = batteryMonitor.readVoltage();
+        lastBatteryPercent = batteryMonitor.computePercentage(lastBatteryVoltage);
+        lastBatterySample = millis();
+    }
+
+    display.updateStatus(commandSystem.getCurrentMode(), radio.getTxCount(), radio.getRxCount(), lastBatteryVoltage, lastBatteryPercent);
 }
 
 String TNCManager::getStatus()

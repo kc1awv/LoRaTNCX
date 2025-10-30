@@ -65,6 +65,16 @@
 #define POWER_ON LOW        // Active low
 #define POWER_OFF HIGH
 
+// Battery monitor configuration
+constexpr uint8_t BATTERY_ADC_PIN = 1;   // ADC1_CH0 (GPIO 1) for battery sense
+constexpr uint8_t BATTERY_CTRL_PIN = 37; // ADC control pin, must be held HIGH
+constexpr float BATTERY_R1_OHMS = 390000.0f; // High-side resistor value
+constexpr float BATTERY_R2_OHMS = 100000.0f; // Low-side resistor value
+constexpr float BATTERY_VREF = 3.3f;         // ADC reference voltage
+constexpr float BATTERY_MIN_VOLTAGE = 3.3f;  // Nominal depleted LiPo voltage
+constexpr float BATTERY_MAX_VOLTAGE = 4.2f;  // Fully charged LiPo voltage
+constexpr unsigned long BATTERY_SAMPLE_INTERVAL = 5000UL; // Battery polling interval (ms)
+
 // ==========================================
 // KISS TNC INTERFACE
 // ==========================================
