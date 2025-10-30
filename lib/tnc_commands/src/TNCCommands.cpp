@@ -13,7 +13,8 @@
 // Command handlers are implemented in separate translation units under
 // lib/tnc_commands/src/commands to simplify maintenance.
 TNCCommands::TNCCommands() 
-    : currentMode(TNCMode::COMMAND_MODE), echoEnabled(true), promptEnabled(true), radio(nullptr) {
+    : currentMode(TNCMode::COMMAND_MODE), echoEnabled(true), promptEnabled(true), radio(nullptr), 
+      gnssSetEnabledCallback(nullptr), gnssGetEnabledCallback(nullptr) {
     
     // Initialize default configuration
     // Station configuration
@@ -436,6 +437,8 @@ TNCCommandResult TNCCommands::processCommand(const String& commandLine) {
         result = handleSELFTEST(cmdArgs, cmdArgCount);
     } else if (command == "DEBUG") {
         result = handleDEBUG(cmdArgs, cmdArgCount);
+    } else if (command == "GNSS") {
+        result = handleGNSS(cmdArgs, cmdArgCount);
     } else if (command == "SIMPLEX") {
         result = handleSIMPLEX(cmdArgs, cmdArgCount);
     }
@@ -525,6 +528,11 @@ void TNCCommands::sendPrompt() {
 
 void TNCCommands::setRadio(LoRaRadio* radioPtr) {
     radio = radioPtr;
+}
+
+void TNCCommands::setGNSSCallbacks(GNSSSetEnabledCallback setCallback, GNSSGetEnabledCallback getCallback) {
+    gnssSetEnabledCallback = setCallback;
+    gnssGetEnabledCallback = getCallback;
 }
 
 bool TNCCommands::loadConfigurationFromFlash() {

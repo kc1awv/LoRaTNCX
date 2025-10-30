@@ -106,6 +106,7 @@ TNCCommandResult TNCCommands::handleHELP(const String args[], int argCount) {
         {"PING",        "Send test packet", 8},
         {"SELFTEST",    "Run self-test suite", 8},
         {"DEBUG",       "Set debug verbosity", 8},
+        {"GNSS",        "Control GNSS module", 8},
 
         {"SAVE",        "Save settings to flash", 9},
         {"SAVED",       "Show settings stored in flash", 9},

@@ -51,7 +51,25 @@ public:
      */
     bool processConfigurationCommand(const String &command);
 
+    /**
+     * @brief Enable or disable the GNSS module
+     * @param enable true to enable, false to disable
+     * @return true if operation successful
+     */
+    bool setGNSSEnabled(bool enable);
+
+    /**
+     * @brief Get current GNSS enabled status
+     * @return true if GNSS is enabled and initialized
+     */
+    bool isGNSSEnabled() const { return gnssEnabled && gnssInitialised; }
+
+    // Static callback functions for TNCCommands
+    static bool gnssSetEnabledCallback(bool enable);
+    static bool gnssGetEnabledCallback();
+
 private:
+    static TNCManager* instance; // Static instance for callbacks
     LoRaRadio radio;                    // LoRa radio interface
     KISSProtocol kiss;                  // KISS protocol handler
     ConfigurationManager configManager; // Configuration management

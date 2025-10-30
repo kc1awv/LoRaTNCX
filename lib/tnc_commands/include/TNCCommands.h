@@ -67,6 +67,11 @@ public:
     // Hardware integration
     void setRadio(LoRaRadio* radioPtr);
     
+    // GNSS control callbacks
+    typedef bool (*GNSSSetEnabledCallback)(bool enable);
+    typedef bool (*GNSSGetEnabledCallback)();
+    void setGNSSCallbacks(GNSSSetEnabledCallback setCallback, GNSSGetEnabledCallback getCallback);
+    
     // Configuration management
     bool loadConfigurationFromFlash();
     bool saveConfigurationToFlash();
@@ -81,6 +86,10 @@ private:
     
     // Hardware reference
     LoRaRadio* radio;
+    
+    // GNSS control callbacks
+    GNSSSetEnabledCallback gnssSetEnabledCallback;
+    GNSSGetEnabledCallback gnssGetEnabledCallback;
     
     // Configuration storage (Arduino-compatible)
     struct TNCConfig {
@@ -335,6 +344,7 @@ private:
     TNCCommandResult handleCALIBRATE(const String args[], int argCount);
     TNCCommandResult handleSELFTEST(const String args[], int argCount);
     TNCCommandResult handleDEBUG(const String args[], int argCount);
+    TNCCommandResult handleGNSS(const String args[], int argCount);
     TNCCommandResult handleSIMPLEX(const String args[], int argCount);
     
     // Utility functions

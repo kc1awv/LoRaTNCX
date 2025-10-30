@@ -29,6 +29,9 @@ inline float clamp01(float value)
 }
 }
 
+// Static member definition
+TNCManager* TNCManager::instance = nullptr;
+
 TNCManager::TNCManager() : configManager(&radio), display(), batteryMonitor(), gnss()
 {
     initialized = false;
@@ -52,6 +55,9 @@ TNCManager::TNCManager() : configManager(&radio), display(), batteryMonitor(), g
     powerOffComplete = false;
     gnssEnabled = false;
     gnssInitialised = false;
+    
+    // Set static instance for callbacks
+    instance = this;
 }
 
 bool TNCManager::begin()
@@ -127,7 +133,8 @@ bool TNCManager::begin()
 
     // Connect radio to command system for hardware integration
     commandSystem.setRadio(&radio);
-    Serial.println("✓ Command system radio integration enabled");
+    commandSystem.setGNSSCallbacks(gnssSetEnabledCallback, gnssGetEnabledCallback);
+    Serial.println("✓ Command system hardware integration enabled");
 
     Serial.println("\n=== TNC Ready ===");
     Serial.println("Starting in Command mode...");
@@ -707,4 +714,57 @@ void TNCManager::performPowerOff()
     {
         delay(1000);
     }
+}
+
+bool TNCManager::setGNSSEnabled(bool enable)
+{
+    if (enable)
+    {
+        if (!gnssEnabled)
+        {
+            Serial.println("Enabling GNSS module...");
+            gnssEnabled = true;
+            if (gnss.begin())
+            {
+                Serial.println("✓ GNSS module enabled");
+                gnssInitialised = true;
+                return true;
+            }
+            else
+            {
+                Serial.println("✗ GNSS initialization failed");
+                gnssEnabled = false;
+                gnssInitialised = false;
+                return false;
+            }
+        }
+        return true; // Already enabled
+    }
+    else
+    {
+        if (gnssEnabled)
+        {
+            Serial.println("Disabling GNSS module...");
+            gnss.end();
+            gnssEnabled = false;
+            gnssInitialised = false;
+            Serial.println("✓ GNSS module disabled");
+        }
+        return true;
+    }
+}
+
+// Static callback functions for TNCCommands
+bool TNCManager::gnssSetEnabledCallback(bool enable) {
+    if (instance) {
+        return instance->setGNSSEnabled(enable);
+    }
+    return false;
+}
+
+bool TNCManager::gnssGetEnabledCallback() {
+    if (instance) {
+        return instance->isGNSSEnabled();
+    }
+    return false;
 }
