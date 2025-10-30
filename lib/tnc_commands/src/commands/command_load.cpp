@@ -46,14 +46,23 @@ TNCCommandResult TNCCommands::handleLOAD(const String args[], int argCount) {
         config.echoEnabled = preferences.getBool("echoEnabled", true);
         config.promptEnabled = preferences.getBool("promptEnabled", true);
         config.monitorEnabled = preferences.getBool("monitorEnabled", false);
+        config.lineEndingCR = preferences.getBool("lineEndingCR", true);
+        config.lineEndingLF = preferences.getBool("lineEndingLF", true);
         
         // Beacon and digi
         config.beaconEnabled = preferences.getBool("beaconEnabled", false);
         config.beaconInterval = preferences.getUShort("beaconInterval", 600);
         config.digiEnabled = preferences.getBool("digiEnabled", false);
         config.digiPath = preferences.getUChar("digiPath", 4);
-        
+
+        // System settings
+        config.debugLevel = preferences.getUChar("debugLevel", config.debugLevel);
+
         preferences.end();
+
+        // Apply user interface settings immediately
+        echoEnabled = config.echoEnabled;
+        promptEnabled = config.promptEnabled;
         
         // Apply loaded radio settings to hardware if radio is available
         if (radio != nullptr) {

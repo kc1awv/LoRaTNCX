@@ -52,6 +52,8 @@ TNCCommands::TNCCommands()
     config.echoEnabled = true;
     config.promptEnabled = true;
     config.monitorEnabled = false;
+    config.lineEndingCR = true;
+    config.lineEndingLF = true;
     
     // Beacon and digi
     config.beaconEnabled = false;
@@ -214,10 +216,6 @@ TNCCommandResult TNCCommands::processCommand(const String& commandLine) {
     }
     
     // Regular command mode processing
-    // Echo command if enabled (but not for KISS command which should be silent)
-    if (echoEnabled && commandLine != "KISS") {
-        sendResponse(commandLine);
-    }
     
     // Parse command line
     String args[10];
@@ -364,6 +362,10 @@ TNCCommandResult TNCCommands::processCommand(const String& commandLine) {
         result = handleECHO(cmdArgs, cmdArgCount);
     } else if (command == "PROMPT") {
         result = handlePROMPT(cmdArgs, cmdArgCount);
+    } else if (command == "LINECR") {
+        result = handleLINECR(cmdArgs, cmdArgCount);
+    } else if (command == "LINELF") {
+        result = handleLINELF(cmdArgs, cmdArgCount);
     } else if (command == "CONNECT") {
         result = handleCONNECT(cmdArgs, cmdArgCount);
     } else if (command == "DISCONNECT") {
@@ -476,13 +478,13 @@ void TNCCommands::setMode(TNCMode mode) {
             promptEnabled = false;
             break;
         case TNCMode::COMMAND_MODE:
-            echoEnabled = true;
-            promptEnabled = true;
+            echoEnabled = config.echoEnabled;
+            promptEnabled = config.promptEnabled;
             break;
         default:
             break;
     }
-    
+
     // Only send prompt when NOT coming from KISS mode (to maintain silence)
     if (promptEnabled && previousMode != TNCMode::KISS_MODE) {
         sendPrompt();
@@ -500,7 +502,13 @@ String TNCCommands::getModeString() const {
 }
 
 void TNCCommands::sendResponse(const String& response) {
-    Serial.println(response);
+    Serial.print(response);
+    if (config.lineEndingCR) {
+        Serial.write('\r');
+    }
+    if (config.lineEndingLF) {
+        Serial.write('\n');
+    }
 }
 
 void TNCCommands::sendPrompt() {
@@ -565,14 +573,23 @@ bool TNCCommands::loadConfigurationFromFlash() {
     config.echoEnabled = preferences.getBool("echoEnabled", true);
     config.promptEnabled = preferences.getBool("promptEnabled", true);
     config.monitorEnabled = preferences.getBool("monitorEnabled", false);
+    config.lineEndingCR = preferences.getBool("lineEndingCR", true);
+    config.lineEndingLF = preferences.getBool("lineEndingLF", true);
     
     // Beacon and digi
     config.beaconEnabled = preferences.getBool("beaconEnabled", false);
     config.beaconInterval = preferences.getUShort("beaconInterval", 600);
     config.digiEnabled = preferences.getBool("digiEnabled", false);
     config.digiPath = preferences.getUChar("digiPath", 4);
-    
+
+    // System
+    config.debugLevel = preferences.getUChar("debugLevel", config.debugLevel);
+
     preferences.end();
+
+    echoEnabled = config.echoEnabled;
+    promptEnabled = config.promptEnabled;
+
     return true;
 }
 
@@ -618,12 +635,17 @@ bool TNCCommands::saveConfigurationToFlash() {
     preferences.putBool("echoEnabled", config.echoEnabled);
     preferences.putBool("promptEnabled", config.promptEnabled);
     preferences.putBool("monitorEnabled", config.monitorEnabled);
+    preferences.putBool("lineEndingCR", config.lineEndingCR);
+    preferences.putBool("lineEndingLF", config.lineEndingLF);
     
     // Beacon and digi
     preferences.putBool("beaconEnabled", config.beaconEnabled);
     preferences.putUShort("beaconInterval", config.beaconInterval);
     preferences.putBool("digiEnabled", config.digiEnabled);
     preferences.putUChar("digiPath", config.digiPath);
+
+    // System
+    preferences.putUChar("debugLevel", config.debugLevel);
     
     preferences.end();
     return true;
