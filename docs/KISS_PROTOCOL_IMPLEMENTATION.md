@@ -98,10 +98,10 @@ This TNC implements standard TNC operating modes with proper ESC handling:
 
 ### ESC Character Behavior by Mode
 
-| Mode | ESC (0x1B) Action | Purpose |
-|------|-------------------|---------|
-| Command | No special action | Normal character input |
-| KISS | Exit to Command Mode | Emergency return to control |
+| Mode     | ESC (0x1B) Action    | Purpose                      |
+| -------- | -------------------- | ---------------------------- |
+| Command  | No special action    | Normal character input       |
+| KISS     | Exit to Command Mode | Emergency return to control  |
 | Converse | Exit to Command Mode | Break transparent connection |
 
 ## Technical Implementation
