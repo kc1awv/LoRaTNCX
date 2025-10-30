@@ -15,7 +15,7 @@ LoRaRadio::LoRaRadio()
     rxCount = 0;
     lastRSSI = 0;
     lastSNR = 0;
-    
+
     // Initialize current parameters with defaults
     currentFrequency = LORA_FREQUENCY;
     currentTxPower = LORA_OUTPUT_POWER;
@@ -120,7 +120,7 @@ bool LoRaRadio::begin(float frequency, float bandwidth, uint8_t spreadingFactor,
         currentCodingRate = codingRate;
         currentSyncWord = LORA_SYNC_WORD;
         currentTxPower = LORA_OUTPUT_POWER;
-        
+
         Serial.println("✓ LoRa radio initialized successfully!");
 
         // Set PA to receive mode after initialization
@@ -379,23 +379,26 @@ void LoRaRadio::initializeSPI()
 // Parameter setter methods - these reinitialize the radio with new parameters
 bool LoRaRadio::setFrequency(float frequency)
 {
-    if (!initialized || radio == nullptr) {
+    if (!initialized || radio == nullptr)
+    {
         return false;
     }
-    
+
     // Reinitialize radio with new frequency
     return begin(frequency, currentBandwidth, currentSpreadingFactor, currentCodingRate);
 }
 
 bool LoRaRadio::setTxPower(int8_t power)
 {
-    if (!initialized || radio == nullptr) {
+    if (!initialized || radio == nullptr)
+    {
         return false;
     }
-    
+
     // Set power directly on radio (doesn't require full reinit)
     int state = radio->setOutputPower(power);
-    if (state == RADIOLIB_ERR_NONE) {
+    if (state == RADIOLIB_ERR_NONE)
+    {
         currentTxPower = power;
         return true;
     }
@@ -404,43 +407,48 @@ bool LoRaRadio::setTxPower(int8_t power)
 
 bool LoRaRadio::setSpreadingFactor(uint8_t sf)
 {
-    if (!initialized || radio == nullptr) {
+    if (!initialized || radio == nullptr)
+    {
         return false;
     }
-    
+
     // Reinitialize radio with new spreading factor
     return begin(currentFrequency, currentBandwidth, sf, currentCodingRate);
 }
 
 bool LoRaRadio::setBandwidth(float bw)
 {
-    if (!initialized || radio == nullptr) {
+    if (!initialized || radio == nullptr)
+    {
         return false;
     }
-    
+
     // Reinitialize radio with new bandwidth
     return begin(currentFrequency, bw, currentSpreadingFactor, currentCodingRate);
 }
 
 bool LoRaRadio::setCodingRate(uint8_t cr)
 {
-    if (!initialized || radio == nullptr) {
+    if (!initialized || radio == nullptr)
+    {
         return false;
     }
-    
+
     // Reinitialize radio with new coding rate
     return begin(currentFrequency, currentBandwidth, currentSpreadingFactor, cr);
 }
 
 bool LoRaRadio::setSyncWord(uint8_t syncWord)
 {
-    if (!initialized || radio == nullptr) {
+    if (!initialized || radio == nullptr)
+    {
         return false;
     }
-    
+
     // Set sync word directly on radio (doesn't require full reinit)
     int state = radio->setSyncWord(syncWord);
-    if (state == RADIOLIB_ERR_NONE) {
+    if (state == RADIOLIB_ERR_NONE)
+    {
         currentSyncWord = syncWord;
         return true;
     }

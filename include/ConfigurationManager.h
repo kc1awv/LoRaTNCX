@@ -7,12 +7,13 @@
 /**
  * @file ConfigurationManager.h
  * @brief Manages LoRa configuration selection and switching for amateur radio use
- * 
+ *
  * Provides runtime configuration management for optimized amateur radio LoRa settings.
  * Allows switching between different configurations via KISS commands or serial interface.
  */
 
-enum class LoRaConfigPreset {
+enum class LoRaConfigPreset
+{
     HIGH_SPEED = 0,
     FAST_BALANCED = 1,
     BALANCED = 2,
@@ -25,7 +26,8 @@ enum class LoRaConfigPreset {
     CUSTOM = 99
 };
 
-struct LoRaConfiguration {
+struct LoRaConfiguration
+{
     String name;
     float frequency;
     float bandwidth;
@@ -37,43 +39,42 @@ struct LoRaConfiguration {
     String useCase;
 };
 
-class ConfigurationManager {
+class ConfigurationManager
+{
 private:
-    LoRaRadio* radio;
+    LoRaRadio *radio;
     LoRaConfigPreset currentPreset;
     LoRaConfiguration currentConfig;
     LoRaConfiguration customConfig;
-    
+
     static const LoRaConfiguration presetConfigurations[];
-    
+
 public:
-    ConfigurationManager(LoRaRadio* radioInstance);
-    
+    ConfigurationManager(LoRaRadio *radioInstance);
+
     // Configuration management
     bool setConfiguration(LoRaConfigPreset preset);
     bool setCustomConfiguration(float frequency, float bandwidth, uint8_t sf, uint8_t cr);
     LoRaConfigPreset getCurrentPreset() const { return currentPreset; }
     LoRaConfiguration getCurrentConfiguration() const { return currentConfig; }
-    
+
     // Configuration queries
     String getConfigurationName() const;
     String getConfigurationInfo() const;
     uint16_t getMaxPayloadSize() const { return currentConfig.maxPayload; }
-    
+
     // Preset utilities
     static String getPresetName(LoRaConfigPreset preset);
     static LoRaConfiguration getPresetConfiguration(LoRaConfigPreset preset);
     static void listAllPresets();
-    
+
     // Command interface
-    bool processConfigCommand(const String& command);
+    bool processConfigCommand(const String &command);
     String getConfigStatus() const;
-    
+
     // Validation
     static bool validateConfiguration(float frequency, float bandwidth, uint8_t sf, uint8_t cr);
     static uint16_t calculateMaxPayload(uint8_t sf, uint8_t cr, float bandwidth);
 };
-
-
 
 #endif // CONFIGURATION_MANAGER_H

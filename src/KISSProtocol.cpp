@@ -24,11 +24,11 @@ bool KISSProtocol::begin()
     errors = 0;
 
     // Initialize TNC parameters with defaults
-    txDelay = 30;       // 300ms default TX delay
-    persistence = 63;   // ~25% default persistence
-    slotTime = 10;      // 100ms default slot time
-    txTail = 5;         // 50ms default TX tail
-    fullDuplex = false; // Half duplex by default
+    txDelay = 30;          // 300ms default TX delay
+    persistence = 63;      // ~25% default persistence
+    slotTime = 10;         // 100ms default slot time
+    txTail = 5;            // 50ms default TX tail
+    fullDuplex = false;    // Half duplex by default
     exitRequested = false; // No exit request initially
 
     Serial.println("✓ KISS protocol initialized");
