@@ -364,17 +364,17 @@ bool ConfigurationManager::processConfigCommand(const String &command)
 
 String ConfigurationManager::getConfigStatus() const
 {
-    String status = "\nCurrent LoRa Configuration Status:\n";
-    status += "==================================\n";
+    String status = "\nCurrent LoRa Configuration Status:\r\n";
+    status += "==================================\r\n";
     status += "Preset: ";
     if (currentPreset == LoRaConfigPreset::CUSTOM)
     {
-        status += "Custom\n";
+        status += "Custom\r\n";
     }
     else
     {
         status += String(static_cast<int>(currentPreset)) + " (";
-        status += getPresetName(currentPreset) + ")\n";
+        status += getPresetName(currentPreset) + ")\r\n";
     }
     status += getConfigurationInfo();
     return status;
