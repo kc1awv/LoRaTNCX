@@ -7,6 +7,28 @@
 
 #include "TNCManager.h"
 
+#include "HardwareConfig.h"
+
+namespace
+{
+constexpr unsigned long BUTTON_DEBOUNCE_MS = 30UL;
+constexpr unsigned long POWER_OFF_WARNING_DELAY_MS = 750UL;
+constexpr unsigned long POWER_OFF_HOLD_MS = 3000UL;
+
+inline float clamp01(float value)
+{
+    if (value < 0.0f)
+    {
+        return 0.0f;
+    }
+    if (value > 1.0f)
+    {
+        return 1.0f;
+    }
+    return value;
+}
+}
+
 TNCManager::TNCManager() : configManager(&radio), display(), batteryMonitor()
 {
     initialized = false;
@@ -15,6 +37,19 @@ TNCManager::TNCManager() : configManager(&radio), display(), batteryMonitor()
     lastBatteryVoltage = 0.0f;
     lastBatteryPercent = 0;
     lastBatterySample = 0;
+    lastPacketRSSI = 0.0f;
+    lastPacketSNR = 0.0f;
+    lastPacketTimestamp = 0;
+    hasRecentPacket = false;
+    buttonStableState = false;
+    buttonLastReading = false;
+    buttonLastChange = 0;
+    buttonPressStart = 0;
+    buttonLongPressHandled = false;
+    powerOffWarningActive = false;
+    powerOffProgress = 0.0f;
+    powerOffInitiated = false;
+    powerOffComplete = false;
 }
 
 bool TNCManager::begin()
@@ -30,6 +65,19 @@ bool TNCManager::begin()
     lastBatteryVoltage = batteryMonitor.readVoltage();
     lastBatteryPercent = batteryMonitor.computePercentage(lastBatteryVoltage);
     lastBatterySample = millis();
+
+    pinMode(USER_BUTTON_PIN, INPUT_PULLUP);
+    bool initialReading = (digitalRead(USER_BUTTON_PIN) == USER_BUTTON_ACTIVE_STATE);
+    buttonStableState = initialReading;
+    buttonLastReading = initialReading;
+    unsigned long now = millis();
+    buttonLastChange = now;
+    buttonPressStart = now;
+    buttonLongPressHandled = false;
+    powerOffWarningActive = false;
+    powerOffProgress = 0.0f;
+    powerOffInitiated = false;
+    powerOffComplete = false;
 
     initialized = false;
     lastStatus = 0;
@@ -66,7 +114,7 @@ bool TNCManager::begin()
 
     initialized = true;
 
-    display.updateStatus(commandSystem.getCurrentMode(), radio.getTxCount(), radio.getRxCount(), lastBatteryVoltage, lastBatteryPercent);
+    display.updateStatus(buildDisplayStatus());
     return true;
 }
 
@@ -97,7 +145,9 @@ void TNCManager::update()
         lastBatterySample = millis();
     }
 
-    display.updateStatus(commandSystem.getCurrentMode(), radio.getTxCount(), radio.getRxCount(), lastBatteryVoltage, lastBatteryPercent);
+    handleUserButton();
+
+    display.updateStatus(buildDisplayStatus());
 }
 
 String TNCManager::getStatus()
@@ -399,6 +449,11 @@ void TNCManager::handleIncomingRadio()
             float rssi = radio.getRSSI();
             float snr = radio.getSNR();
 
+            lastPacketRSSI = rssi;
+            lastPacketSNR = snr;
+            lastPacketTimestamp = millis();
+            hasRecentPacket = true;
+
             if (commandSystem.getDebugLevel() >= 2)
             {
                 Serial.print("TNC: Received ");
@@ -471,4 +526,118 @@ void TNCManager::printStatus()
 
     // If we want status output, it should go to a separate debug interface
     // or be disabled entirely in production KISS mode
+}
+
+void TNCManager::handleUserButton()
+{
+    if (powerOffInitiated)
+    {
+        return;
+    }
+
+    unsigned long now = millis();
+    bool rawPressed = (digitalRead(USER_BUTTON_PIN) == USER_BUTTON_ACTIVE_STATE);
+
+    if (rawPressed != buttonLastReading)
+    {
+        buttonLastReading = rawPressed;
+        buttonLastChange = now;
+    }
+
+    if ((now - buttonLastChange) >= BUTTON_DEBOUNCE_MS && rawPressed != buttonStableState)
+    {
+        buttonStableState = rawPressed;
+        if (buttonStableState)
+        {
+            buttonPressStart = now;
+            buttonLongPressHandled = false;
+        }
+        else
+        {
+            if (!buttonLongPressHandled)
+            {
+                display.nextScreen();
+            }
+
+            powerOffWarningActive = false;
+            powerOffProgress = 0.0f;
+            buttonLongPressHandled = false;
+        }
+    }
+
+    if (buttonStableState)
+    {
+        unsigned long held = now - buttonPressStart;
+
+        if (held >= POWER_OFF_HOLD_MS)
+        {
+            powerOffWarningActive = true;
+            powerOffProgress = 1.0f;
+            buttonLongPressHandled = true;
+            performPowerOff();
+        }
+        else if (held >= POWER_OFF_WARNING_DELAY_MS)
+        {
+            powerOffWarningActive = true;
+            float denom = static_cast<float>(POWER_OFF_HOLD_MS - POWER_OFF_WARNING_DELAY_MS);
+            float progress = denom > 0.0f ? static_cast<float>(held - POWER_OFF_WARNING_DELAY_MS) / denom : 1.0f;
+            powerOffProgress = clamp01(progress);
+            buttonLongPressHandled = true;
+        }
+    }
+    else if (powerOffWarningActive)
+    {
+        powerOffWarningActive = false;
+        powerOffProgress = 0.0f;
+    }
+}
+
+DisplayManager::StatusData TNCManager::buildDisplayStatus()
+{
+    DisplayManager::StatusData status;
+    status.mode = commandSystem.getCurrentMode();
+    status.txCount = radio.getTxCount();
+    status.rxCount = radio.getRxCount();
+    status.batteryVoltage = lastBatteryVoltage;
+    status.batteryPercent = lastBatteryPercent;
+    status.hasRecentPacket = hasRecentPacket;
+    status.lastRSSI = lastPacketRSSI;
+    status.lastSNR = lastPacketSNR;
+    status.lastPacketMillis = lastPacketTimestamp;
+    status.frequency = radio.getFrequency();
+    status.bandwidth = radio.getBandwidth();
+    status.spreadingFactor = radio.getSpreadingFactor();
+    status.codingRate = radio.getCodingRate();
+    status.txPower = radio.getTxPower();
+    status.uptimeMillis = millis();
+    status.powerOffActive = powerOffWarningActive;
+    status.powerOffProgress = powerOffProgress;
+    status.powerOffComplete = powerOffComplete;
+    return status;
+}
+
+void TNCManager::performPowerOff()
+{
+    if (powerOffInitiated)
+    {
+        return;
+    }
+
+    powerOffInitiated = true;
+    powerOffComplete = true;
+    powerOffWarningActive = true;
+    powerOffProgress = 1.0f;
+
+    Serial.println("Power-off button hold detected. Shutting down.");
+
+    display.updateStatus(buildDisplayStatus());
+    delay(500);
+
+    digitalWrite(POWER_CTRL_PIN, POWER_OFF);
+    delay(1000);
+
+    while (true)
+    {
+        delay(1000);
+    }
 }

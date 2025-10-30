@@ -11,6 +11,36 @@
 class DisplayManager
 {
 public:
+    enum class Screen : uint8_t
+    {
+        MAIN = 0,
+        LORA_DETAILS,
+        BATTERY,
+        SYSTEM
+    };
+
+    struct StatusData
+    {
+        TNCMode mode = TNCMode::COMMAND_MODE;
+        uint32_t txCount = 0;
+        uint32_t rxCount = 0;
+        float batteryVoltage = 0.0f;
+        uint8_t batteryPercent = 0;
+        bool hasRecentPacket = false;
+        float lastRSSI = 0.0f;
+        float lastSNR = 0.0f;
+        unsigned long lastPacketMillis = 0;
+        float frequency = 0.0f;
+        float bandwidth = 0.0f;
+        uint8_t spreadingFactor = 0;
+        uint8_t codingRate = 0;
+        int8_t txPower = 0;
+        unsigned long uptimeMillis = 0;
+        bool powerOffActive = false;
+        float powerOffProgress = 0.0f;
+        bool powerOffComplete = false;
+    };
+
     DisplayManager();
 
     /**
@@ -25,24 +55,52 @@ public:
     void showBootScreen();
 
     /**
-     * @brief Update the runtime status view.
-     *
-     * @param mode    Current operating mode of the TNC.
-     * @param txCount Number of LoRa frames transmitted.
-     * @param rxCount Number of LoRa frames received.
+     * @brief Update the runtime status view using the provided telemetry.
      */
-    void updateStatus(TNCMode mode, uint32_t txCount, uint32_t rxCount, float batteryVoltage, uint8_t batteryPercent);
+    void updateStatus(const StatusData &status);
+
+    /**
+     * @brief Advance to the next detail screen.
+     */
+    void nextScreen();
+
+    /**
+     * @brief Set the active screen directly.
+     */
+    void setScreen(Screen screen);
+
+    /**
+     * @brief Get the currently selected screen.
+     */
+    Screen getScreen() const { return currentScreen; }
+
+    /**
+     * @brief Get the total number of available screens.
+     */
+    uint8_t getScreenCount() const { return SCREEN_COUNT; }
 
 private:
+    static constexpr uint8_t SCREEN_COUNT = 4;
+
     U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2;
     bool enabled;
-    TNCMode lastMode;
-    uint32_t lastTx;
-    uint32_t lastRx;
-    float lastBatteryVoltage;
-    uint8_t lastBatteryPercent;
+    Screen currentScreen;
+    Screen lastRenderedScreen;
+    bool hasLastStatus;
+    bool forceFullRefresh;
+    StatusData lastStatus;
     unsigned long lastRefresh;
 
     const char *modeToLabel(TNCMode mode) const;
-    void drawStatus(TNCMode mode, uint32_t txCount, uint32_t rxCount, float batteryVoltage, uint8_t batteryPercent);
+    void drawMainScreen();
+    void drawLoRaDetails();
+    void drawBatteryScreen();
+    void drawSystemScreen();
+    void drawPowerOffWarning();
+    void drawPowerOffComplete();
+    void drawProgressBar(int16_t x, int16_t y, int16_t width, int16_t height, float progress);
+    void drawBatteryGauge(int16_t x, int16_t y, int16_t width, int16_t height, uint8_t percent);
+    void drawCenteredText(int16_t y, const char *text, const uint8_t *font);
+    void drawHeader(const char *title);
+    static void formatUptime(char *buffer, size_t length, unsigned long millisValue);
 };

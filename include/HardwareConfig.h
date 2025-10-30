@@ -44,6 +44,12 @@
 #define DISPLAY_ENABLED true
 
 // ==========================================
+// USER INTERFACE INPUTS
+// ==========================================
+#define USER_BUTTON_PIN 0             // GPIO connected to the front-panel user button
+#define USER_BUTTON_ACTIVE_STATE LOW  // Button pulls the line low when pressed
+
+// ==========================================
 // DEBUG CONFIGURATION
 // ==========================================
 // Control debug output for performance optimization
