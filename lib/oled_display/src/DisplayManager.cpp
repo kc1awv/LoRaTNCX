@@ -2,12 +2,16 @@
 
 #include <Wire.h>
 
+#include <cmath>
+
 DisplayManager::DisplayManager()
     : u8g2(U8G2_R0, OLED_RST_PIN),
       enabled(false),
       lastMode(TNCMode::COMMAND_MODE),
       lastTx(0),
       lastRx(0),
+      lastBatteryVoltage(0.0f),
+      lastBatteryPercent(0),
       lastRefresh(0)
 {
 }
@@ -34,6 +38,8 @@ bool DisplayManager::begin()
     lastMode = TNCMode::COMMAND_MODE;
     lastTx = 0;
     lastRx = 0;
+    lastBatteryVoltage = 0.0f;
+    lastBatteryPercent = 0;
     lastRefresh = 0;
 
     return true;
@@ -69,7 +75,7 @@ void DisplayManager::showBootScreen()
     u8g2.sendBuffer();
 }
 
-void DisplayManager::updateStatus(TNCMode mode, uint32_t txCount, uint32_t rxCount)
+void DisplayManager::updateStatus(TNCMode mode, uint32_t txCount, uint32_t rxCount, float batteryVoltage, uint8_t batteryPercent)
 {
     if (!enabled)
     {
@@ -77,6 +83,10 @@ void DisplayManager::updateStatus(TNCMode mode, uint32_t txCount, uint32_t rxCou
     }
 
     bool changed = (mode != lastMode) || (txCount != lastTx) || (rxCount != lastRx);
+    if (!changed)
+    {
+        changed = (std::fabs(batteryVoltage - lastBatteryVoltage) >= 0.05f) || (batteryPercent != lastBatteryPercent);
+    }
     unsigned long now = millis();
 
     if (!changed && (now - lastRefresh) < DISPLAY_UPDATE)
@@ -87,9 +97,11 @@ void DisplayManager::updateStatus(TNCMode mode, uint32_t txCount, uint32_t rxCou
     lastMode = mode;
     lastTx = txCount;
     lastRx = rxCount;
+    lastBatteryVoltage = batteryVoltage;
+    lastBatteryPercent = batteryPercent;
     lastRefresh = now;
 
-    drawStatus(mode, txCount, rxCount);
+    drawStatus(mode, txCount, rxCount, batteryVoltage, batteryPercent);
 }
 
 const char *DisplayManager::modeToLabel(TNCMode mode) const
@@ -109,7 +121,7 @@ const char *DisplayManager::modeToLabel(TNCMode mode) const
     }
 }
 
-void DisplayManager::drawStatus(TNCMode mode, uint32_t txCount, uint32_t rxCount)
+void DisplayManager::drawStatus(TNCMode mode, uint32_t txCount, uint32_t rxCount, float batteryVoltage, uint8_t batteryPercent)
 {
     u8g2.clearBuffer();
 
@@ -131,6 +143,10 @@ void DisplayManager::drawStatus(TNCMode mode, uint32_t txCount, uint32_t rxCount
     char statsLine[24];
     snprintf(statsLine, sizeof(statsLine), "LoRa TX:%lu RX:%lu", static_cast<unsigned long>(txCount), static_cast<unsigned long>(rxCount));
     u8g2.drawStr(0, 52, statsLine);
+
+    char batteryLine[24];
+    snprintf(batteryLine, sizeof(batteryLine), "BAT: %.2fV %3u%%", static_cast<double>(batteryVoltage), static_cast<unsigned int>(batteryPercent));
+    u8g2.drawStr(0, 62, batteryLine);
 
     u8g2.sendBuffer();
 }

@@ -1,0 +1,11 @@
+{
+    "name": "LoRaTNCXBatteryMonitor",
+    "version": "0.1.0",
+    "description": "Battery monitoring helper for the LoRaTNCX project",
+    "authors": [
+        {
+            "name": "LoRaTNCX Project"
+        }
+    ],
+    "dependencies": []
+}

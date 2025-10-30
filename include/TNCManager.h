@@ -17,6 +17,7 @@
 #include "ConfigurationManager.h"
 #include <TNCCommands.h>
 #include <DisplayManager.h>
+#include <BatteryMonitor.h>
 
 class TNCManager
 {
@@ -55,10 +56,14 @@ private:
     ConfigurationManager configManager; // Configuration management
     TNCCommands commandSystem;          // Command system interface
     DisplayManager display;             // OLED display manager
+    BatteryMonitor batteryMonitor;      // Battery monitoring helper
 
     bool initialized;
     unsigned long lastStatus;
     String serialBuffer; // Buffer for incoming serial data
+    float lastBatteryVoltage;
+    uint8_t lastBatteryPercent;
+    unsigned long lastBatterySample;
 
     /**
      * @brief Handle incoming LoRa packets
