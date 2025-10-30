@@ -13,10 +13,10 @@ BatteryMonitor::BatteryMonitor(uint8_t adcPin, uint8_t controlPin)
 bool BatteryMonitor::begin()
 {
     pinMode(controlPin, OUTPUT);
-    digitalWrite(controlPin, HIGH); // Enable battery voltage divider per Heltec docs
+    digitalWrite(controlPin, LOW); // Default to disabled; V4 boards enable with HIGH
 
     analogReadResolution(12);
-    analogSetPinAttenuation(adcPin, ADC_11db);
+    analogSetPinAttenuation(adcPin, ADC_0db);
 
     initialized = true;
     return true;
@@ -71,10 +71,12 @@ float BatteryMonitor::readAdcVoltage()
     uint32_t accumulator = 0;
     for (uint8_t i = 0; i < SAMPLE_COUNT; ++i)
     {
-        accumulator += analogRead(adcPin);
+        accumulator += analogReadMilliVolts(adcPin);
         delayMicroseconds(250);
     }
 
-    float average = static_cast<float>(accumulator) / static_cast<float>(SAMPLE_COUNT);
-    return (average / static_cast<float>(ADC_MAX)) * BATTERY_VREF;
+    digitalWrite(controlPin, LOW);
+
+    float averageMillivolts = static_cast<float>(accumulator) / static_cast<float>(SAMPLE_COUNT);
+    return averageMillivolts / 1000.0f;
 }
