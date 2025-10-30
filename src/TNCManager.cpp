@@ -29,7 +29,7 @@ inline float clamp01(float value)
 }
 }
 
-TNCManager::TNCManager() : configManager(&radio), display(), batteryMonitor()
+TNCManager::TNCManager() : configManager(&radio), display(), batteryMonitor(), gnss()
 {
     initialized = false;
     lastStatus = 0;
@@ -50,6 +50,8 @@ TNCManager::TNCManager() : configManager(&radio), display(), batteryMonitor()
     powerOffProgress = 0.0f;
     powerOffInitiated = false;
     powerOffComplete = false;
+    gnssEnabled = false;
+    gnssInitialised = false;
 }
 
 bool TNCManager::begin()
@@ -65,6 +67,28 @@ bool TNCManager::begin()
     lastBatteryVoltage = batteryMonitor.readVoltage();
     lastBatteryPercent = batteryMonitor.computePercentage(lastBatteryVoltage);
     lastBatterySample = millis();
+
+    gnssEnabled = GNSS_ENABLED;
+    gnssInitialised = false;
+
+    if (gnssEnabled)
+    {
+        Serial.println("Initializing GNSS module...");
+        if (gnss.begin())
+        {
+            Serial.println("✓ GNSS module initialized");
+            gnssInitialised = true;
+        }
+        else
+        {
+            Serial.println("✗ GNSS initialization failed");
+            gnssEnabled = false;
+        }
+    }
+    else
+    {
+        Serial.println("GNSS module disabled");
+    }
 
     pinMode(USER_BUTTON_PIN, INPUT_PULLUP);
     bool initialReading = (digitalRead(USER_BUTTON_PIN) == USER_BUTTON_ACTIVE_STATE);
@@ -123,6 +147,19 @@ void TNCManager::update()
     if (!initialized)
     {
         return;
+    }
+
+    if (gnssEnabled && gnssInitialised)
+    {
+        gnss.update();
+        const auto &timeStatus = gnss.getTimeStatus();
+        if (timeStatus.valid && !timeStatus.synced)
+        {
+            if (gnss.syncSystemTime())
+            {
+                Serial.println("System clock synchronized via GNSS.");
+            }
+        }
     }
 
     // Handle incoming serial data (could be commands or KISS)
@@ -613,6 +650,36 @@ DisplayManager::StatusData TNCManager::buildDisplayStatus()
     status.powerOffActive = powerOffWarningActive;
     status.powerOffProgress = powerOffProgress;
     status.powerOffComplete = powerOffComplete;
+
+    status.gnssEnabled = gnssEnabled && gnssInitialised;
+    if (status.gnssEnabled)
+    {
+        const auto &fix = gnss.getFixData();
+        status.gnssHasFix = fix.valid;
+        status.gnssIs3DFix = fix.is3DFix;
+        status.gnssLatitude = fix.latitude;
+        status.gnssLongitude = fix.longitude;
+        status.gnssAltitude = fix.altitudeMeters;
+        status.gnssSpeed = fix.speedKnots;
+        status.gnssCourse = fix.courseDegrees;
+        status.gnssHdop = fix.hdop;
+        status.gnssSatellites = fix.satellites;
+
+        const auto &timeStatus = gnss.getTimeStatus();
+        status.gnssTimeValid = timeStatus.valid;
+        status.gnssTimeSynced = timeStatus.synced;
+        status.gnssYear = timeStatus.year;
+        status.gnssMonth = timeStatus.month;
+        status.gnssDay = timeStatus.day;
+        status.gnssHour = timeStatus.hour;
+        status.gnssMinute = timeStatus.minute;
+        status.gnssSecond = timeStatus.second;
+
+        const auto pps = gnss.getPPSStatus();
+        status.gnssPpsAvailable = pps.available;
+        status.gnssPpsLastMillis = pps.lastPulseMillis;
+        status.gnssPpsCount = pps.pulseCount;
+    }
     return status;
 }
 
