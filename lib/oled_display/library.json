@@ -1,0 +1,11 @@
+{
+    "name": "LoRaTNCXDisplay",
+    "version": "0.1.0",
+    "description": "OLED display helper for the LoRaTNCX project",
+    "authors": [
+        {
+            "name": "LoRaTNCX Project"
+        }
+    ],
+    "dependencies": []
+}
