@@ -115,7 +115,7 @@ This TNC implements standard TNC operating modes with proper ESC handling:
 ### KISS Protocol Stack
 - **KISSProtocol.cpp**: Core KISS frame processing
 - **TNCManager.cpp**: Mode switching and initialization handling
-- **TNCCommandsSimple.cpp**: Enhanced command system with amateur radio presets
+- **lib/tnc_commands/src/TNCCommands.cpp**: Enhanced command system with amateur radio presets
 
 ### Serial Communication
 - 9600 baud default (configurable)

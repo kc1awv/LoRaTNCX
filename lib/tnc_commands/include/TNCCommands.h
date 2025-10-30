@@ -1,14 +1,14 @@
 /**
- * @file TNCCommandsSimple.h
- * @brief Simplified TNC Command System for Arduino compatibility
+ * @file TNCCommands.h
+ * @brief LoRaTNCX command system for Arduino compatibility
  * @author LoRaTNCX Project
  * @date October 29, 2025
  *
  * Arduino-compatible command system that doesn't use STL containers.
  */
 
-#ifndef TNC_COMMANDS_SIMPLE_H
-#define TNC_COMMANDS_SIMPLE_H
+#ifndef TNC_COMMANDS_H
+#define TNC_COMMANDS_H
 
 #include <Arduino.h>
 
@@ -37,10 +37,10 @@ enum class TNCMode {
     TRANSPARENT_MODE // Transparent/connected mode
 };
 
-// Simple command system that works with Arduino
-class SimpleTNCCommands {
+// Command system that works with Arduino
+class TNCCommands {
 public:
-    SimpleTNCCommands();
+    TNCCommands();
     
     // Core command processing
     TNCCommandResult processCommand(const String& commandLine);
@@ -345,4 +345,4 @@ private:
 #define TNC_OK_RESPONSE "OK"
 #define TNC_ERROR_RESPONSE "ERROR"
 
-#endif // TNC_COMMANDS_SIMPLE_H
+#endif // TNC_COMMANDS_H
