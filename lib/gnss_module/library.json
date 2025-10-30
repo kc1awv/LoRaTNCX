@@ -1,0 +1,13 @@
+{
+    "name": "GNSSManager",
+    "version": "0.1.0",
+    "description": "GNSS management helpers for LoRaTNCX, including NMEA parsing, PPS tracking, and time synchronization.",
+    "keywords": "gnss,gps,nmea,pps,time",
+    "authors": [
+        {
+            "name": "LoRaTNCX Project"
+        }
+    ],
+    "license": "MIT",
+    "frameworks": "arduino"
+}

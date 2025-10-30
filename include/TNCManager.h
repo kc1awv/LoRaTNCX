@@ -18,6 +18,7 @@
 #include <TNCCommands.h>
 #include <DisplayManager.h>
 #include <BatteryMonitor.h>
+#include <GNSSManager.h>
 
 class TNCManager
 {
@@ -57,6 +58,10 @@ private:
     TNCCommands commandSystem;          // Command system interface
     DisplayManager display;             // OLED display manager
     BatteryMonitor batteryMonitor;      // Battery monitoring helper
+    GNSSManager gnss;                   // GNSS module interface
+
+    bool gnssEnabled;
+    bool gnssInitialised;
 
     bool initialized;
     unsigned long lastStatus;
