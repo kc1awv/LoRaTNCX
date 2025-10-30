@@ -15,7 +15,7 @@
 #include "LoRaRadio.h"
 #include "KISSProtocol.h"
 #include "ConfigurationManager.h"
-#include "TNCCommandsSimple.h"
+#include <TNCCommands.h>
 
 class TNCManager
 {
@@ -54,7 +54,7 @@ private:
     LoRaRadio radio;                    // LoRa radio interface
     KISSProtocol kiss;                  // KISS protocol handler
     ConfigurationManager configManager; // Configuration management
-    SimpleTNCCommands commandSystem;    // Command system interface
+    TNCCommands commandSystem;    // Command system interface
     
     bool initialized;
     unsigned long lastStatus;

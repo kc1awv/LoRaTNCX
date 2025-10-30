@@ -22,7 +22,7 @@ The comprehensive TNC command system has been successfully implemented with 73+ 
 These commands now have full hardware integration with the `LoRaRadio` class:
 
 ### FREQ - Frequency Control ✅ COMPLETED
-- **File**: `src/TNCCommandsSimple.cpp` (line ~596)
+- **File**: `lib/tnc_commands/src/TNCCommands.cpp` (line ~596)
 - **Current Status**: ✅ **IMPLEMENTED** - Full hardware integration complete
 - **Implementation**: Connected to `LoRaRadio::setFrequency()` method
 - **Features**: 
@@ -32,7 +32,7 @@ These commands now have full hardware integration with the `LoRaRadio` class:
   - Stores configuration for persistence
 
 ### POWER - TX Power Control ✅ COMPLETED
-- **File**: `src/TNCCommandsSimple.cpp` (line ~614)
+- **File**: `lib/tnc_commands/src/TNCCommands.cpp` (line ~614)
 - **Current Status**: ✅ **IMPLEMENTED** - Full hardware integration complete
 - **Implementation**: Connected to `LoRaRadio::setTxPower()` method  
 - **Features**:
@@ -42,7 +42,7 @@ These commands now have full hardware integration with the `LoRaRadio` class:
   - Stores configuration for persistence
 
 ### SF - Spreading Factor Control ✅ COMPLETED
-- **File**: `src/TNCCommandsSimple.cpp` (line ~632) 
+- **File**: `lib/tnc_commands/src/TNCCommands.cpp` (line ~632) 
 - **Current Status**: ✅ **IMPLEMENTED** - Full hardware integration complete
 - **Implementation**: Connected to `LoRaRadio::setSpreadingFactor()` method
 - **Features**:
@@ -52,7 +52,7 @@ These commands now have full hardware integration with the `LoRaRadio` class:
   - Stores configuration for persistence
 
 ### BW - Bandwidth Control ✅ COMPLETED
-- **File**: `src/TNCCommandsSimple.cpp` (line ~651)
+- **File**: `lib/tnc_commands/src/TNCCommands.cpp` (line ~651)
 - **Current Status**: ✅ **IMPLEMENTED** - Full hardware integration complete
 - **Implementation**: Connected to `LoRaRadio::setBandwidth()` method
 - **Features**:
@@ -62,7 +62,7 @@ These commands now have full hardware integration with the `LoRaRadio` class:
   - Stores configuration for persistence
 
 ### CR - Coding Rate Control ✅ COMPLETED
-- **File**: `src/TNCCommandsSimple.cpp` (line ~669)
+- **File**: `lib/tnc_commands/src/TNCCommands.cpp` (line ~669)
 - **Current Status**: ✅ **IMPLEMENTED** - Full hardware integration complete
 - **Implementation**: Connected to `LoRaRadio::setCodingRate()` method
 - **Features**:
@@ -72,7 +72,7 @@ These commands now have full hardware integration with the `LoRaRadio` class:
   - Stores configuration for persistence
 
 ### SYNC - Sync Word Control ✅ COMPLETED
-- **File**: `src/TNCCommandsSimple.cpp` (line ~689)
+- **File**: `lib/tnc_commands/src/TNCCommands.cpp` (line ~689)
 - **Current Status**: ✅ **IMPLEMENTED** - Full hardware integration complete
 - **Implementation**: Connected to `LoRaRadio::setSyncWord()` method
 - **Features**:
@@ -82,7 +82,7 @@ These commands now have full hardware integration with the `LoRaRadio` class:
   - Stores configuration for persistence
 
 ### Priority 1 Implementation Summary:
-- ✅ **Hardware Integration System**: Added `SimpleTNCCommands::setRadio()` method
+- ✅ **Hardware Integration System**: Added `TNCCommands::setRadio()` method
 - ✅ **LoRaRadio Extensions**: Added 6 setter methods and 6 getter methods
 - ✅ **Parameter Storage**: All radio parameters tracked in LoRaRadio class
 - ✅ **Error Handling**: Comprehensive validation and hardware error reporting
@@ -93,7 +93,7 @@ These commands now have full hardware integration with the `LoRaRadio` class:
 Radio telemetry now provides live hardware data:
 
 ### RSSI - Signal Strength ✅ COMPLETED
-- **File**: `src/TNCCommandsSimple.cpp` (line ~930)
+- **File**: `lib/tnc_commands/src/TNCCommands.cpp` (line ~930)
 - **Current Status**: ✅ **IMPLEMENTED** - Real-time hardware data
 - **Implementation**: Connected to existing `LoRaRadio::getRSSI()` method
 - **Features**:
@@ -103,7 +103,7 @@ Radio telemetry now provides live hardware data:
   - Direct hardware integration (no simulation)
 
 ### SNR - Signal-to-Noise Ratio ✅ COMPLETED
-- **File**: `src/TNCCommandsSimple.cpp` (line ~936)
+- **File**: `lib/tnc_commands/src/TNCCommands.cpp` (line ~936)
 - **Current Status**: ✅ **IMPLEMENTED** - Real-time hardware data
 - **Implementation**: Connected to existing `LoRaRadio::getSNR()` method
 - **Features**:
@@ -117,7 +117,7 @@ Radio telemetry now provides live hardware data:
 Essential TNC configuration management now fully implemented:
 
 ### SAVE - Save Configuration ✅ COMPLETED
-- **File**: `src/TNCCommandsSimple.cpp` (line ~1079)
+- **File**: `lib/tnc_commands/src/TNCCommands.cpp` (line ~1079)
 - **Current Status**: ✅ **IMPLEMENTED** - Full configuration persistence
 - **Implementation**: Complete ESP32 Preferences-based storage system
 - **Features**:
@@ -128,7 +128,7 @@ Essential TNC configuration management now fully implemented:
   - Helper method `saveConfigurationToFlash()` for programmatic access
 
 ### LOAD - Load Configuration ✅ COMPLETED
-- **File**: `src/TNCCommandsSimple.cpp` (line ~1127)
+- **File**: `lib/tnc_commands/src/TNCCommands.cpp` (line ~1127)
 - **Current Status**: ✅ **IMPLEMENTED** - Full configuration restoration with hardware sync
 - **Implementation**: Complete ESP32 Preferences-based loading system with hardware integration
 - **Features**:
@@ -151,7 +151,7 @@ Essential TNC configuration management now fully implemented:
 Core TNC functionality with complete packet protocol implementation:
 
 ### LINKTEST - Link Quality Testing ✅ COMPLETED
-- **File**: `src/TNCCommandsSimple.cpp` (line ~1851)
+- **File**: `lib/tnc_commands/src/TNCCommands.cpp` (line ~1851)
 - **Current Status**: ✅ **IMPLEMENTED** - Complete ping/pong link testing
 - **Implementation**: Full ping/pong style link quality testing with hardware integration
 - **Features**:
@@ -163,7 +163,7 @@ Core TNC functionality with complete packet protocol implementation:
   - Leverages existing LoRaRadio transmit/receive methods
 
 ### UIDFRAME - UI Frame Transmission ✅ COMPLETED
-- **File**: `src/TNCCommandsSimple.cpp` (line ~2071)
+- **File**: `lib/tnc_commands/src/TNCCommands.cpp` (line ~2071)
 - **Current Status**: ✅ **IMPLEMENTED** - AX.25 UI frame generation and transmission
 - **Implementation**: Complete AX.25 UI frame creation and transmission system
 - **Features**:
@@ -175,7 +175,7 @@ Core TNC functionality with complete packet protocol implementation:
   - Error handling for hardware failures
 
 ### BEACON - Automatic Beaconing ✅ COMPLETED
-- **File**: `src/TNCCommandsSimple.cpp` (line ~851)
+- **File**: `lib/tnc_commands/src/TNCCommands.cpp` (line ~851)
 - **Current Status**: ✅ **IMPLEMENTED** - Enhanced beacon system with immediate transmission
 - **Implementation**: Complete beacon transmission system with configuration management
 - **Features**:
@@ -188,7 +188,7 @@ Core TNC functionality with complete packet protocol implementation:
   - Helper method `transmitBeacon()` for programmatic access
 
 ### ROUTE - Routing Table ✅ COMPLETED
-- **File**: `src/TNCCommandsSimple.cpp` (line ~948)
+- **File**: `lib/tnc_commands/src/TNCCommands.cpp` (line ~948)
 - **Current Status**: ✅ **IMPLEMENTED** - Complete routing table management system
 - **Implementation**: Full routing table with add/delete/display/purge functionality
 - **Features**:
@@ -201,7 +201,7 @@ Core TNC functionality with complete packet protocol implementation:
   - Route lookup and path optimization support
 
 ### NODES - Network Discovery ✅ COMPLETED
-- **File**: `src/TNCCommandsSimple.cpp` (line ~1148)
+- **File**: `lib/tnc_commands/src/TNCCommands.cpp` (line ~1148)
 - **Current Status**: ✅ **IMPLEMENTED** - Network topology discovery and station tracking
 - **Implementation**: Complete heard station database with signal quality tracking
 - **Features**:
@@ -214,7 +214,7 @@ Core TNC functionality with complete packet protocol implementation:
   - Comprehensive display with formatted statistics table
 
 ### DIGI - Digipeater Functionality ✅ COMPLETED
-- **File**: `src/TNCCommandsSimple.cpp` (line ~940)
+- **File**: `lib/tnc_commands/src/TNCCommands.cpp` (line ~940)
 - **Current Status**: ✅ **IMPLEMENTED** - AX.25 digipeater with complete path processing
 - **Implementation**: Full digipeater functionality with WIDE alias support and path processing
 - **Features**:
@@ -227,7 +227,7 @@ Core TNC functionality with complete packet protocol implementation:
   - Statistics display and configuration management
 
 ### CONNECT - AX.25 Connection ✅ COMPLETED
-- **File**: `src/TNCCommandsSimple.cpp` (line ~2115)
+- **File**: `lib/tnc_commands/src/TNCCommands.cpp` (line ~2115)
 - **Current Status**: ✅ **IMPLEMENTED** - AX.25 connection establishment protocol
 - **Implementation**: Complete connection state management with multi-connection support
 - **Features**:
@@ -240,7 +240,7 @@ Core TNC functionality with complete packet protocol implementation:
   - Comprehensive error handling and validation
 
 ### DISCONNECT - AX.25 Disconnection ✅ COMPLETED
-- **File**: `src/TNCCommandsSimple.cpp` (line ~2125)
+- **File**: `lib/tnc_commands/src/TNCCommands.cpp` (line ~2125)
 - **Current Status**: ✅ **IMPLEMENTED** - AX.25 disconnection protocol
 - **Implementation**: Complete disconnection handling with proper state cleanup
 - **Features**:
@@ -362,9 +362,9 @@ Additional TNC capabilities for future enhancement:
 
 ## Files to Modify
 
-- **Primary**: `src/TNCCommandsSimple.cpp` - Command implementations
+- **Primary**: `lib/tnc_commands/src/TNCCommands.cpp` - Command implementations
 - **Secondary**: `src/LoRaRadio.cpp` - May need additional methods for power/sync control
-- **Configuration**: `include/TNCCommandsSimple.h` - May need additional data structures
+- **Configuration**: `lib/tnc_commands/include/TNCCommands.h` - May need additional data structures
 - **Documentation**: `docs/COMPREHENSIVE_COMMAND_SET.md` - Update implementation status
 
 ## Success Criteria
