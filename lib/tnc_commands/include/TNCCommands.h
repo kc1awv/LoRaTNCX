@@ -258,6 +258,7 @@ private:
     
     // Configuration management
     TNCCommandResult handleSAVE(const String args[], int argCount);
+    TNCCommandResult handleSAVED(const String args[], int argCount);
     TNCCommandResult handleLOAD(const String args[], int argCount);
     TNCCommandResult handleRESET(const String args[], int argCount);
     TNCCommandResult handleFACTORY(const String args[], int argCount);

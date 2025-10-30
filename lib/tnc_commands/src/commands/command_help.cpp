@@ -47,6 +47,7 @@ TNCCommandResult TNCCommands::handleHELP(const String args[], int argCount) {
         sendResponse("");
         sendResponse("CONFIGURATION:");
         sendResponse("  SAVE       - Save settings to flash");
+        sendResponse("  SAVED      - Show settings stored in flash");
         sendResponse("  LOAD       - Load settings from flash");
         sendResponse("  RESET      - Reset to defaults");
         sendResponse("  FACTORY    - Factory reset");
@@ -72,6 +73,9 @@ TNCCommandResult TNCCommands::handleHELP(const String args[], int argCount) {
             sendResponse("MYCALL [callsign] - Set/show station callsign");
             sendResponse("  callsign: 3-6 character amateur radio callsign");
             sendResponse("  Examples: MYCALL W1AW, MYCALL KJ4ABC");
+        } else if (cmd == "SAVED") {
+            sendResponse("SAVED - Display configuration saved in flash");
+            sendResponse("  Shows station, radio, protocol, and system settings");
         } else {
             sendResponse("No detailed help available for: " + cmd);
         }

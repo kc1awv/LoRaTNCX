@@ -302,6 +302,8 @@ TNCCommandResult TNCCommands::processCommand(const String& commandLine) {
     // Configuration management
     } else if (command == "SAVE") {
         result = handleSAVE(cmdArgs, cmdArgCount);
+    } else if (command == "SAVED") {
+        result = handleSAVED(cmdArgs, cmdArgCount);
     } else if (command == "LOAD") {
         result = handleLOAD(cmdArgs, cmdArgCount);
     } else if (command == "RESET") {
