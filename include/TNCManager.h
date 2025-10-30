@@ -16,6 +16,8 @@
 #include "KISSProtocol.h"
 #include "ConfigurationManager.h"
 #include <TNCCommands.h>
+#include <DisplayManager.h>
+#include <BatteryMonitor.h>
 
 class TNCManager
 {
@@ -53,10 +55,15 @@ private:
     KISSProtocol kiss;                  // KISS protocol handler
     ConfigurationManager configManager; // Configuration management
     TNCCommands commandSystem;          // Command system interface
+    DisplayManager display;             // OLED display manager
+    BatteryMonitor batteryMonitor;      // Battery monitoring helper
 
     bool initialized;
     unsigned long lastStatus;
     String serialBuffer; // Buffer for incoming serial data
+    float lastBatteryVoltage;
+    uint8_t lastBatteryPercent;
+    unsigned long lastBatterySample;
 
     /**
      * @brief Handle incoming LoRa packets
@@ -77,6 +84,37 @@ private:
      * @brief Print periodic status updates
      */
     void printStatus();
+
+    /**
+     * @brief Handle the front-panel user button actions.
+     */
+    void handleUserButton();
+
+    /**
+     * @brief Build the data structure used for OLED updates.
+     */
+    DisplayManager::StatusData buildDisplayStatus();
+
+    /**
+     * @brief Execute the hardware power-off procedure.
+     */
+    void performPowerOff();
+
+    float lastPacketRSSI;
+    float lastPacketSNR;
+    unsigned long lastPacketTimestamp;
+    bool hasRecentPacket;
+
+    bool buttonStableState;
+    bool buttonLastReading;
+    unsigned long buttonLastChange;
+    unsigned long buttonPressStart;
+    bool buttonLongPressHandled;
+
+    bool powerOffWarningActive;
+    float powerOffProgress;
+    bool powerOffInitiated;
+    bool powerOffComplete;
 };
 
 #endif // TNC_MANAGER_H

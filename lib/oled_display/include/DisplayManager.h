@@ -1,0 +1,106 @@
+#pragma once
+
+#include <Arduino.h>
+#include <TNCCommands.h>
+#include <U8g2lib.h>
+#include "HardwareConfig.h"
+
+/**
+ * @brief Simple OLED display manager for the Heltec WiFi LoRa 32 V4 board.
+ */
+class DisplayManager
+{
+public:
+    enum class Screen : uint8_t
+    {
+        MAIN = 0,
+        LORA_DETAILS,
+        BATTERY,
+        SYSTEM
+    };
+
+    struct StatusData
+    {
+        TNCMode mode = TNCMode::COMMAND_MODE;
+        uint32_t txCount = 0;
+        uint32_t rxCount = 0;
+        float batteryVoltage = 0.0f;
+        uint8_t batteryPercent = 0;
+        bool hasRecentPacket = false;
+        float lastRSSI = 0.0f;
+        float lastSNR = 0.0f;
+        unsigned long lastPacketMillis = 0;
+        float frequency = 0.0f;
+        float bandwidth = 0.0f;
+        uint8_t spreadingFactor = 0;
+        uint8_t codingRate = 0;
+        int8_t txPower = 0;
+        unsigned long uptimeMillis = 0;
+        bool powerOffActive = false;
+        float powerOffProgress = 0.0f;
+        bool powerOffComplete = false;
+    };
+
+    DisplayManager();
+
+    /**
+     * @brief Initialize the OLED display hardware.
+     * @return true if the display is available and ready for use.
+     */
+    bool begin();
+
+    /**
+     * @brief Show a minimal boot screen while the system is starting.
+     */
+    void showBootScreen();
+
+    /**
+     * @brief Update the runtime status view using the provided telemetry.
+     */
+    void updateStatus(const StatusData &status);
+
+    /**
+     * @brief Advance to the next detail screen.
+     */
+    void nextScreen();
+
+    /**
+     * @brief Set the active screen directly.
+     */
+    void setScreen(Screen screen);
+
+    /**
+     * @brief Get the currently selected screen.
+     */
+    Screen getScreen() const { return currentScreen; }
+
+    /**
+     * @brief Get the total number of available screens.
+     */
+    uint8_t getScreenCount() const { return SCREEN_COUNT; }
+
+private:
+    static constexpr uint8_t SCREEN_COUNT = 4;
+
+    U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2;
+    bool enabled;
+    Screen currentScreen;
+    Screen lastRenderedScreen;
+    bool hasLastStatus;
+    bool forceFullRefresh;
+    StatusData lastStatus;
+    unsigned long lastRefresh;
+
+    const char *modeToLabel(TNCMode mode) const;
+    void drawMainScreen();
+    void drawLoRaDetails();
+    void drawBatteryScreen();
+    void drawSystemScreen();
+    void drawPowerOffWarning();
+    void drawPowerOffComplete();
+    void drawProgressBar(int16_t x, int16_t y, int16_t width, int16_t height, float progress);
+    void drawBatteryGauge(int16_t x, int16_t y, int16_t width, int16_t height, uint8_t percent);
+    void drawCenteredText(int16_t y, const char *text, const uint8_t *font);
+    void drawHeader(const char *title);
+    static void formatUptime(char *buffer, size_t length, unsigned long millisValue);
+};

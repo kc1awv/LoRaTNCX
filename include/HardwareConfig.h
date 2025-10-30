@@ -35,13 +35,19 @@
 // ==========================================
 // DISPLAY CONFIGURATION
 // ==========================================
-#define OLED_SDA_PIN SDA_OLED // OLED I2C Data (Pin 17)
-#define OLED_SCL_PIN SCL_OLED // OLED I2C Clock (Pin 18)
-#define OLED_RST_PIN RST_OLED // OLED Reset (Pin 21)
+#define OLED_SDA_PIN 17 // OLED I2C Data (Pin 17)
+#define OLED_SCL_PIN 18 // OLED I2C Clock (Pin 18)
+#define OLED_RST_PIN 21 // OLED Reset (Pin 21)
 #define OLED_ADDRESS 0x3C     // Standard OLED I2C address
 
 // Enable/disable display
 #define DISPLAY_ENABLED true
+
+// ==========================================
+// USER INTERFACE INPUTS
+// ==========================================
+#define USER_BUTTON_PIN 0             // GPIO connected to the front-panel user button
+#define USER_BUTTON_ACTIVE_STATE LOW  // Button pulls the line low when pressed
 
 // ==========================================
 // DEBUG CONFIGURATION
@@ -61,9 +67,18 @@
 // ==========================================
 // POWER MANAGEMENT
 // ==========================================
-#define POWER_CTRL_PIN Vext // External power control (Pin 36)
+#define POWER_CTRL_PIN 36 // External power control (Pin 36)
 #define POWER_ON LOW        // Active low
 #define POWER_OFF HIGH
+
+// Battery monitor configuration
+constexpr uint8_t BATTERY_ADC_PIN = 1;   // ADC1_CH0 (GPIO 1) for battery sense
+constexpr uint8_t BATTERY_CTRL_PIN = 37; // ADC control pin, drive HIGH during sampling
+constexpr float BATTERY_R1_OHMS = 390000.0f; // High-side resistor value
+constexpr float BATTERY_R2_OHMS = 100000.0f; // Low-side resistor value
+constexpr float BATTERY_MIN_VOLTAGE = 3.3f;  // Nominal depleted LiPo voltage
+constexpr float BATTERY_MAX_VOLTAGE = 4.2f;  // Fully charged LiPo voltage
+constexpr unsigned long BATTERY_SAMPLE_INTERVAL = 5000UL; // Battery polling interval (ms)
 
 // ==========================================
 // KISS TNC INTERFACE
