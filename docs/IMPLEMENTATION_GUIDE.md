@@ -34,8 +34,8 @@ This guide shows how to enhance it with a comprehensive command set comparable t
 
 ### Phase 1: Core Command Infrastructure ✅ COMPLETE
 **Files Created:**
-- `include/TNCCommands.h` - Command system architecture
-- `src/TNCCommands.cpp` - Command parser and core handlers
+- `lib/tnc_commands/include/TNCCommands.h` - Command system architecture
+- `lib/tnc_commands/src/TNCCommands.cpp` - Command parser and core handlers
 - `include/StationConfig.h` - Station configuration management
 
 **What This Provides:**

@@ -3,10 +3,10 @@
  * @brief Pin reference for Heltec WiFi LoRa 32 V4 board
  * @author LoRaTNCX Project
  * @date October 28, 2025
- * 
+ *
  * This file provides a reference of pin assignments for the Heltec V4 board.
  * The actual pin definitions are provided by the board's pins_arduino.h file.
- * 
+ *
  * Pin definitions source: https://github.com/Heltec-Aaron-Lee/WiFi_Kit_series
  */
 
@@ -24,7 +24,7 @@
 // TX = 43, RX = 44
 // SDA = 3, SCL = 4 (but note: OLED uses different pins)
 // SS = 8, MOSI = 10, MISO = 11, SCK = 9
-// 
+//
 // OLED Display:
 // RST_OLED = 21, SCL_OLED = 18, SDA_OLED = 17
 //

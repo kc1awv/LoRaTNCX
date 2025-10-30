@@ -24,20 +24,20 @@ bool KISSProtocol::begin()
     errors = 0;
 
     // Initialize TNC parameters with defaults
-    txDelay = 30;       // 300ms default TX delay
-    persistence = 63;   // ~25% default persistence
-    slotTime = 10;      // 100ms default slot time
-    txTail = 5;         // 50ms default TX tail
-    fullDuplex = false; // Half duplex by default
+    txDelay = 30;          // 300ms default TX delay
+    persistence = 63;      // ~25% default persistence
+    slotTime = 10;         // 100ms default slot time
+    txTail = 5;            // 50ms default TX tail
+    fullDuplex = false;    // Half duplex by default
     exitRequested = false; // No exit request initially
 
     Serial.println("✓ KISS protocol initialized");
     Serial.println("Default parameters:");
-    Serial.printf("  TX Delay: %d (%.1f ms)\n", txDelay, txDelay * 10.0);
-    Serial.printf("  Persistence: %d (%.1f%%)\n", persistence, (persistence / 255.0) * 100.0);
-    Serial.printf("  Slot Time: %d (%.1f ms)\n", slotTime, slotTime * 10.0);
-    Serial.printf("  TX Tail: %d (%.1f ms)\n", txTail, txTail * 10.0);
-    Serial.printf("  Full Duplex: %s\n", fullDuplex ? "Yes" : "No");
+    Serial.printf("  TX Delay: %d (%.1f ms)\r\n", txDelay, txDelay * 10.0);
+    Serial.printf("  Persistence: %d (%.1f%%)\r\n", persistence, (persistence / 255.0) * 100.0);
+    Serial.printf("  Slot Time: %d (%.1f ms)\r\n", slotTime, slotTime * 10.0);
+    Serial.printf("  TX Tail: %d (%.1f ms)\r\n", txTail, txTail * 10.0);
+    Serial.printf("  Full Duplex: %s\r\n", fullDuplex ? "Yes" : "No");
 
     return true;
 }

@@ -1,0 +1,29 @@
+{
+  "name": "TNCCommands",
+  "version": "1.0.0",
+  "description": "Refactored TNC command handlers split into per-command translation units.",
+  "keywords": [
+    "tnc",
+    "lora",
+    "commands"
+  ],
+  "authors": [
+    {
+      "name": "LoRaTNCX Project"
+    }
+  ],
+  "build": {
+    "flags": [],
+    "srcFilter": [
+      "+<*>"
+    ]
+  },
+  "dependencies": [
+    {
+      "name": "SPI"
+    },
+    {
+      "name": "RadioLib"
+    }
+  ]
+}
