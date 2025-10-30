@@ -201,15 +201,15 @@ String ConfigurationManager::getConfigurationName() const
 
 String ConfigurationManager::getConfigurationInfo() const
 {
-    String info = "Configuration: " + currentConfig.name + "\n";
-    info += "Frequency: " + String(currentConfig.frequency, 1) + " MHz\n";
-    info += "Bandwidth: " + String(currentConfig.bandwidth, 1) + " kHz\n";
-    info += "Spreading Factor: SF" + String(currentConfig.spreadingFactor) + "\n";
-    info += "Coding Rate: 4/" + String(currentConfig.codingRate) + "\n";
-    info += "Max Payload: " + String(currentConfig.maxPayload) + " bytes\n";
-    info += "Expected Range: " + currentConfig.expectedRange + "\n";
-    info += "Expected Throughput: " + currentConfig.expectedThroughput + "\n";
-    info += "Use Case: " + currentConfig.useCase;
+    String info = "Configuration: " + currentConfig.name + "\r\n";
+    info += "Frequency: " + String(currentConfig.frequency, 1) + " MHz\r\n";
+    info += "Bandwidth: " + String(currentConfig.bandwidth, 1) + " kHz\r\n";
+    info += "Spreading Factor: SF" + String(currentConfig.spreadingFactor) + "\r\n";
+    info += "Coding Rate: 4/" + String(currentConfig.codingRate) + "\r\n";
+    info += "Max Payload: " + String(currentConfig.maxPayload) + " bytes\r\n";
+    info += "Expected Range: " + currentConfig.expectedRange + "\r\n";
+    info += "Expected Throughput: " + currentConfig.expectedThroughput + "\r\n";
+    info += "Use Case: " + currentConfig.useCase + "\r\n";
     return info;
 }
 
