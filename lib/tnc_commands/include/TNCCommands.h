@@ -58,6 +58,7 @@ public:
     bool isLocalEchoEnabled() const { return echoEnabled; }
     bool isLineEndingCREnabled() const { return config.lineEndingCR; }
     bool isLineEndingLFEnabled() const { return config.lineEndingLF; }
+    bool isMonitorEnabled() const { return config.monitorEnabled; }
     
     // Response handling
     void sendResponse(const String& response);

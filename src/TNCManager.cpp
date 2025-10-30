@@ -401,8 +401,38 @@ void TNCManager::handleIncomingRadio()
             // Process packet for connection management and protocol handling
             commandSystem.processReceivedPacket(packet, rssi, snr);
 
-            // Send received packet to host via KISS
-            kiss.sendData(buffer, length);
+            // Only forward KISS frames to the host when operating in KISS mode.
+            if (commandSystem.getCurrentMode() == TNCMode::KISS_MODE)
+            {
+                kiss.sendData(buffer, length);
+            }
+            else if (commandSystem.isMonitorEnabled() || commandSystem.getDebugLevel() >= 2)
+            {
+                const size_t maxPreview = 120;
+                size_t previewLength = length < maxPreview ? length : maxPreview;
+                String preview;
+                preview.reserve(static_cast<unsigned int>(previewLength));
+                for (size_t i = 0; i < previewLength; i++)
+                {
+                    char c = static_cast<char>(buffer[i]);
+                    if (c >= 32 && c <= 126)
+                    {
+                        preview += c;
+                    }
+                    else
+                    {
+                        preview += '.';
+                    }
+                }
+                if (length > maxPreview)
+                {
+                    preview += "...";
+                }
+
+                String monitorLine = "MON RX (" + String(length) + " bytes, RSSI " + String(rssi, 1) +
+                                      " dBm, SNR " + String(snr, 1) + " dB): " + preview;
+                commandSystem.sendResponse(monitorLine);
+            }
         }
     }
 }

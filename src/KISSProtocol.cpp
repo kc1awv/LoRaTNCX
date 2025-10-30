@@ -33,11 +33,11 @@ bool KISSProtocol::begin()
 
     Serial.println("✓ KISS protocol initialized");
     Serial.println("Default parameters:");
-    Serial.printf("  TX Delay: %d (%.1f ms)\n", txDelay, txDelay * 10.0);
-    Serial.printf("  Persistence: %d (%.1f%%)\n", persistence, (persistence / 255.0) * 100.0);
-    Serial.printf("  Slot Time: %d (%.1f ms)\n", slotTime, slotTime * 10.0);
-    Serial.printf("  TX Tail: %d (%.1f ms)\n", txTail, txTail * 10.0);
-    Serial.printf("  Full Duplex: %s\n", fullDuplex ? "Yes" : "No");
+    Serial.printf("  TX Delay: %d (%.1f ms)\r\n", txDelay, txDelay * 10.0);
+    Serial.printf("  Persistence: %d (%.1f%%)\r\n", persistence, (persistence / 255.0) * 100.0);
+    Serial.printf("  Slot Time: %d (%.1f ms)\r\n", slotTime, slotTime * 10.0);
+    Serial.printf("  TX Tail: %d (%.1f ms)\r\n", txTail, txTail * 10.0);
+    Serial.printf("  Full Duplex: %s\r\n", fullDuplex ? "Yes" : "No");
 
     return true;
 }
