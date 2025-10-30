@@ -71,12 +71,12 @@ bool LoRaRadio::begin()
 
         // Print configuration
         Serial.println("LoRa Configuration:");
-        Serial.printf("  Frequency: %.1f MHz\n", LORA_FREQUENCY);
-        Serial.printf("  Bandwidth: %.1f kHz\n", LORA_BANDWIDTH);
-        Serial.printf("  Spreading Factor: %d\n", LORA_SPREADING_FACTOR);
-        Serial.printf("  Coding Rate: 4/%d\n", LORA_CODING_RATE);
-        Serial.printf("  Output Power: %d dBm\n", LORA_OUTPUT_POWER);
-        Serial.printf("  Sync Word: 0x%02X\n", LORA_SYNC_WORD);
+        Serial.printf("  Frequency: %.1f MHz\r\n", LORA_FREQUENCY);
+        Serial.printf("  Bandwidth: %.1f kHz\r\n", LORA_BANDWIDTH);
+        Serial.printf("  Spreading Factor: %d\r\n", LORA_SPREADING_FACTOR);
+        Serial.printf("  Coding Rate: 4/%d\r\n", LORA_CODING_RATE);
+        Serial.printf("  Output Power: %d dBm\r\n", LORA_OUTPUT_POWER);
+        Serial.printf("  Sync Word: 0x%02X\r\n", LORA_SYNC_WORD);
     }
     else
     {
@@ -142,12 +142,12 @@ bool LoRaRadio::begin(float frequency, float bandwidth, uint8_t spreadingFactor,
 
         // Print configuration
         Serial.println("LoRa Configuration:");
-        Serial.printf("  Frequency: %.1f MHz\n", frequency);
-        Serial.printf("  Bandwidth: %.1f kHz\n", bandwidth);
-        Serial.printf("  Spreading Factor: %d\n", spreadingFactor);
-        Serial.printf("  Coding Rate: 4/%d\n", codingRate);
-        Serial.printf("  Output Power: %d dBm\n", LORA_OUTPUT_POWER);
-        Serial.printf("  Sync Word: 0x%02X\n", LORA_SYNC_WORD);
+        Serial.printf("  Frequency: %.1f MHz\r\n", frequency);
+        Serial.printf("  Bandwidth: %.1f kHz\r\n", bandwidth);
+        Serial.printf("  Spreading Factor: %d\r\n", spreadingFactor);
+        Serial.printf("  Coding Rate: 4/%d\r\n", codingRate);
+        Serial.printf("  Output Power: %d dBm\r\n", LORA_OUTPUT_POWER);
+        Serial.printf("  Sync Word: 0x%02X\r\n", LORA_SYNC_WORD);
     }
     else
     {
@@ -331,17 +331,17 @@ void LoRaRadio::initializePAControl()
 
     // PA Power Control (LORA_PA_POWER = 7) - ANALOG mode (factory firmware insight)
     pinMode(LORA_PA_POWER_PIN, ANALOG);
-    Serial.printf("  PA_POWER (pin %d): ANALOG mode (factory style)\n", LORA_PA_POWER_PIN);
+    Serial.printf("  PA_POWER (pin %d): ANALOG mode (factory style)\r\n", LORA_PA_POWER_PIN);
 
     // PA Enable (LORA_PA_EN = 2) - Keep enabled
     pinMode(LORA_PA_EN_PIN, OUTPUT);
     digitalWrite(LORA_PA_EN_PIN, HIGH);
-    Serial.printf("  PA_EN (pin %d): HIGH\n", LORA_PA_EN_PIN);
+    Serial.printf("  PA_EN (pin %d): HIGH\r\n", LORA_PA_EN_PIN);
 
     // PA TX Enable (LORA_PA_TX_EN = 46) - Start in receive mode
     pinMode(LORA_PA_TX_EN_PIN, OUTPUT);
     digitalWrite(LORA_PA_TX_EN_PIN, LOW); // LOW for receive mode
-    Serial.printf("  PA_TX_EN (pin %d): LOW (RX mode)\n", LORA_PA_TX_EN_PIN);
+    Serial.printf("  PA_TX_EN (pin %d): LOW (RX mode)\r\n", LORA_PA_TX_EN_PIN);
 
     Serial.println("PA configured: Power/Enable HIGH, TX_EN LOW for receive mode");
 
