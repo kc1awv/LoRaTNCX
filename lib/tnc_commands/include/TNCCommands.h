@@ -52,6 +52,12 @@ public:
     String getModeString() const;
     bool isInConverseMode() const;
     bool sendChatMessage(const String& message);
+
+    // User interface helpers
+    uint8_t getDebugLevel() const { return config.debugLevel; }
+    bool isLocalEchoEnabled() const { return echoEnabled; }
+    bool isLineEndingCREnabled() const { return config.lineEndingCR; }
+    bool isLineEndingLFEnabled() const { return config.lineEndingLF; }
     
     // Response handling
     void sendResponse(const String& response);
@@ -113,6 +119,8 @@ private:
         bool echoEnabled;
         bool promptEnabled;
         bool monitorEnabled;
+        bool lineEndingCR;
+        bool lineEndingLF;
         
         // Beacon and digi
         bool beaconEnabled;
@@ -284,6 +292,8 @@ private:
     TNCCommandResult handleTRANSPARENT(const String args[], int argCount);
     TNCCommandResult handleECHO(const String args[], int argCount);
     TNCCommandResult handlePROMPT(const String args[], int argCount);
+    TNCCommandResult handleLINECR(const String args[], int argCount);
+    TNCCommandResult handleLINELF(const String args[], int argCount);
     TNCCommandResult handleCONNECT(const String args[], int argCount);
     TNCCommandResult handleDISCONNECT(const String args[], int argCount);
     

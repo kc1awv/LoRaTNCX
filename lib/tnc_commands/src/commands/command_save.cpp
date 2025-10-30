@@ -46,6 +46,8 @@ TNCCommandResult TNCCommands::handleSAVE(const String args[], int argCount) {
         preferences.putBool("echoEnabled", config.echoEnabled);
         preferences.putBool("promptEnabled", config.promptEnabled);
         preferences.putBool("monitorEnabled", config.monitorEnabled);
+        preferences.putBool("lineEndingCR", config.lineEndingCR);
+        preferences.putBool("lineEndingLF", config.lineEndingLF);
         
         // Beacon and digi
         preferences.putBool("beaconEnabled", config.beaconEnabled);
@@ -53,6 +55,9 @@ TNCCommandResult TNCCommands::handleSAVE(const String args[], int argCount) {
         preferences.putBool("digiEnabled", config.digiEnabled);
         preferences.putUChar("digiPath", config.digiPath);
         
+        // System settings
+        preferences.putUChar("debugLevel", config.debugLevel);
+
         preferences.end();
         sendResponse("Configuration saved to flash");
         return TNCCommandResult::SUCCESS;

@@ -95,9 +95,44 @@ bool TNCManager::processConfigurationCommand(const String &command)
 void TNCManager::handleIncomingSerial()
 {
     // Read available serial data
+    static bool lastInputWasCR = false;
     while (Serial.available())
     {
         uint8_t byte = Serial.read();
+
+        bool shouldEcho = (commandSystem.getCurrentMode() != TNCMode::KISS_MODE) && commandSystem.isLocalEchoEnabled();
+        if (shouldEcho)
+        {
+            if (byte == '\r' || byte == '\n')
+            {
+                if (!(byte == '\n' && lastInputWasCR))
+                {
+                    if (commandSystem.isLineEndingCREnabled())
+                    {
+                        Serial.write('\r');
+                    }
+                    if (commandSystem.isLineEndingLFEnabled())
+                    {
+                        Serial.write('\n');
+                    }
+                }
+            }
+            else if (byte == 8 || byte == 127)
+            {
+                if (serialBuffer.length() > 0)
+                {
+                    Serial.write('\b');
+                    Serial.write(' ');
+                    Serial.write('\b');
+                }
+            }
+            else
+            {
+                Serial.write(byte);
+            }
+        }
+
+        lastInputWasCR = (byte == '\r');
 
         // Handle special initialization sequences before KISS auto-detection
         if (commandSystem.getCurrentMode() != TNCMode::KISS_MODE)
@@ -270,14 +305,17 @@ void TNCManager::handleIncomingKISS()
         if (isText && (frameData.startsWith("CONFIG") || frameData.startsWith("SETCONFIG") ||
                        frameData.startsWith("LISTCONFIG") || frameData.startsWith("GETCONFIG")))
         {
-            Serial.println("TNC: Processing configuration command: " + frameData);
+            if (commandSystem.getDebugLevel() >= 2)
+            {
+                Serial.println("TNC: Processing configuration command: " + frameData);
+            }
             processConfigurationCommand(frameData);
             return; // Don't transmit configuration commands over radio
         }
 
         // Regular data packet - transmit via LoRa
         // Only show debug output in command mode (not KISS mode)
-        if (commandSystem.getCurrentMode() != TNCMode::KISS_MODE)
+        if (commandSystem.getCurrentMode() != TNCMode::KISS_MODE && commandSystem.getDebugLevel() >= 2)
         {
             Serial.print("TNC: Transmitting ");
             Serial.print(length);
@@ -300,7 +338,7 @@ void TNCManager::handleIncomingKISS()
         if (radio.transmit(buffer, length))
         {
             // Only show debug output in command mode (not KISS mode)
-            if (commandSystem.getCurrentMode() != TNCMode::KISS_MODE)
+            if (commandSystem.getCurrentMode() != TNCMode::KISS_MODE && commandSystem.getDebugLevel() >= 2)
             {
                 Serial.println("TNC: Transmission successful");
             }
@@ -308,7 +346,7 @@ void TNCManager::handleIncomingKISS()
         else
         {
             // Only show debug output in command mode (not KISS mode)
-            if (commandSystem.getCurrentMode() != TNCMode::KISS_MODE)
+            if (commandSystem.getCurrentMode() != TNCMode::KISS_MODE && commandSystem.getDebugLevel() >= 2)
             {
                 Serial.println("TNC: Transmission failed");
             }
@@ -337,25 +375,28 @@ void TNCManager::handleIncomingRadio()
             float rssi = radio.getRSSI();
             float snr = radio.getSNR();
 
-            Serial.print("TNC: Received ");
-            Serial.print(length);
-            Serial.print(" bytes via LoRa: ");
-            for (size_t i = 0; i < length && i < 20; i++)
+            if (commandSystem.getDebugLevel() >= 2)
             {
-                if (buffer[i] >= 32 && buffer[i] < 127)
+                Serial.print("TNC: Received ");
+                Serial.print(length);
+                Serial.print(" bytes via LoRa: ");
+                for (size_t i = 0; i < length && i < 20; i++)
                 {
-                    Serial.print((char)buffer[i]);
+                    if (buffer[i] >= 32 && buffer[i] < 127)
+                    {
+                        Serial.print((char)buffer[i]);
+                    }
+                    else
+                    {
+                        Serial.print('.');
+                    }
                 }
-                else
-                {
-                    Serial.print('.');
-                }
+                Serial.print(" (RSSI: ");
+                Serial.print(rssi, 1);
+                Serial.print(" dBm, SNR: ");
+                Serial.print(snr, 1);
+                Serial.println(" dB)");
             }
-            Serial.print(" (RSSI: ");
-            Serial.print(rssi, 1);
-            Serial.print(" dBm, SNR: ");
-            Serial.print(snr, 1);
-            Serial.println(" dB)");
 
             // Process packet for connection management and protocol handling
             commandSystem.processReceivedPacket(packet, rssi, snr);
