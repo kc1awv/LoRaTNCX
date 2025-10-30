@@ -7,7 +7,7 @@
 
 #include "TNCManager.h"
 
-TNCManager::TNCManager() : configManager(&radio)
+TNCManager::TNCManager() : configManager(&radio), display()
 {
     initialized = false;
     lastStatus = 0;
@@ -17,6 +17,11 @@ TNCManager::TNCManager() : configManager(&radio)
 bool TNCManager::begin()
 {
     Serial.println("=== LoRaTNCX Initialization ===");
+
+    if (display.begin())
+    {
+        display.showBootScreen();
+    }
 
     initialized = false;
     lastStatus = 0;
@@ -52,6 +57,8 @@ bool TNCManager::begin()
     Serial.println("===============================");
 
     initialized = true;
+
+    display.updateStatus(commandSystem.getCurrentMode(), radio.getTxCount(), radio.getRxCount());
     return true;
 }
 
@@ -74,6 +81,8 @@ void TNCManager::update()
         printStatus();
         lastStatus = millis();
     }
+
+    display.updateStatus(commandSystem.getCurrentMode(), radio.getTxCount(), radio.getRxCount());
 }
 
 String TNCManager::getStatus()

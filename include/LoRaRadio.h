@@ -185,6 +185,18 @@ public:
      */
     uint8_t getSyncWord() const;
 
+    /**
+     * @brief Get number of packets transmitted since startup
+     * @return Transmission counter
+     */
+    unsigned long getTxCount() const { return txCount; }
+
+    /**
+     * @brief Get number of packets received since startup
+     * @return Reception counter
+     */
+    unsigned long getRxCount() const { return rxCount; }
+
 private:
     SX1262 *radio;         // RadioLib SX1262 instance pointer
     bool initialized;      // Initialization status

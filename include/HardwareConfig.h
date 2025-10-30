@@ -35,9 +35,9 @@
 // ==========================================
 // DISPLAY CONFIGURATION
 // ==========================================
-#define OLED_SDA_PIN SDA_OLED // OLED I2C Data (Pin 17)
-#define OLED_SCL_PIN SCL_OLED // OLED I2C Clock (Pin 18)
-#define OLED_RST_PIN RST_OLED // OLED Reset (Pin 21)
+#define OLED_SDA_PIN 17 // OLED I2C Data (Pin 17)
+#define OLED_SCL_PIN 18 // OLED I2C Clock (Pin 18)
+#define OLED_RST_PIN 21 // OLED Reset (Pin 21)
 #define OLED_ADDRESS 0x3C     // Standard OLED I2C address
 
 // Enable/disable display
@@ -61,7 +61,7 @@
 // ==========================================
 // POWER MANAGEMENT
 // ==========================================
-#define POWER_CTRL_PIN Vext // External power control (Pin 36)
+#define POWER_CTRL_PIN 36 // External power control (Pin 36)
 #define POWER_ON LOW        // Active low
 #define POWER_OFF HIGH
 

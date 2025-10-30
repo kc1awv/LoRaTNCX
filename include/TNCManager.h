@@ -16,6 +16,7 @@
 #include "KISSProtocol.h"
 #include "ConfigurationManager.h"
 #include <TNCCommands.h>
+#include <DisplayManager.h>
 
 class TNCManager
 {
@@ -53,6 +54,7 @@ private:
     KISSProtocol kiss;                  // KISS protocol handler
     ConfigurationManager configManager; // Configuration management
     TNCCommands commandSystem;          // Command system interface
+    DisplayManager display;             // OLED display manager
 
     bool initialized;
     unsigned long lastStatus;
