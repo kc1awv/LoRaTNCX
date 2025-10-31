@@ -15,6 +15,7 @@ public:
     enum class Screen : uint8_t
     {
         MAIN = 0,
+        WIFI_STATUS,
         LORA_DETAILS,
         BATTERY,
         SYSTEM,
@@ -23,6 +24,14 @@ public:
 
     struct StatusData
     {
+        enum class WiFiMode : uint8_t
+        {
+            OFF = 0,
+            ACCESS_POINT,
+            STATION,
+            AP_STATION
+        };
+
         TNCMode mode = TNCMode::COMMAND_MODE;
         uint32_t txCount = 0;
         uint32_t rxCount = 0;
@@ -63,6 +72,13 @@ public:
         bool gnssPpsAvailable = false;
         unsigned long gnssPpsLastMillis = 0;
         uint32_t gnssPpsCount = 0;
+
+        WiFiMode wifiMode = WiFiMode::OFF;
+        bool wifiConnected = false;
+        bool wifiConnecting = false;
+        bool wifiHasIPAddress = false;
+        char wifiSSID[33] = {0};
+        char wifiIPAddress[18] = {0};
     };
 
     DisplayManager();
@@ -120,7 +136,7 @@ public:
     bool isAvailable() const { return hardwarePresent; }
 
 private:
-    static constexpr uint8_t SCREEN_COUNT = 5;
+    static constexpr uint8_t SCREEN_COUNT = 6;
 
     U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2;
     bool enabled;
@@ -134,6 +150,7 @@ private:
 
     const char *modeToLabel(TNCMode mode) const;
     void drawMainScreen();
+    void drawWiFiScreen();
     void drawLoRaDetails();
     void drawBatteryScreen();
     void drawSystemScreen();

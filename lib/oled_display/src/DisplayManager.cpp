@@ -3,6 +3,7 @@
 #include <Wire.h>
 
 #include <cmath>
+#include <cstring>
 
 namespace
 {
@@ -165,12 +166,20 @@ void DisplayManager::updateStatus(const StatusData &status)
                        status.gnssPpsCount != lastStatus.gnssPpsCount ||
                        status.gnssPpsLastMillis != lastStatus.gnssPpsLastMillis;
 
+    bool wifiChanged = !hasLastStatus ||
+                       status.wifiMode != lastStatus.wifiMode ||
+                       status.wifiConnected != lastStatus.wifiConnected ||
+                       status.wifiConnecting != lastStatus.wifiConnecting ||
+                       status.wifiHasIPAddress != lastStatus.wifiHasIPAddress ||
+                       std::strncmp(status.wifiSSID, lastStatus.wifiSSID, sizeof(status.wifiSSID)) != 0 ||
+                       std::strncmp(status.wifiIPAddress, lastStatus.wifiIPAddress, sizeof(status.wifiIPAddress)) != 0;
+
     bool screenChanged = (!status.powerOffActive && !status.powerOffComplete && (currentScreen != lastRenderedScreen));
 
     unsigned long now = millis();
     bool timedRefresh = (now - lastRefresh) >= DISPLAY_UPDATE;
 
-    bool shouldRefresh = forceFullRefresh || dataChanged || powerStateChanged || progressChanged || screenChanged || timedRefresh || gnssChanged;
+    bool shouldRefresh = forceFullRefresh || dataChanged || powerStateChanged || progressChanged || screenChanged || timedRefresh || gnssChanged || wifiChanged;
 
     if (!shouldRefresh)
     {
@@ -195,6 +204,9 @@ void DisplayManager::updateStatus(const StatusData &status)
         {
         case Screen::MAIN:
             drawMainScreen();
+            break;
+        case Screen::WIFI_STATUS:
+            drawWiFiScreen();
             break;
         case Screen::LORA_DETAILS:
             drawLoRaDetails();
@@ -324,6 +336,83 @@ void DisplayManager::drawMainScreen()
              static_cast<double>(lastStatus.batteryVoltage),
              static_cast<unsigned int>(lastStatus.batteryPercent));
     u8g2.drawStr(0, 60, batteryLine);
+}
+
+void DisplayManager::drawWiFiScreen()
+{
+    u8g2.clearBuffer();
+    drawHeader("WiFi Status");
+    u8g2.setFont(u8g2_font_6x10_tf);
+
+    const char *modeLabel = "Off";
+    switch (lastStatus.wifiMode)
+    {
+    case StatusData::WiFiMode::ACCESS_POINT:
+        modeLabel = "AP";
+        break;
+    case StatusData::WiFiMode::STATION:
+        modeLabel = "STA";
+        break;
+    case StatusData::WiFiMode::AP_STATION:
+        modeLabel = "AP+STA";
+        break;
+    case StatusData::WiFiMode::OFF:
+    default:
+        modeLabel = "Off";
+        break;
+    }
+
+    char modeLine[24];
+    snprintf(modeLine, sizeof(modeLine), "Mode: %s", modeLabel);
+    u8g2.drawStr(0, 30, modeLine);
+
+    char statusLine[28];
+    if (lastStatus.wifiMode == StatusData::WiFiMode::OFF)
+    {
+        snprintf(statusLine, sizeof(statusLine), "Status: Disabled");
+    }
+    else if (lastStatus.wifiConnecting)
+    {
+        snprintf(statusLine, sizeof(statusLine), "Status: Connecting");
+    }
+    else if (lastStatus.wifiConnected)
+    {
+        if (lastStatus.wifiMode == StatusData::WiFiMode::ACCESS_POINT)
+        {
+            snprintf(statusLine, sizeof(statusLine), "Status: AP Ready");
+        }
+        else
+        {
+            snprintf(statusLine, sizeof(statusLine), "Status: Connected");
+        }
+    }
+    else
+    {
+        snprintf(statusLine, sizeof(statusLine), "Status: Idle");
+    }
+    u8g2.drawStr(0, 42, statusLine);
+
+    char ssidLine[44];
+    if (lastStatus.wifiSSID[0] != '\0')
+    {
+        snprintf(ssidLine, sizeof(ssidLine), "SSID: %s", lastStatus.wifiSSID);
+    }
+    else
+    {
+        snprintf(ssidLine, sizeof(ssidLine), "SSID: --");
+    }
+    u8g2.drawStr(0, 54, ssidLine);
+
+    char ipLine[32];
+    if (lastStatus.wifiHasIPAddress && lastStatus.wifiIPAddress[0] != '\0')
+    {
+        snprintf(ipLine, sizeof(ipLine), "IP: %s", lastStatus.wifiIPAddress);
+    }
+    else
+    {
+        snprintf(ipLine, sizeof(ipLine), "IP: --");
+    }
+    u8g2.drawStr(0, 64, ipLine);
 }
 
 void DisplayManager::drawLoRaDetails()
