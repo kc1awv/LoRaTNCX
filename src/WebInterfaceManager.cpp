@@ -312,6 +312,41 @@ void WebInterfaceManager::setupWebServer()
         AsyncStaticWebHandler &staticHandler = server.serveStatic("/", SPIFFS, "/");
         staticHandler.setDefaultFile("index.html");
         staticHandler.setCacheControl("public, max-age=86400, immutable");
+        
+        // Explicitly handle CSS files with correct MIME type
+        server.on("/css/bootstrap.css", HTTP_GET, [](AsyncWebServerRequest *request) {
+            request->send(SPIFFS, "/css/bootstrap.css", "text/css");
+        });
+        
+        // Explicitly handle JS files with correct MIME type
+        server.on("/js/bootstrap.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+            request->send(SPIFFS, "/js/bootstrap.js", "application/javascript");
+        });
+        
+        // Handle other common JS files
+        server.on("/js/api.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+            request->send(SPIFFS, "/js/api.js", "application/javascript");
+        });
+        
+        server.on("/js/common.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+            request->send(SPIFFS, "/js/common.js", "application/javascript");
+        });
+        
+        server.on("/js/config.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+            request->send(SPIFFS, "/js/config.js", "application/javascript");
+        });
+        
+        server.on("/js/index.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+            request->send(SPIFFS, "/js/index.js", "application/javascript");
+        });
+        
+        server.on("/js/status.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+            request->send(SPIFFS, "/js/status.js", "application/javascript");
+        });
+        
+        server.on("/js/theme.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+            request->send(SPIFFS, "/js/theme.js", "application/javascript");
+        });
     }
 
     server.on(
