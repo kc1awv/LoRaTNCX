@@ -34,7 +34,14 @@ inline float clamp01(float value)
 // Static member definition
 TNCManager* TNCManager::instance = nullptr;
 
-TNCManager::TNCManager() : configManager(&radio), display(), batteryMonitor(), gnss(), wifiManager()
+TNCManager::TNCManager()
+    : configManager(&radio),
+      display(),
+      batteryMonitor(),
+      gnss(),
+      wifiManager(),
+      kissTcpServer(KISS_TCP_PORT),
+      nmeaTcpServer(NMEA_TCP_PORT)
 {
     initialized = false;
     lastStatus = 0;
@@ -58,9 +65,15 @@ TNCManager::TNCManager() : configManager(&radio), display(), batteryMonitor(), g
     gnssEnabled = false;
     gnssInitialised = false;
     oledEnabled = true;
+    kissServerRunning = false;
+    nmeaServerRunning = false;
 
     // Set static instance for callbacks
     instance = this;
+
+    gnss.setNMEACallback([this](const String &line) {
+        handleNMEASentence(line);
+    });
 }
 
 bool TNCManager::begin()
@@ -212,6 +225,8 @@ void TNCManager::update()
     }
 
     wifiManager.update();
+    updateTcpServers();
+    processKISSTcpClients();
 
     handleUserButton();
 
@@ -548,12 +563,20 @@ void TNCManager::handleIncomingRadio()
             // Process packet for connection management and protocol handling
             commandSystem.processReceivedPacket(packet, rssi, snr);
 
-            // Only forward KISS frames to the host when operating in KISS mode.
+            bool forwarded = false;
             if (commandSystem.getCurrentMode() == TNCMode::KISS_MODE)
             {
                 kiss.sendData(buffer, length);
+                forwarded = true;
             }
-            else if (commandSystem.isMonitorEnabled() || commandSystem.getDebugLevel() >= 2)
+
+            if (hasActiveKISSClients())
+            {
+                broadcastKISSFrame(buffer, length);
+                forwarded = true;
+            }
+
+            if (!forwarded && (commandSystem.isMonitorEnabled() || commandSystem.getDebugLevel() >= 2))
             {
                 const size_t maxPreview = 120;
                 size_t previewLength = length < maxPreview ? length : maxPreview;
@@ -807,6 +830,222 @@ void TNCManager::performPowerOff()
     {
         delay(1000);
     }
+}
+
+void TNCManager::updateTcpServers()
+{
+    auto wifiInfo = wifiManager.getStatusInfo();
+    bool wifiReady = wifiInfo.apActive || wifiInfo.stationConnected;
+
+    if (wifiReady)
+    {
+        if (!kissServerRunning)
+        {
+            kissTcpServer.begin();
+            kissTcpServer.setNoDelay(true);
+            kissServerRunning = true;
+        }
+
+        if (!nmeaServerRunning)
+        {
+            nmeaTcpServer.begin();
+            nmeaTcpServer.setNoDelay(true);
+            nmeaServerRunning = true;
+        }
+
+        acceptClient(kissTcpServer, kissTcpClients);
+        acceptClient(nmeaTcpServer, nmeaTcpClients);
+    }
+    else
+    {
+        if (kissServerRunning)
+        {
+            stopClients(kissTcpClients);
+            kissTcpServer.stop();
+            kissServerRunning = false;
+        }
+
+        if (nmeaServerRunning)
+        {
+            stopClients(nmeaTcpClients);
+            nmeaTcpServer.stop();
+            nmeaServerRunning = false;
+        }
+    }
+
+    pruneClients(kissTcpClients);
+    pruneClients(nmeaTcpClients);
+}
+
+void TNCManager::acceptClient(WiFiServer &server, std::array<WiFiClient, MAX_TCP_CLIENTS> &clients)
+{
+    if (!server.hasClient())
+    {
+        return;
+    }
+
+    WiFiClient incoming = server.available();
+    if (!incoming)
+    {
+        return;
+    }
+
+    for (auto &client : clients)
+    {
+        if (client && client.remoteIP() == incoming.remoteIP() && client.remotePort() == incoming.remotePort())
+        {
+            incoming.stop();
+            return;
+        }
+    }
+
+    for (auto &client : clients)
+    {
+        if (!client || !client.connected())
+        {
+            if (client)
+            {
+                client.stop();
+            }
+            client = incoming;
+            client.setNoDelay(true);
+            return;
+        }
+    }
+
+    incoming.stop();
+}
+
+void TNCManager::pruneClients(std::array<WiFiClient, MAX_TCP_CLIENTS> &clients)
+{
+    for (auto &client : clients)
+    {
+        if (client && !client.connected())
+        {
+            client.stop();
+        }
+    }
+}
+
+void TNCManager::stopClients(std::array<WiFiClient, MAX_TCP_CLIENTS> &clients)
+{
+    for (auto &client : clients)
+    {
+        if (client)
+        {
+            client.stop();
+        }
+    }
+}
+
+void TNCManager::processKISSTcpClients()
+{
+    for (auto &client : kissTcpClients)
+    {
+        if (!client || !client.connected())
+        {
+            continue;
+        }
+
+        while (client.available())
+        {
+            int value = client.read();
+            if (value < 0)
+            {
+                break;
+            }
+
+            if (kiss.processByte(static_cast<uint8_t>(value)))
+            {
+                handleIncomingKISS();
+            }
+        }
+    }
+}
+
+void TNCManager::broadcastKISSFrame(const uint8_t *data, size_t length)
+{
+    if (data == nullptr || length == 0)
+    {
+        return;
+    }
+
+    for (auto &client : kissTcpClients)
+    {
+        if (!client || !client.connected())
+        {
+            continue;
+        }
+
+        client.write(static_cast<uint8_t>(FEND));
+        client.write(static_cast<uint8_t>(CMD_DATA));
+        for (size_t i = 0; i < length; ++i)
+        {
+            uint8_t byte = data[i];
+            if (byte == FEND)
+            {
+                client.write(static_cast<uint8_t>(FESC));
+                client.write(static_cast<uint8_t>(TFEND));
+            }
+            else if (byte == FESC)
+            {
+                client.write(static_cast<uint8_t>(FESC));
+                client.write(static_cast<uint8_t>(TFESC));
+            }
+            else
+            {
+                client.write(byte);
+            }
+        }
+        client.write(static_cast<uint8_t>(FEND));
+        client.flush();
+    }
+}
+
+void TNCManager::broadcastNMEALine(const String &line)
+{
+    if (line.length() == 0)
+    {
+        return;
+    }
+
+    String payload = line;
+    if (!payload.endsWith("\r\n"))
+    {
+        payload += "\r\n";
+    }
+
+    const uint8_t *buffer = reinterpret_cast<const uint8_t *>(payload.c_str());
+    size_t length = payload.length();
+
+    for (auto &client : nmeaTcpClients)
+    {
+        if (!client || !client.connected())
+        {
+            continue;
+        }
+
+        client.write(buffer, length);
+        client.flush();
+    }
+}
+
+bool TNCManager::hasActiveKISSClients()
+{
+    for (auto &client : kissTcpClients)
+    {
+        if (client && client.connected())
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void TNCManager::handleNMEASentence(const String &line)
+{
+    broadcastNMEALine(line);
 }
 
 bool TNCManager::setGNSSEnabled(bool enable)
