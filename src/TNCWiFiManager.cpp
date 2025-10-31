@@ -209,6 +209,42 @@ String TNCWiFiManager::getStatusSummary() const
     return status;
 }
 
+TNCWiFiManager::StatusInfo TNCWiFiManager::getStatusInfo() const
+{
+    StatusInfo info;
+
+    wifi_mode_t mode = WiFi.getMode();
+    info.apActive = (mode & WIFI_MODE_AP) != 0 || apModeActive;
+    info.stationActive = (mode & WIFI_MODE_STA) != 0;
+    info.stationAttemptActive = stationAttemptActive;
+
+    wl_status_t status = WiFi.status();
+    info.stationConnected = info.stationActive && status == WL_CONNECTED;
+
+    if (info.apActive)
+    {
+        info.apSSID = apSSID;
+        info.apIP = WiFi.softAPIP();
+    }
+
+    if (info.stationConnected)
+    {
+        info.stationSSID = WiFi.SSID();
+        info.stationIP = WiFi.localIP();
+    }
+    else if (info.stationAttemptActive && stationAttemptIndex < networkCount)
+    {
+        info.stationSSID = networks[stationAttemptIndex].ssid;
+    }
+    else if (connectedNetworkIndex >= 0 && connectedNetworkIndex < networkCount)
+    {
+        info.stationSSID = networks[connectedNetworkIndex].ssid;
+        info.stationIP = WiFi.localIP();
+    }
+
+    return info;
+}
+
 void TNCWiFiManager::loadNetworksFromPreferences()
 {
     Preferences preferences;

@@ -9,6 +9,8 @@
 
 #include "HardwareConfig.h"
 
+#include <cstring>
+
 namespace
 {
 constexpr unsigned long BUTTON_DEBOUNCE_MS = 30UL;
@@ -679,6 +681,75 @@ DisplayManager::StatusData TNCManager::buildDisplayStatus()
     status.powerOffActive = powerOffWarningActive;
     status.powerOffProgress = powerOffProgress;
     status.powerOffComplete = powerOffComplete;
+
+    auto wifiInfo = wifiManager.getStatusInfo();
+    using WiFiMode = DisplayManager::StatusData::WiFiMode;
+
+    if (wifiInfo.apActive && wifiInfo.stationConnected)
+    {
+        status.wifiMode = WiFiMode::AP_STATION;
+    }
+    else if (wifiInfo.stationActive || wifiInfo.stationAttemptActive)
+    {
+        status.wifiMode = WiFiMode::STATION;
+    }
+    else if (wifiInfo.apActive)
+    {
+        status.wifiMode = WiFiMode::ACCESS_POINT;
+    }
+    else
+    {
+        status.wifiMode = WiFiMode::OFF;
+    }
+
+    status.wifiConnected = wifiInfo.stationConnected || (status.wifiMode == WiFiMode::ACCESS_POINT);
+    status.wifiConnecting = wifiInfo.stationAttemptActive && !wifiInfo.stationConnected;
+    status.wifiHasIPAddress = false;
+    status.wifiSSID[0] = '\0';
+    status.wifiIPAddress[0] = '\0';
+
+    auto copyString = [](char *destination, size_t destinationSize, const String &value) {
+        if (destinationSize == 0)
+        {
+            return;
+        }
+
+        if (value.length() >= destinationSize)
+        {
+            value.substring(0, destinationSize - 1).toCharArray(destination, destinationSize);
+        }
+        else
+        {
+            value.toCharArray(destination, destinationSize);
+        }
+    };
+
+    if (wifiInfo.stationConnected)
+    {
+        copyString(status.wifiSSID, sizeof(status.wifiSSID), wifiInfo.stationSSID);
+
+        String ipString = wifiInfo.stationIP.toString();
+        if (ipString != "0.0.0.0")
+        {
+            copyString(status.wifiIPAddress, sizeof(status.wifiIPAddress), ipString);
+            status.wifiHasIPAddress = true;
+        }
+    }
+    else if (wifiInfo.apActive)
+    {
+        copyString(status.wifiSSID, sizeof(status.wifiSSID), wifiInfo.apSSID);
+
+        String ipString = wifiInfo.apIP.toString();
+        if (ipString != "0.0.0.0")
+        {
+            copyString(status.wifiIPAddress, sizeof(status.wifiIPAddress), ipString);
+            status.wifiHasIPAddress = true;
+        }
+    }
+    else if (!wifiInfo.stationSSID.isEmpty())
+    {
+        copyString(status.wifiSSID, sizeof(status.wifiSSID), wifiInfo.stationSSID);
+    }
 
     status.gnssEnabled = gnssEnabled && gnssInitialised;
     if (status.gnssEnabled)

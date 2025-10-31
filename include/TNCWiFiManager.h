@@ -55,6 +55,23 @@ public:
      */
     String getStatusSummary() const;
 
+    struct StatusInfo
+    {
+        bool apActive = false;
+        bool stationActive = false;
+        bool stationConnected = false;
+        bool stationAttemptActive = false;
+        String apSSID;
+        IPAddress apIP;
+        String stationSSID;
+        IPAddress stationIP;
+    };
+
+    /**
+     * @brief Detailed status for UI presentation.
+     */
+    StatusInfo getStatusInfo() const;
+
 private:
     static constexpr const char *PREF_NAMESPACE = "wifi";
     static constexpr uint8_t MAX_NETWORKS = 8;
