@@ -26,6 +26,19 @@ function buildHeaders(options = {}) {
     return headers;
 }
 
+function ensureCsrfHeader(headers) {
+    if (!headers || headers['X-CSRF-Token']) {
+        return headers;
+    }
+    if (typeof document !== 'undefined') {
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        if (meta?.content) {
+            headers['X-CSRF-Token'] = meta.content;
+        }
+    }
+    return headers;
+}
+
 export function setCsrfToken(token) {
     latestCsrfToken = token || null;
 }
@@ -81,12 +94,14 @@ export async function postConfigCommand(command) {
     );
 }
 
-export async function postCommand(command) {
+export async function postCommand(command, { signal } = {}) {
+    const headers = ensureCsrfHeader(buildHeaders(true));
     return handleResponse(
         await fetch('/api/command', {
             method: 'POST',
-            headers: buildHeaders(true),
-            body: JSON.stringify({ command })
+            headers,
+            body: JSON.stringify({ command }),
+            signal
         })
     );
 }
