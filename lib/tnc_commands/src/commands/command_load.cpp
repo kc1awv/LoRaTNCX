@@ -1,4 +1,5 @@
 #include "CommandContext.h"
+#include <math.h>
 
 TNCCommandResult TNCCommands::handleLOAD(const String args[], int argCount) {
     sendResponse("Loading configuration from flash...");
@@ -57,6 +58,8 @@ TNCCommandResult TNCCommands::handleLOAD(const String args[], int argCount) {
 
         // System settings
         config.debugLevel = preferences.getUChar("debugLevel", config.debugLevel);
+        config.gnssEnabled = preferences.getBool("gnssEnabled", config.gnssEnabled);
+        config.oledEnabled = preferences.getBool("oledEnabled", config.oledEnabled);
 
         preferences.end();
 
@@ -68,33 +71,49 @@ TNCCommandResult TNCCommands::handleLOAD(const String args[], int argCount) {
         if (radio != nullptr) {
             sendResponse("Applying loaded settings to radio hardware...");
             bool radioOk = true;
-            
-            // Apply radio parameters in sequence
-            if (!radio->setFrequency(config.frequency)) {
+
+            if (!radio->applyConfiguration(
+                    config.frequency,
+                    config.bandwidth,
+                    config.spreadingFactor,
+                    config.codingRate,
+                    config.txPower,
+                    static_cast<uint8_t>(config.syncWord))) {
+                radioOk = false;
+            }
+
+            const float freqDiff = fabsf(radio->getFrequency() - config.frequency);
+            if (freqDiff >= 0.001f) {
                 sendResponse("WARNING: Failed to set frequency on radio");
                 radioOk = false;
             }
-            if (!radio->setTxPower(config.txPower)) {
+
+            if (radio->getTxPower() != config.txPower) {
                 sendResponse("WARNING: Failed to set TX power on radio");
                 radioOk = false;
             }
-            if (!radio->setSpreadingFactor(config.spreadingFactor)) {
-                sendResponse("WARNING: Failed to set spreading factor on radio");
-                radioOk = false;
-            }
-            if (!radio->setBandwidth(config.bandwidth)) {
+
+            const float bwDiff = fabsf(radio->getBandwidth() - config.bandwidth);
+            if (bwDiff >= 0.001f) {
                 sendResponse("WARNING: Failed to set bandwidth on radio");
                 radioOk = false;
             }
-            if (!radio->setCodingRate(config.codingRate)) {
+
+            if (radio->getSpreadingFactor() != config.spreadingFactor) {
+                sendResponse("WARNING: Failed to set spreading factor on radio");
+                radioOk = false;
+            }
+
+            if (radio->getCodingRate() != config.codingRate) {
                 sendResponse("WARNING: Failed to set coding rate on radio");
                 radioOk = false;
             }
-            if (!radio->setSyncWord(config.syncWord)) {
+
+            if (radio->getSyncWord() != static_cast<uint8_t>(config.syncWord)) {
                 sendResponse("WARNING: Failed to set sync word on radio");
                 radioOk = false;
             }
-            
+
             if (radioOk) {
                 sendResponse("Configuration loaded and applied to radio");
             } else {
@@ -103,9 +122,27 @@ TNCCommandResult TNCCommands::handleLOAD(const String args[], int argCount) {
         } else {
             sendResponse("Configuration loaded (radio not available for hardware update)");
         }
-        
+
+        if (gnssSetEnabledCallback) {
+            if (!gnssSetEnabledCallback(config.gnssEnabled)) {
+                sendResponse("WARNING: Failed to apply GNSS setting");
+            }
+            if (gnssGetEnabledCallback) {
+                config.gnssEnabled = gnssGetEnabledCallback();
+            }
+        }
+
+        if (oledSetEnabledCallback) {
+            if (!oledSetEnabledCallback(config.oledEnabled)) {
+                sendResponse("WARNING: Failed to apply OLED setting");
+            }
+            if (oledGetEnabledCallback) {
+                config.oledEnabled = oledGetEnabledCallback();
+            }
+        }
+
         return TNCCommandResult::SUCCESS;
-        
+
     } catch (...) {
         preferences.end();
         sendResponse("ERROR: Failed to load configuration");

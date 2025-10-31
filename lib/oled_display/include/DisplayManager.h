@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <TNCCommands.h>
 #include <U8g2lib.h>
+#include <math.h>
 #include "HardwareConfig.h"
 
 /**
@@ -16,7 +17,8 @@ public:
         MAIN = 0,
         LORA_DETAILS,
         BATTERY,
-        SYSTEM
+        SYSTEM,
+        GNSS_STATUS
     };
 
     struct StatusData
@@ -39,6 +41,28 @@ public:
         bool powerOffActive = false;
         float powerOffProgress = 0.0f;
         bool powerOffComplete = false;
+
+        bool gnssEnabled = false;
+        bool gnssHasFix = false;
+        bool gnssIs3DFix = false;
+        double gnssLatitude = NAN;
+        double gnssLongitude = NAN;
+        double gnssAltitude = NAN;
+        float gnssSpeed = 0.0f;
+        float gnssCourse = 0.0f;
+        float gnssHdop = 0.0f;
+        uint8_t gnssSatellites = 0;
+        bool gnssTimeValid = false;
+        bool gnssTimeSynced = false;
+        uint16_t gnssYear = 0;
+        uint8_t gnssMonth = 0;
+        uint8_t gnssDay = 0;
+        uint8_t gnssHour = 0;
+        uint8_t gnssMinute = 0;
+        uint8_t gnssSecond = 0;
+        bool gnssPpsAvailable = false;
+        unsigned long gnssPpsLastMillis = 0;
+        uint32_t gnssPpsCount = 0;
     };
 
     DisplayManager();
@@ -79,11 +103,28 @@ public:
      */
     uint8_t getScreenCount() const { return SCREEN_COUNT; }
 
+    /**
+     * @brief Enable or disable the OLED panel at runtime.
+     * @return true if the request could be processed.
+     */
+    bool setEnabled(bool enable);
+
+    /**
+     * @brief Query whether the OLED panel is currently active.
+     */
+    bool isEnabled() const { return enabled; }
+
+    /**
+     * @brief Query whether OLED hardware is available on this build.
+     */
+    bool isAvailable() const { return hardwarePresent; }
+
 private:
-    static constexpr uint8_t SCREEN_COUNT = 4;
+    static constexpr uint8_t SCREEN_COUNT = 5;
 
     U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2;
     bool enabled;
+    bool hardwarePresent;
     Screen currentScreen;
     Screen lastRenderedScreen;
     bool hasLastStatus;
@@ -96,6 +137,7 @@ private:
     void drawLoRaDetails();
     void drawBatteryScreen();
     void drawSystemScreen();
+    void drawGNSSScreen();
     void drawPowerOffWarning();
     void drawPowerOffComplete();
     void drawProgressBar(int16_t x, int16_t y, int16_t width, int16_t height, float progress);
@@ -103,4 +145,7 @@ private:
     void drawCenteredText(int16_t y, const char *text, const uint8_t *font);
     void drawHeader(const char *title);
     static void formatUptime(char *buffer, size_t length, unsigned long millisValue);
+
+    void initializeHardware();
+    void shutdownHardware();
 };

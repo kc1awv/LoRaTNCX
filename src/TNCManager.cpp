@@ -29,7 +29,10 @@ inline float clamp01(float value)
 }
 }
 
-TNCManager::TNCManager() : configManager(&radio), display(), batteryMonitor()
+// Static member definition
+TNCManager* TNCManager::instance = nullptr;
+
+TNCManager::TNCManager() : configManager(&radio), display(), batteryMonitor(), gnss()
 {
     initialized = false;
     lastStatus = 0;
@@ -50,6 +53,12 @@ TNCManager::TNCManager() : configManager(&radio), display(), batteryMonitor()
     powerOffProgress = 0.0f;
     powerOffInitiated = false;
     powerOffComplete = false;
+    gnssEnabled = false;
+    gnssInitialised = false;
+    oledEnabled = true;
+
+    // Set static instance for callbacks
+    instance = this;
 }
 
 bool TNCManager::begin()
@@ -58,13 +67,41 @@ bool TNCManager::begin()
 
     if (display.begin())
     {
+        oledEnabled = true;
         display.showBootScreen();
+    }
+    else
+    {
+        oledEnabled = false;
+        Serial.println("OLED display not available");
     }
 
     batteryMonitor.begin();
     lastBatteryVoltage = batteryMonitor.readVoltage();
     lastBatteryPercent = batteryMonitor.computePercentage(lastBatteryVoltage);
     lastBatterySample = millis();
+
+    gnssEnabled = GNSS_ENABLED;
+    gnssInitialised = false;
+
+    if (gnssEnabled)
+    {
+        Serial.println("Initializing GNSS module...");
+        if (gnss.begin())
+        {
+            Serial.println("✓ GNSS module initialized");
+            gnssInitialised = true;
+        }
+        else
+        {
+            Serial.println("✗ GNSS initialization failed");
+            gnssEnabled = false;
+        }
+    }
+    else
+    {
+        Serial.println("GNSS module disabled");
+    }
 
     pinMode(USER_BUTTON_PIN, INPUT_PULLUP);
     bool initialReading = (digitalRead(USER_BUTTON_PIN) == USER_BUTTON_ACTIVE_STATE);
@@ -103,7 +140,10 @@ bool TNCManager::begin()
 
     // Connect radio to command system for hardware integration
     commandSystem.setRadio(&radio);
-    Serial.println("✓ Command system radio integration enabled");
+    commandSystem.setGNSSCallbacks(gnssSetEnabledCallback, gnssGetEnabledCallback);
+    commandSystem.setOLEDCallbacks(oledSetEnabledCallback, oledGetEnabledCallback);
+    commandSystem.setPeripheralStateDefaults(isGNSSEnabled(), isOLEDEnabled());
+    Serial.println("✓ Command system hardware integration enabled");
 
     Serial.println("\n=== TNC Ready ===");
     Serial.println("Starting in Command mode...");
@@ -123,6 +163,19 @@ void TNCManager::update()
     if (!initialized)
     {
         return;
+    }
+
+    if (gnssEnabled && gnssInitialised)
+    {
+        gnss.update();
+        const auto &timeStatus = gnss.getTimeStatus();
+        if (timeStatus.valid && !timeStatus.synced)
+        {
+            if (gnss.syncSystemTime())
+            {
+                Serial.println("System clock synchronized via GNSS.");
+            }
+        }
     }
 
     // Handle incoming serial data (could be commands or KISS)
@@ -613,6 +666,36 @@ DisplayManager::StatusData TNCManager::buildDisplayStatus()
     status.powerOffActive = powerOffWarningActive;
     status.powerOffProgress = powerOffProgress;
     status.powerOffComplete = powerOffComplete;
+
+    status.gnssEnabled = gnssEnabled && gnssInitialised;
+    if (status.gnssEnabled)
+    {
+        const auto &fix = gnss.getFixData();
+        status.gnssHasFix = fix.valid;
+        status.gnssIs3DFix = fix.is3DFix;
+        status.gnssLatitude = fix.latitude;
+        status.gnssLongitude = fix.longitude;
+        status.gnssAltitude = fix.altitudeMeters;
+        status.gnssSpeed = fix.speedKnots;
+        status.gnssCourse = fix.courseDegrees;
+        status.gnssHdop = fix.hdop;
+        status.gnssSatellites = fix.satellites;
+
+        const auto &timeStatus = gnss.getTimeStatus();
+        status.gnssTimeValid = timeStatus.valid;
+        status.gnssTimeSynced = timeStatus.synced;
+        status.gnssYear = timeStatus.year;
+        status.gnssMonth = timeStatus.month;
+        status.gnssDay = timeStatus.day;
+        status.gnssHour = timeStatus.hour;
+        status.gnssMinute = timeStatus.minute;
+        status.gnssSecond = timeStatus.second;
+
+        const auto pps = gnss.getPPSStatus();
+        status.gnssPpsAvailable = pps.available;
+        status.gnssPpsLastMillis = pps.lastPulseMillis;
+        status.gnssPpsCount = pps.pulseCount;
+    }
     return status;
 }
 
@@ -640,4 +723,143 @@ void TNCManager::performPowerOff()
     {
         delay(1000);
     }
+}
+
+bool TNCManager::setGNSSEnabled(bool enable)
+{
+    bool result = true;
+
+    if (enable)
+    {
+        if (!gnssEnabled || !gnssInitialised)
+        {
+            Serial.println("Enabling GNSS module...");
+            gnssEnabled = true;
+            if (gnss.begin())
+            {
+                Serial.println("✓ GNSS module enabled");
+                gnssInitialised = true;
+            }
+            else
+            {
+                Serial.println("✗ GNSS initialization failed");
+                gnssEnabled = false;
+                gnssInitialised = false;
+                result = false;
+            }
+        }
+    }
+    else
+    {
+        if (gnssEnabled || gnssInitialised)
+        {
+            Serial.println("Disabling GNSS module...");
+            if (gnssInitialised)
+            {
+                gnss.end();
+            }
+            gnssEnabled = false;
+            gnssInitialised = false;
+            Serial.println("✓ GNSS module disabled");
+        }
+    }
+
+    commandSystem.setPeripheralStateDefaults(isGNSSEnabled(), isOLEDEnabled());
+    return result;
+}
+
+bool TNCManager::setOLEDEnabled(bool enable)
+{
+    if (!display.isAvailable())
+    {
+        Serial.println("OLED display hardware not available");
+        oledEnabled = false;
+        commandSystem.setPeripheralStateDefaults(isGNSSEnabled(), isOLEDEnabled());
+        return false;
+    }
+
+    bool result = true;
+
+    if (enable)
+    {
+        if (!oledEnabled || !display.isEnabled())
+        {
+            Serial.println("Enabling OLED display...");
+            if (display.setEnabled(true))
+            {
+                oledEnabled = true;
+                Serial.println("✓ OLED display enabled");
+                display.updateStatus(buildDisplayStatus());
+            }
+            else
+            {
+                Serial.println("✗ OLED display enable failed");
+                oledEnabled = display.isEnabled();
+                result = false;
+            }
+        }
+        else
+        {
+            oledEnabled = true;
+        }
+    }
+    else
+    {
+        if (oledEnabled && display.isEnabled())
+        {
+            Serial.println("Disabling OLED display...");
+            if (display.setEnabled(false))
+            {
+                oledEnabled = false;
+                Serial.println("✓ OLED display disabled");
+            }
+            else
+            {
+                Serial.println("✗ OLED display disable failed");
+                oledEnabled = display.isEnabled();
+                result = false;
+            }
+        }
+        else
+        {
+            oledEnabled = false;
+            if (display.isEnabled())
+            {
+                display.setEnabled(false);
+            }
+        }
+    }
+
+    oledEnabled = display.isEnabled();
+    commandSystem.setPeripheralStateDefaults(isGNSSEnabled(), isOLEDEnabled());
+    return result;
+}
+
+// Static callback functions for TNCCommands
+bool TNCManager::gnssSetEnabledCallback(bool enable) {
+    if (instance) {
+        return instance->setGNSSEnabled(enable);
+    }
+    return false;
+}
+
+bool TNCManager::oledSetEnabledCallback(bool enable) {
+    if (instance) {
+        return instance->setOLEDEnabled(enable);
+    }
+    return false;
+}
+
+bool TNCManager::oledGetEnabledCallback() {
+    if (instance) {
+        return instance->isOLEDEnabled();
+    }
+    return false;
+}
+
+bool TNCManager::gnssGetEnabledCallback() {
+    if (instance) {
+        return instance->isGNSSEnabled();
+    }
+    return false;
 }

@@ -17,6 +17,24 @@ TNCCommandResult TNCCommands::handleFACTORY(const String args[], int argCount) {
     config.lineEndingLF = true;
     config.echoEnabled = true;
     echoEnabled = true;
+    config.gnssEnabled = false;
+    config.oledEnabled = true;
+
+    if (gnssSetEnabledCallback) {
+        gnssSetEnabledCallback(false);
+        if (gnssGetEnabledCallback) {
+            config.gnssEnabled = gnssGetEnabledCallback();
+        }
+    }
+
+    if (oledSetEnabledCallback) {
+        if (!oledSetEnabledCallback(true)) {
+            sendResponse("WARNING: OLED display could not be enabled");
+        }
+        if (oledGetEnabledCallback) {
+            config.oledEnabled = oledGetEnabledCallback();
+        }
+    }
 
     sendResponse("Factory reset complete");
     return TNCCommandResult::SUCCESS;

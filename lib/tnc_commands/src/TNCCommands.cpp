@@ -12,8 +12,10 @@
 
 // Command handlers are implemented in separate translation units under
 // lib/tnc_commands/src/commands to simplify maintenance.
-TNCCommands::TNCCommands() 
-    : currentMode(TNCMode::COMMAND_MODE), echoEnabled(true), promptEnabled(true), radio(nullptr) {
+TNCCommands::TNCCommands()
+    : currentMode(TNCMode::COMMAND_MODE), echoEnabled(true), promptEnabled(true), radio(nullptr),
+      gnssSetEnabledCallback(nullptr), gnssGetEnabledCallback(nullptr),
+      oledSetEnabledCallback(nullptr), oledGetEnabledCallback(nullptr) {
     
     // Initialize default configuration
     // Station configuration
@@ -79,6 +81,8 @@ TNCCommands::TNCCommands()
     // System
     config.debugLevel = 1;
     config.autoSave = true;
+    config.gnssEnabled = false;
+    config.oledEnabled = true;
     
     // Initialize statistics
     stats.packetsTransmitted = 0;
@@ -436,6 +440,10 @@ TNCCommandResult TNCCommands::processCommand(const String& commandLine) {
         result = handleSELFTEST(cmdArgs, cmdArgCount);
     } else if (command == "DEBUG") {
         result = handleDEBUG(cmdArgs, cmdArgCount);
+    } else if (command == "GNSS") {
+        result = handleGNSS(cmdArgs, cmdArgCount);
+    } else if (command == "OLED") {
+        result = handleOLED(cmdArgs, cmdArgCount);
     } else if (command == "SIMPLEX") {
         result = handleSIMPLEX(cmdArgs, cmdArgCount);
     }
@@ -527,6 +535,21 @@ void TNCCommands::setRadio(LoRaRadio* radioPtr) {
     radio = radioPtr;
 }
 
+void TNCCommands::setGNSSCallbacks(GNSSSetEnabledCallback setCallback, GNSSGetEnabledCallback getCallback) {
+    gnssSetEnabledCallback = setCallback;
+    gnssGetEnabledCallback = getCallback;
+}
+
+void TNCCommands::setOLEDCallbacks(OLEDSetEnabledCallback setCallback, OLEDGetEnabledCallback getCallback) {
+    oledSetEnabledCallback = setCallback;
+    oledGetEnabledCallback = getCallback;
+}
+
+void TNCCommands::setPeripheralStateDefaults(bool gnssState, bool oledState) {
+    config.gnssEnabled = gnssState;
+    config.oledEnabled = oledState;
+}
+
 bool TNCCommands::loadConfigurationFromFlash() {
     Preferences preferences;
     if (!preferences.begin("tnc_config", true)) {
@@ -586,6 +609,8 @@ bool TNCCommands::loadConfigurationFromFlash() {
 
     // System
     config.debugLevel = preferences.getUChar("debugLevel", config.debugLevel);
+    config.gnssEnabled = preferences.getBool("gnssEnabled", config.gnssEnabled);
+    config.oledEnabled = preferences.getBool("oledEnabled", config.oledEnabled);
 
     preferences.end();
 
@@ -648,7 +673,9 @@ bool TNCCommands::saveConfigurationToFlash() {
 
     // System
     preferences.putUChar("debugLevel", config.debugLevel);
-    
+    preferences.putBool("gnssEnabled", config.gnssEnabled);
+    preferences.putBool("oledEnabled", config.oledEnabled);
+
     preferences.end();
     return true;
 }

@@ -67,6 +67,19 @@ public:
     // Hardware integration
     void setRadio(LoRaRadio* radioPtr);
     
+    // GNSS control callbacks
+    typedef bool (*GNSSSetEnabledCallback)(bool enable);
+    typedef bool (*GNSSGetEnabledCallback)();
+    void setGNSSCallbacks(GNSSSetEnabledCallback setCallback, GNSSGetEnabledCallback getCallback);
+
+    // OLED control callbacks
+    typedef bool (*OLEDSetEnabledCallback)(bool enable);
+    typedef bool (*OLEDGetEnabledCallback)();
+    void setOLEDCallbacks(OLEDSetEnabledCallback setCallback, OLEDGetEnabledCallback getCallback);
+
+    // Synchronize configuration with current peripheral state
+    void setPeripheralStateDefaults(bool gnssEnabled, bool oledEnabled);
+    
     // Configuration management
     bool loadConfigurationFromFlash();
     bool saveConfigurationToFlash();
@@ -81,6 +94,12 @@ private:
     
     // Hardware reference
     LoRaRadio* radio;
+    
+    // GNSS control callbacks
+    GNSSSetEnabledCallback gnssSetEnabledCallback;
+    GNSSGetEnabledCallback gnssGetEnabledCallback;
+    OLEDSetEnabledCallback oledSetEnabledCallback;
+    OLEDGetEnabledCallback oledGetEnabledCallback;
     
     // Configuration storage (Arduino-compatible)
     struct TNCConfig {
@@ -147,6 +166,8 @@ private:
         // System
         uint8_t debugLevel;
         bool autoSave;
+        bool gnssEnabled;
+        bool oledEnabled;
     } config;
     
     // Statistics storage
@@ -335,6 +356,8 @@ private:
     TNCCommandResult handleCALIBRATE(const String args[], int argCount);
     TNCCommandResult handleSELFTEST(const String args[], int argCount);
     TNCCommandResult handleDEBUG(const String args[], int argCount);
+    TNCCommandResult handleGNSS(const String args[], int argCount);
+    TNCCommandResult handleOLED(const String args[], int argCount);
     TNCCommandResult handleSIMPLEX(const String args[], int argCount);
     
     // Utility functions

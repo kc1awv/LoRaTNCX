@@ -18,6 +18,7 @@
 #include <TNCCommands.h>
 #include <DisplayManager.h>
 #include <BatteryMonitor.h>
+#include <GNSSManager.h>
 
 class TNCManager
 {
@@ -50,13 +51,48 @@ public:
      */
     bool processConfigurationCommand(const String &command);
 
+    /**
+     * @brief Enable or disable the GNSS module
+     * @param enable true to enable, false to disable
+     * @return true if operation successful
+     */
+    bool setGNSSEnabled(bool enable);
+
+    /**
+     * @brief Get current GNSS enabled status
+     * @return true if GNSS is enabled and initialized
+     */
+    bool isGNSSEnabled() const { return gnssEnabled && gnssInitialised; }
+
+    /**
+     * @brief Enable or disable the OLED display
+     */
+    bool setOLEDEnabled(bool enable);
+
+    /**
+     * @brief Query whether the OLED display is active.
+     */
+    bool isOLEDEnabled() const { return oledEnabled && display.isEnabled(); }
+
+    // Static callback functions for TNCCommands
+    static bool gnssSetEnabledCallback(bool enable);
+    static bool gnssGetEnabledCallback();
+    static bool oledSetEnabledCallback(bool enable);
+    static bool oledGetEnabledCallback();
+
 private:
+    static TNCManager* instance; // Static instance for callbacks
     LoRaRadio radio;                    // LoRa radio interface
     KISSProtocol kiss;                  // KISS protocol handler
     ConfigurationManager configManager; // Configuration management
     TNCCommands commandSystem;          // Command system interface
     DisplayManager display;             // OLED display manager
     BatteryMonitor batteryMonitor;      // Battery monitoring helper
+    GNSSManager gnss;                   // GNSS module interface
+
+    bool gnssEnabled;
+    bool gnssInitialised;
+    bool oledEnabled;
 
     bool initialized;
     unsigned long lastStatus;
