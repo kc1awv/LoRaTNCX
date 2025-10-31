@@ -23,6 +23,12 @@
 class TNCManager
 {
 public:
+    struct StatusSnapshot
+    {
+        DisplayManager::StatusData displayStatus;
+        String statusText;
+    };
+
     /**
      * @brief Constructor
      */
@@ -45,11 +51,41 @@ public:
     String getStatus();
 
     /**
+     * @brief Retrieve the latest status information in structured form.
+     */
+    StatusSnapshot getStatusSnapshot();
+
+    /**
+     * @brief Retrieve the status structure used for display updates.
+     */
+    DisplayManager::StatusData getDisplayStatusSnapshot();
+
+    /**
      * @brief Process configuration commands
      * @param command Configuration command string
      * @return true if command processed successfully
      */
     bool processConfigurationCommand(const String &command);
+
+    /**
+     * @brief Process configuration commands from C-style strings safely.
+     */
+    bool processConfigurationCommand(const char *command);
+
+    /**
+     * @brief Execute a textual TNC command.
+     */
+    TNCCommandResult executeCommand(const String &command);
+
+    /**
+     * @brief Execute a textual TNC command from a C-style string safely.
+     */
+    TNCCommandResult executeCommand(const char *command);
+
+    /**
+     * @brief Retrieve the formatted configuration status text.
+     */
+    String getConfigurationStatus() const;
 
     /**
      * @brief Enable or disable the GNSS module

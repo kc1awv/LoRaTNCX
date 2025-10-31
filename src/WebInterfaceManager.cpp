@@ -3,6 +3,7 @@
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
 #include <WiFi.h>
+#include <math.h>
 
 #include "TNCManager.h"
 
@@ -11,6 +12,89 @@ namespace
 constexpr uint16_t WIFI_CONNECT_TIMEOUT_MS = 10000;
 constexpr uint16_t WIFI_CHECK_INTERVAL_MS = 1000;
 constexpr const char *DEFAULT_AP_PASSWORD = "LoRaTNCX";
+constexpr size_t MAX_JSON_BODY_SIZE = 512;
+
+const char *modeToString(TNCMode mode)
+{
+    switch (mode)
+    {
+    case TNCMode::KISS_MODE:
+        return "KISS";
+    case TNCMode::COMMAND_MODE:
+        return "COMMAND";
+    case TNCMode::TERMINAL_MODE:
+        return "TERMINAL";
+    case TNCMode::TRANSPARENT_MODE:
+        return "TRANSPARENT";
+    default:
+        return "UNKNOWN";
+    }
+}
+
+struct CommandHttpMapping
+{
+    int statusCode;
+    bool success;
+    const char *message;
+};
+
+CommandHttpMapping mapCommandResultToHttp(TNCCommandResult result)
+{
+    switch (result)
+    {
+    case TNCCommandResult::SUCCESS:
+        return {200, true, "Command executed successfully."};
+    case TNCCommandResult::SUCCESS_SILENT:
+        return {200, true, "Command executed successfully (no output)."};
+    case TNCCommandResult::ERROR_UNKNOWN_COMMAND:
+        return {404, false, "Unknown command."};
+    case TNCCommandResult::ERROR_INVALID_PARAMETER:
+        return {400, false, "Invalid parameter."};
+    case TNCCommandResult::ERROR_SYSTEM_ERROR:
+        return {500, false, "System error encountered."};
+    case TNCCommandResult::ERROR_NOT_IMPLEMENTED:
+        return {501, false, "Command not implemented."};
+    case TNCCommandResult::ERROR_INSUFFICIENT_ARGS:
+        return {400, false, "Insufficient arguments provided."};
+    case TNCCommandResult::ERROR_TOO_MANY_ARGS:
+        return {400, false, "Too many arguments provided."};
+    case TNCCommandResult::ERROR_INVALID_VALUE:
+        return {400, false, "Invalid value provided."};
+    case TNCCommandResult::ERROR_HARDWARE_ERROR:
+        return {503, false, "Hardware error encountered."};
+    default:
+        return {500, false, "Unhandled command result."};
+    }
+}
+
+const char *commandResultToString(TNCCommandResult result)
+{
+    switch (result)
+    {
+    case TNCCommandResult::SUCCESS:
+        return "SUCCESS";
+    case TNCCommandResult::SUCCESS_SILENT:
+        return "SUCCESS_SILENT";
+    case TNCCommandResult::ERROR_UNKNOWN_COMMAND:
+        return "ERROR_UNKNOWN_COMMAND";
+    case TNCCommandResult::ERROR_INVALID_PARAMETER:
+        return "ERROR_INVALID_PARAMETER";
+    case TNCCommandResult::ERROR_SYSTEM_ERROR:
+        return "ERROR_SYSTEM_ERROR";
+    case TNCCommandResult::ERROR_NOT_IMPLEMENTED:
+        return "ERROR_NOT_IMPLEMENTED";
+    case TNCCommandResult::ERROR_INSUFFICIENT_ARGS:
+        return "ERROR_INSUFFICIENT_ARGS";
+    case TNCCommandResult::ERROR_TOO_MANY_ARGS:
+        return "ERROR_TOO_MANY_ARGS";
+    case TNCCommandResult::ERROR_INVALID_VALUE:
+        return "ERROR_INVALID_VALUE";
+    case TNCCommandResult::ERROR_HARDWARE_ERROR:
+        return "ERROR_HARDWARE_ERROR";
+    default:
+        return "UNKNOWN";
+    }
+}
 } // namespace
 
 WebInterfaceManager::WebInterfaceManager()
@@ -209,21 +293,258 @@ void WebInterfaceManager::setupWebServer()
 
     server.on(
         "/api/status", HTTP_GET, [this](AsyncWebServerRequest *request) {
-            JsonDocument doc;
-            doc["wifi"]["sta_connected"] = staConnected;
-            doc["wifi"]["ap_ssid"] = apSSID;
+            DynamicJsonDocument doc(4096);
+            JsonObject wifi = doc.createNestedObject("wifi");
+            wifi["sta_connected"] = staConnected;
+            wifi["ap_ssid"] = apSSID;
+
+            JsonObject tnc = doc.createNestedObject("tnc");
             if (tncManager)
             {
-                doc["tnc"]["status"] = tncManager->getStatus();
+                TNCManager::StatusSnapshot snapshot = tncManager->getStatusSnapshot();
+                tnc["available"] = true;
+                tnc["status_text"] = snapshot.statusText;
+
+                JsonObject display = tnc.createNestedObject("display");
+                display["mode"] = modeToString(snapshot.displayStatus.mode);
+                display["tx_count"] = snapshot.displayStatus.txCount;
+                display["rx_count"] = snapshot.displayStatus.rxCount;
+                display["last_packet_millis"] = snapshot.displayStatus.lastPacketMillis;
+                display["has_recent_packet"] = snapshot.displayStatus.hasRecentPacket;
+                display["last_rssi"] = snapshot.displayStatus.lastRSSI;
+                display["last_snr"] = snapshot.displayStatus.lastSNR;
+                display["frequency_mhz"] = snapshot.displayStatus.frequency;
+                display["bandwidth_khz"] = snapshot.displayStatus.bandwidth;
+                display["spreading_factor"] = snapshot.displayStatus.spreadingFactor;
+                display["coding_rate"] = snapshot.displayStatus.codingRate;
+                display["tx_power_dbm"] = snapshot.displayStatus.txPower;
+                display["uptime_ms"] = snapshot.displayStatus.uptimeMillis;
+
+                JsonObject battery = display.createNestedObject("battery");
+                battery["voltage"] = snapshot.displayStatus.batteryVoltage;
+                battery["percent"] = snapshot.displayStatus.batteryPercent;
+
+                JsonObject powerOff = display.createNestedObject("power_off");
+                powerOff["active"] = snapshot.displayStatus.powerOffActive;
+                powerOff["progress"] = snapshot.displayStatus.powerOffProgress;
+                powerOff["complete"] = snapshot.displayStatus.powerOffComplete;
+
+                JsonObject gnss = display.createNestedObject("gnss");
+                gnss["enabled"] = snapshot.displayStatus.gnssEnabled;
+                gnss["has_fix"] = snapshot.displayStatus.gnssHasFix;
+                gnss["is_3d_fix"] = snapshot.displayStatus.gnssIs3DFix;
+                if (!isnan(snapshot.displayStatus.gnssLatitude))
+                {
+                    gnss["latitude"] = snapshot.displayStatus.gnssLatitude;
+                }
+                else
+                {
+                    gnss["latitude"] = nullptr;
+                }
+                if (!isnan(snapshot.displayStatus.gnssLongitude))
+                {
+                    gnss["longitude"] = snapshot.displayStatus.gnssLongitude;
+                }
+                else
+                {
+                    gnss["longitude"] = nullptr;
+                }
+                if (!isnan(snapshot.displayStatus.gnssAltitude))
+                {
+                    gnss["altitude_m"] = snapshot.displayStatus.gnssAltitude;
+                }
+                else
+                {
+                    gnss["altitude_m"] = nullptr;
+                }
+                gnss["speed_knots"] = snapshot.displayStatus.gnssSpeed;
+                gnss["course_degrees"] = snapshot.displayStatus.gnssCourse;
+                gnss["hdop"] = snapshot.displayStatus.gnssHdop;
+                gnss["satellites"] = snapshot.displayStatus.gnssSatellites;
+                gnss["time_valid"] = snapshot.displayStatus.gnssTimeValid;
+                gnss["time_synced"] = snapshot.displayStatus.gnssTimeSynced;
+                gnss["year"] = snapshot.displayStatus.gnssYear;
+                gnss["month"] = snapshot.displayStatus.gnssMonth;
+                gnss["day"] = snapshot.displayStatus.gnssDay;
+                gnss["hour"] = snapshot.displayStatus.gnssHour;
+                gnss["minute"] = snapshot.displayStatus.gnssMinute;
+                gnss["second"] = snapshot.displayStatus.gnssSecond;
+                gnss["pps_available"] = snapshot.displayStatus.gnssPpsAvailable;
+                gnss["pps_last_millis"] = snapshot.displayStatus.gnssPpsLastMillis;
+                gnss["pps_count"] = snapshot.displayStatus.gnssPpsCount;
             }
             else
             {
-                doc["tnc"]["status"] = "unavailable";
+                tnc["available"] = false;
+                tnc["status_text"] = "TNC manager unavailable";
             }
 
             String payload;
             serializeJson(doc, payload);
             request->send(200, "application/json", payload);
+        });
+
+    server.on(
+        "/api/config", HTTP_GET, [this](AsyncWebServerRequest *request) {
+            DynamicJsonDocument doc(1024);
+            JsonObject config = doc.createNestedObject("config");
+            if (tncManager)
+            {
+                config["available"] = true;
+                config["status_text"] = tncManager->getConfigurationStatus();
+            }
+            else
+            {
+                config["available"] = false;
+                config["status_text"] = "TNC manager unavailable";
+            }
+
+            String payload;
+            serializeJson(doc, payload);
+            request->send(200, "application/json", payload);
+        });
+
+    server.on(
+        "/api/config", HTTP_POST,
+        [this](AsyncWebServerRequest *request) {
+            if (!request->_tempObject)
+            {
+                request->send(400, "application/json", "{\"error\":\"Missing JSON body\"}");
+            }
+        },
+        nullptr,
+        [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+            if (index == 0)
+            {
+                request->_tempObject = new String();
+                size_t reserveSize = total;
+                if (reserveSize > MAX_JSON_BODY_SIZE)
+                {
+                    reserveSize = MAX_JSON_BODY_SIZE;
+                }
+                static_cast<String *>(request->_tempObject)->reserve(reserveSize);
+            }
+
+            String *body = static_cast<String *>(request->_tempObject);
+            if (body->length() + len > MAX_JSON_BODY_SIZE)
+            {
+                delete body;
+                request->_tempObject = nullptr;
+                request->send(413, "application/json", "{\"error\":\"JSON payload too large\"}");
+                return;
+            }
+
+            body->concat(reinterpret_cast<const char *>(data), len);
+
+            if (index + len == total)
+            {
+                DynamicJsonDocument doc(512);
+                DeserializationError error = deserializeJson(doc, *body);
+                delete body;
+                request->_tempObject = nullptr;
+
+                if (error)
+                {
+                    request->send(400, "application/json", "{\"error\":\"Invalid JSON payload\"}");
+                    return;
+                }
+
+                if (!doc.containsKey("command") || !doc["command"].is<const char *>())
+                {
+                    request->send(400, "application/json", "{\"error\":\"Missing command field\"}");
+                    return;
+                }
+
+                if (!tncManager)
+                {
+                    request->send(503, "application/json", "{\"error\":\"TNC manager unavailable\"}");
+                    return;
+                }
+
+                const char *command = doc["command"];
+                bool success = tncManager->processConfigurationCommand(command);
+
+                DynamicJsonDocument response(1024);
+                response["success"] = success;
+                response["status_text"] = tncManager->getConfigurationStatus();
+                response["message"] = success ? "Configuration command accepted." : "Configuration command rejected.";
+
+                String payload;
+                serializeJson(response, payload);
+                request->send(success ? 200 : 400, "application/json", payload);
+            }
+        });
+
+    server.on(
+        "/api/command", HTTP_POST,
+        [this](AsyncWebServerRequest *request) {
+            if (!request->_tempObject)
+            {
+                request->send(400, "application/json", "{\"error\":\"Missing JSON body\"}");
+            }
+        },
+        nullptr,
+        [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+            if (index == 0)
+            {
+                request->_tempObject = new String();
+                size_t reserveSize = total;
+                if (reserveSize > MAX_JSON_BODY_SIZE)
+                {
+                    reserveSize = MAX_JSON_BODY_SIZE;
+                }
+                static_cast<String *>(request->_tempObject)->reserve(reserveSize);
+            }
+
+            String *body = static_cast<String *>(request->_tempObject);
+            if (body->length() + len > MAX_JSON_BODY_SIZE)
+            {
+                delete body;
+                request->_tempObject = nullptr;
+                request->send(413, "application/json", "{\"error\":\"JSON payload too large\"}");
+                return;
+            }
+
+            body->concat(reinterpret_cast<const char *>(data), len);
+
+            if (index + len == total)
+            {
+                DynamicJsonDocument doc(512);
+                DeserializationError error = deserializeJson(doc, *body);
+                delete body;
+                request->_tempObject = nullptr;
+
+                if (error)
+                {
+                    request->send(400, "application/json", "{\"error\":\"Invalid JSON payload\"}");
+                    return;
+                }
+
+                if (!doc.containsKey("command") || !doc["command"].is<const char *>())
+                {
+                    request->send(400, "application/json", "{\"error\":\"Missing command field\"}");
+                    return;
+                }
+
+                if (!tncManager)
+                {
+                    request->send(503, "application/json", "{\"error\":\"TNC manager unavailable\"}");
+                    return;
+                }
+
+                const char *command = doc["command"];
+                TNCCommandResult result = tncManager->executeCommand(command);
+                CommandHttpMapping mapping = mapCommandResultToHttp(result);
+
+                DynamicJsonDocument response(512);
+                response["success"] = mapping.success;
+                response["result"] = commandResultToString(result);
+                response["message"] = mapping.message;
+
+                String payload;
+                serializeJson(response, payload);
+                request->send(mapping.statusCode, "application/json", payload);
+            }
         });
 
     server.onNotFound([this](AsyncWebServerRequest *request) {
