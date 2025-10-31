@@ -20,6 +20,8 @@
 #include <BatteryMonitor.h>
 #include <GNSSManager.h>
 #include "TNCWiFiManager.h"
+#include <WiFi.h>
+#include <array>
 
 class TNCManager
 {
@@ -95,6 +97,15 @@ private:
     BatteryMonitor batteryMonitor;      // Battery monitoring helper
     GNSSManager gnss;                   // GNSS module interface
     TNCWiFiManager wifiManager;         // WiFi management with AP fallback
+    static constexpr uint16_t KISS_TCP_PORT = 8001;
+    static constexpr uint16_t NMEA_TCP_PORT = 10110;
+    static constexpr size_t MAX_TCP_CLIENTS = 4;
+    WiFiServer kissTcpServer;
+    WiFiServer nmeaTcpServer;
+    std::array<WiFiClient, MAX_TCP_CLIENTS> kissTcpClients;
+    std::array<WiFiClient, MAX_TCP_CLIENTS> nmeaTcpClients;
+    bool kissServerRunning;
+    bool nmeaServerRunning;
 
     bool gnssEnabled;
     bool gnssInitialised;
@@ -141,6 +152,16 @@ private:
      * @brief Execute the hardware power-off procedure.
      */
     void performPowerOff();
+
+    void updateTcpServers();
+    void acceptClient(WiFiServer &server, std::array<WiFiClient, MAX_TCP_CLIENTS> &clients);
+    void pruneClients(std::array<WiFiClient, MAX_TCP_CLIENTS> &clients);
+    void stopClients(std::array<WiFiClient, MAX_TCP_CLIENTS> &clients);
+    void processKISSTcpClients();
+    void broadcastKISSFrame(const uint8_t *data, size_t length);
+    void broadcastNMEALine(const String &line);
+    bool hasActiveKISSClients();
+    void handleNMEASentence(const String &line);
 
     float lastPacketRSSI;
     float lastPacketSNR;

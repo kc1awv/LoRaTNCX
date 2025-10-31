@@ -23,6 +23,7 @@ GNSSManager::GNSSManager(HardwareSerial &serialPort)
       ppsStatus(),
       nmeaBuffer(),
       ppsCallback(nullptr),
+      nmeaCallback(nullptr),
       ppsPulseCount(0),
       ppsLastMicros(0),
       ppsInterruptFlag(false),
@@ -189,6 +190,11 @@ void GNSSManager::setPPSCallback(PPSCallback callback)
     ppsCallback = callback;
 }
 
+void GNSSManager::setNMEACallback(NMEACallback callback)
+{
+    nmeaCallback = callback;
+}
+
 GNSSManager::PPSStatus GNSSManager::getPPSStatus() const
 {
     return ppsStatus;
@@ -275,6 +281,11 @@ void GNSSManager::handleNMEALine(const String &line)
     if (!validateChecksum(trimmed))
     {
         return;
+    }
+
+    if (nmeaCallback)
+    {
+        nmeaCallback(trimmed);
     }
 
     int starIndex = trimmed.indexOf('*');

@@ -60,6 +60,7 @@ public:
     };
 
     using PPSCallback = std::function<void(uint32_t pulseCount)>;
+    using NMEACallback = std::function<void(const String &line)>;
 
     explicit GNSSManager(HardwareSerial &serialPort = Serial1);
 
@@ -105,6 +106,11 @@ public:
     void setPPSCallback(PPSCallback callback);
 
     /**
+     * @brief Register a callback that receives validated NMEA sentences.
+     */
+    void setNMEACallback(NMEACallback callback);
+
+    /**
      * @brief Access the latest fix information.
      */
     const FixData &getFixData() const { return fixData; }
@@ -137,6 +143,7 @@ private:
     String nmeaBuffer;
 
     PPSCallback ppsCallback;
+    NMEACallback nmeaCallback;
 
     volatile uint32_t ppsPulseCount;
     volatile unsigned long ppsLastMicros;
