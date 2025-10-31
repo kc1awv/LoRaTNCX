@@ -127,6 +127,15 @@ platformio run -e heltec_wifi_lora_32_V4 -t upload
 python3 test_kiss_tnc.py
 ```
 
+### Web Interface
+
+The browser dashboard now maintains a persistent WebSocket connection (`data/js/websocket.js`) to stream telemetry, packet
+alerts, and command results in real time. When `/ws` is unreachable the client automatically falls back to periodic REST polling
+against `/api/status`, ensuring the UI continues to refresh even if the socket is blocked by captive portals or aggressive
+firewalls. Modules subscribe to custom DOM events (`lora:telemetry`, `lora:activity`, and `lora:csrf-token`) dispatched from
+`data/js/common.js`, making it straightforward to react to live updates or refreshed CSRF tokens without duplicating transport
+logic.
+
 ## Technical Deep Dive
 
 ### LoRa Configuration
