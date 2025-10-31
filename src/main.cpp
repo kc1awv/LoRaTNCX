@@ -21,9 +21,11 @@
 #include "TNCManager.h"
 #include "KISSProtocol.h"
 #include "LoRaRadio.h"
+#include "WebInterfaceManager.h"
 
 // Global instances
 TNCManager tnc;
+WebInterfaceManager webInterface;
 void setup()
 {
     Serial.begin(115200);
@@ -38,6 +40,15 @@ void setup()
     {
         Serial.println("TNC initialization successful!");
         Serial.println("Ready for KISS protocol communication");
+
+        if (webInterface.begin(tnc))
+        {
+            Serial.println("Web interface started successfully.");
+        }
+        else
+        {
+            Serial.println("Web interface failed to start; continuing without network services.");
+        }
     }
     else
     {
@@ -53,6 +64,7 @@ void loop()
 {
     // Let the TNC manager handle all operations
     tnc.update();
+    webInterface.loop();
 
     // Small delay to prevent overwhelming the loop
     delay(1);
