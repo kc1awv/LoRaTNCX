@@ -4,9 +4,23 @@ const DEFAULT_HEADERS = {
 
 let latestCsrfToken = null;
 
-function buildHeaders(includeJson = true) {
+function buildHeaders(options = {}) {
+    let includeJson = true;
+    let includeCsrf = true;
+
+    if (typeof options === 'boolean') {
+        includeJson = options;
+    } else if (options && typeof options === 'object') {
+        if (options.includeJson !== undefined) {
+            includeJson = Boolean(options.includeJson);
+        }
+        if (options.includeCsrf !== undefined) {
+            includeCsrf = Boolean(options.includeCsrf);
+        }
+    }
+
     const headers = includeJson ? { ...DEFAULT_HEADERS } : {};
-    if (latestCsrfToken) {
+    if (includeCsrf && latestCsrfToken) {
         headers['X-CSRF-Token'] = latestCsrfToken;
     }
     return headers;
@@ -87,6 +101,16 @@ export async function postThemePreference(theme, source = 'user') {
             method: 'POST',
             headers: buildHeaders(true),
             body: JSON.stringify({ theme, source })
+        })
+    );
+}
+
+export async function postPairingConfiguration(payload) {
+    return handleResponse(
+        await fetch('/api/pair', {
+            method: 'POST',
+            headers: buildHeaders({ includeJson: true, includeCsrf: false }),
+            body: JSON.stringify(payload)
         })
     );
 }

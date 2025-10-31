@@ -9,6 +9,12 @@ const REALTIME_EVENTS = Object.freeze({
     CONNECTION: 'lora:connection'
 });
 
+const PAIRING_EVENTS = Object.freeze({
+    STATE: 'lora:pairing-state'
+});
+
+const PAIRING_PAGE_PATH = '/pair.html';
+
 const MAX_ACTIVITY_ENTRIES = 50;
 const POLL_INTERVAL_MS = 15000;
 const POLL_RETRY_DELAY_MS = 5000;
@@ -23,6 +29,7 @@ const activityLog = [];
 let pollingEnabled = false;
 let pollTimer = null;
 let pollInFlight = false;
+let lastPairingRequired = null;
 
 function isObject(value) {
     return value != null && typeof value === 'object' && !Array.isArray(value);
@@ -63,6 +70,33 @@ function mergeDeep(target, source) {
 
 function dispatchDocumentEvent(name, detail) {
     document.dispatchEvent(new CustomEvent(name, { detail }));
+}
+
+function isOnPairingPage() {
+    const pathname = window.location.pathname || '';
+    return pathname === PAIRING_PAGE_PATH || pathname.endsWith('/pair.html');
+}
+
+function dispatchPairingState(required, source, timestamp) {
+    dispatchDocumentEvent(PAIRING_EVENTS.STATE, {
+        required,
+        source,
+        timestamp
+    });
+}
+
+function evaluatePairingRequirement(source, timestamp) {
+    const required = Boolean(telemetryState?.wifi?.pairingRequired);
+    if (required === lastPairingRequired) {
+        return;
+    }
+    lastPairingRequired = required;
+
+    dispatchPairingState(required, source, timestamp);
+
+    if (required && !isOnPairingPage()) {
+        window.location.replace(PAIRING_PAGE_PATH);
+    }
 }
 
 function dispatchTelemetry(source, timestamp) {
@@ -123,6 +157,7 @@ function applySnapshot(payload, source, timestamp) {
     telemetryState = next;
     hasSnapshot = true;
     dispatchTelemetry(source, timestamp);
+    evaluatePairingRequirement(source, timestamp);
 }
 
 function applyHello(payload, source, timestamp) {
@@ -158,6 +193,7 @@ function applyHello(payload, source, timestamp) {
     }
     telemetryState = next;
     dispatchTelemetry(source, timestamp);
+    evaluatePairingRequirement(source, timestamp);
 }
 
 function applyStatusUpdate(payload, source, timestamp) {
@@ -407,5 +443,5 @@ export function syncCsrfToken(token) {
     updateCsrfToken(token, 'api', Date.now());
 }
 
-export { REALTIME_EVENTS };
+export { REALTIME_EVENTS, PAIRING_EVENTS };
 

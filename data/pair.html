@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="color-scheme" content="dark light" />
+        <title>LoRaTNCX • Pairing</title>
+        <link rel="stylesheet" href="./css/bootstrap.css" />
+        <style>
+            body {
+                min-height: 100vh;
+            }
+        </style>
+    </head>
+    <body class="bg-body-tertiary d-flex align-items-center py-5">
+        <main class="container">
+            <div class="row justify-content-center">
+                <div class="col-xl-5 col-lg-6">
+                    <div class="text-center mb-4">
+                        <h1 class="h3 mb-2">Initial setup required</h1>
+                        <p class="text-muted mb-0">
+                            This device must be paired before the dashboard becomes available.
+                        </p>
+                    </div>
+                    <div data-feedback></div>
+                    <div class="card shadow-sm">
+                        <div class="card-body p-4">
+                            <p class="small text-muted">
+                                Connect to the temporary access point <strong data-ap-ssid>Loading…</strong> and
+                                provide permanent credentials below to finish setup.
+                            </p>
+                            <form class="mt-3" data-pair-form novalidate>
+                                <div class="mb-3">
+                                    <label class="form-label" for="wifiSsid">Wi-Fi SSID</label>
+                                    <input
+                                        type="text"
+                                        class="form-control"
+                                        id="wifiSsid"
+                                        name="wifi_ssid"
+                                        autocomplete="off"
+                                        required
+                                    />
+                                    <div class="form-text">Network name for the station connection.</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label" for="wifiPassword">Wi-Fi password</label>
+                                    <input
+                                        type="password"
+                                        class="form-control"
+                                        id="wifiPassword"
+                                        name="wifi_password"
+                                        autocomplete="new-password"
+                                        required
+                                        minlength="8"
+                                    />
+                                    <div class="form-text">Minimum 8 characters.</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label" for="uiUsername">UI username</label>
+                                    <input
+                                        type="text"
+                                        class="form-control"
+                                        id="uiUsername"
+                                        name="ui_username"
+                                        autocomplete="off"
+                                        required
+                                    />
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label" for="uiPassword">UI password</label>
+                                    <input
+                                        type="password"
+                                        class="form-control"
+                                        id="uiPassword"
+                                        name="ui_password"
+                                        autocomplete="new-password"
+                                        required
+                                        minlength="8"
+                                    />
+                                    <div class="form-text">Minimum 8 characters.</div>
+                                </div>
+                                <div class="mb-4">
+                                    <label class="form-label" for="themePreference">UI theme (optional)</label>
+                                    <select class="form-select" id="themePreference" name="theme">
+                                        <option value="" selected>Use default (system)</option>
+                                        <option value="system">System</option>
+                                        <option value="light">Light</option>
+                                        <option value="dark">Dark</option>
+                                    </select>
+                                </div>
+                                <div class="d-grid gap-2">
+                                    <button type="submit" class="btn btn-primary" data-submit>
+                                        Complete pairing
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary d-none" data-continue>
+                                        Go to dashboard
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    <p class="text-center text-muted small mt-3 mb-0">
+                        Pairing removes this page and unlocks the standard interface.
+                    </p>
+                </div>
+            </div>
+        </main>
+        <script src="./js/bootstrap.js" defer></script>
+        <script type="module" src="./js/pair.js" defer></script>
+    </body>
+</html>
