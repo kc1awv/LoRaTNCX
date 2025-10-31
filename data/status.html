@@ -51,6 +51,72 @@
                     <p class="mt-3 mb-0">Fetching telemetry…</p>
                 </div>
             </section>
+            <template id="status-detail-template">
+                <div class="row g-3">
+                    <div class="col-lg-6">
+                        <div class="card h-100">
+                            <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                <span class="fw-semibold">Display</span>
+                                <div
+                                    class="d-flex align-items-center gap-2 flex-wrap justify-content-end"
+                                    data-peripheral-group="oled"
+                                >
+                                    <span class="badge rounded-pill text-bg-secondary" data-peripheral-status="oled"
+                                        >Unknown</span
+                                    >
+                                    <div class="form-check form-switch m-0">
+                                        <input
+                                            class="form-check-input"
+                                            type="checkbox"
+                                            role="switch"
+                                            data-peripheral-toggle="oled"
+                                        />
+                                        <label class="form-check-label small" data-peripheral-label="oled">Enabled</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body" data-display-body></div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="card h-100">
+                            <div class="card-header">Battery</div>
+                            <div class="card-body" data-battery-body></div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="card h-100">
+                            <div class="card-header">Power-Off</div>
+                            <div class="card-body" data-power-body></div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="card h-100">
+                            <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                <span class="fw-semibold">GNSS</span>
+                                <div
+                                    class="d-flex align-items-center gap-2 flex-wrap justify-content-end"
+                                    data-peripheral-group="gnss"
+                                >
+                                    <span class="badge rounded-pill text-bg-secondary" data-peripheral-status="gnss"
+                                        >Unknown</span
+                                    >
+                                    <div class="form-check form-switch m-0">
+                                        <input
+                                            class="form-check-input"
+                                            type="checkbox"
+                                            role="switch"
+                                            data-peripheral-toggle="gnss"
+                                        />
+                                        <label class="form-check-label small" data-peripheral-label="gnss">Enabled</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body" data-gnss-body></div>
+                        </div>
+                    </div>
+                </div>
+            </template>
             <section class="mt-4">
                 <div class="d-flex align-items-center mb-3">
                     <h2 class="h5 mb-0">Recent activity</h2>

@@ -1,6 +1,6 @@
 import { initThemeSync, bindThemeControl, currentThemeState } from './theme.js';
 import { createRealtimeConnection, normalizeMessage } from './websocket.js';
-import { getStatus } from './api.js';
+import { getStatus, setCsrfToken as setApiCsrfToken } from './api.js';
 
 const REALTIME_EVENTS = Object.freeze({
     TELEMETRY: 'lora:telemetry',
@@ -81,6 +81,7 @@ function updateCsrfToken(token, source, timestamp) {
         return;
     }
     latestCsrfToken = token;
+    setApiCsrfToken(token);
     dispatchDocumentEvent(REALTIME_EVENTS.CSRF_TOKEN, {
         token,
         source,
@@ -397,6 +398,13 @@ export function getActivityHistory() {
 
 export function getLatestCsrfToken() {
     return latestCsrfToken;
+}
+
+export function syncCsrfToken(token) {
+    if (!token) {
+        return;
+    }
+    updateCsrfToken(token, 'api', Date.now());
 }
 
 export { REALTIME_EVENTS };

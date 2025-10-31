@@ -1,4 +1,12 @@
-import { initPage, renderAlert, REALTIME_EVENTS, getLatestTelemetry, getActivityHistory } from './common.js';
+import {
+    initPage,
+    renderAlert,
+    REALTIME_EVENTS,
+    getLatestTelemetry,
+    getActivityHistory,
+    syncCsrfToken
+} from './common.js';
+import { updatePeripheral } from './api.js';
 
 function escapeHtml(value) {
     if (value == null) {
@@ -37,6 +45,20 @@ function truncate(value, length = 120) {
     }
     return `${text.slice(0, length - 1)}…`;
 }
+
+const PERIPHERAL_LABELS = Object.freeze({
+    gnss: 'GNSS receiver',
+    oled: 'OLED display'
+});
+
+const peripheralState = {
+    gnss: { enabled: null, busy: false, available: false },
+    oled: { enabled: null, busy: false, available: false }
+};
+
+const alertHost = document.querySelector('[data-alert-host]');
+const statusContainer = document.querySelector('[data-status-details]');
+const statusTemplate = document.getElementById('status-detail-template');
 
 function renderDisplayStatus(display) {
     if (!display) {
@@ -130,47 +152,238 @@ function renderGNSS(gnss) {
         </dl>`;
 }
 
-function renderStatus(data) {
-    const container = document.querySelector('[data-status-details]');
-    if (!container) {
-        return;
-    }
+function renderPeripheralControl(name) {
+    const id = `peripheral-toggle-${name}`;
+    return `
+        <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end" data-peripheral-group="${name}">
+            <span class="badge rounded-pill text-bg-secondary" data-peripheral-status="${name}">Unknown</span>
+            <div class="form-check form-switch m-0">
+                <input class="form-check-input" type="checkbox" role="switch" id="${id}" data-peripheral-toggle="${name}">
+                <label class="form-check-label small" for="${id}" data-peripheral-label="${name}">Enabled</label>
+            </div>
+        </div>`;
+}
 
-    const tnc = data?.tnc;
-    if (!tnc?.available) {
-        container.innerHTML = '<p class="text-danger mb-0">TNC manager is unavailable.</p>';
-        return;
-    }
-
-    const display = tnc.display || {};
-
-    container.innerHTML = `
+function renderStatusLayout(display) {
+    return `
         <div class="row g-3">
             <div class="col-lg-6">
                 <div class="card h-100">
-                    <div class="card-header">Display</div>
+                    <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+                        <span class="fw-semibold">Display</span>
+                        ${renderPeripheralControl('oled')}
+                    </div>
                     <div class="card-body">${renderDisplayStatus(display)}</div>
                 </div>
             </div>
             <div class="col-lg-6">
                 <div class="card h-100">
                     <div class="card-header">Battery</div>
-                    <div class="card-body">${renderBattery(display.battery)}</div>
+                    <div class="card-body">${renderBattery(display?.battery)}</div>
                 </div>
             </div>
             <div class="col-lg-6">
                 <div class="card h-100">
                     <div class="card-header">Power-Off</div>
-                    <div class="card-body">${renderPowerOff(display.powerOff)}</div>
+                    <div class="card-body">${renderPowerOff(display?.powerOff)}</div>
                 </div>
             </div>
             <div class="col-lg-6">
                 <div class="card h-100">
-                    <div class="card-header">GNSS</div>
-                    <div class="card-body">${renderGNSS(display.gnss)}</div>
+                    <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+                        <span class="fw-semibold">GNSS</span>
+                        ${renderPeripheralControl('gnss')}
+                    </div>
+                    <div class="card-body">${renderGNSS(display?.gnss)}</div>
                 </div>
             </div>
         </div>`;
+}
+
+function updatePeripheralStateFromTelemetry(tnc) {
+    if (!tnc || !tnc.available) {
+        Object.keys(peripheralState).forEach((key) => {
+            const state = peripheralState[key];
+            state.available = false;
+            state.busy = false;
+            if (state.enabled !== null) {
+                state.enabled = null;
+            }
+        });
+        return;
+    }
+
+    const display = tnc.display;
+
+    const gnss = display?.gnss;
+    peripheralState.gnss.available = Boolean(gnss);
+    if (gnss && typeof gnss.enabled === 'boolean') {
+        peripheralState.gnss.enabled = gnss.enabled;
+    } else if (!peripheralState.gnss.available && !peripheralState.gnss.busy) {
+        peripheralState.gnss.enabled = null;
+    }
+
+    peripheralState.oled.available = Boolean(display);
+    const oledEnabled =
+        display?.oled?.enabled ?? display?.oledEnabled ?? display?.panelEnabled ?? null;
+    if (typeof oledEnabled === 'boolean') {
+        peripheralState.oled.enabled = oledEnabled;
+    } else if (!peripheralState.oled.available && !peripheralState.oled.busy) {
+        peripheralState.oled.enabled = null;
+    }
+}
+
+function updatePeripheralControls() {
+    if (!statusContainer) {
+        return;
+    }
+
+    Object.entries(peripheralState).forEach(([name, state]) => {
+        const input = statusContainer.querySelector(`[data-peripheral-toggle="${name}"]`);
+        if (input) {
+            const disabled = !state.available || state.busy;
+            input.disabled = disabled;
+            input.checked = Boolean(state.enabled);
+            input.indeterminate = state.enabled == null;
+            input.setAttribute('aria-busy', state.busy ? 'true' : 'false');
+            input.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+        }
+
+        const badge = statusContainer.querySelector(`[data-peripheral-status="${name}"]`);
+        if (badge) {
+            let text = 'Unknown';
+            let badgeClass = 'badge rounded-pill text-bg-secondary';
+            if (!state.available) {
+                text = 'Unavailable';
+            } else if (state.busy) {
+                text = 'Updating…';
+                badgeClass = 'badge rounded-pill text-bg-info';
+            } else if (state.enabled === true) {
+                text = 'Enabled';
+                badgeClass = 'badge rounded-pill text-bg-success';
+            } else if (state.enabled === false) {
+                text = 'Disabled';
+            }
+            badge.textContent = text;
+            badge.className = badgeClass;
+        }
+
+        const label = statusContainer.querySelector(`[data-peripheral-label="${name}"]`);
+        if (label) {
+            label.classList.toggle('text-muted', !state.available);
+        }
+    });
+}
+
+function renderStatus(data) {
+    if (!statusContainer) {
+        return;
+    }
+
+    if (!data) {
+        return;
+    }
+
+    const tnc = data?.tnc;
+    updatePeripheralStateFromTelemetry(tnc);
+
+    if (!tnc?.available) {
+        statusContainer.innerHTML = '<p class="text-danger mb-0">TNC manager is unavailable.</p>';
+        updatePeripheralControls();
+        return;
+    }
+
+    const display = tnc.display || {};
+
+    if (statusTemplate?.content) {
+        const fragment = statusTemplate.content.cloneNode(true);
+
+        const displayBody = fragment.querySelector('[data-display-body]');
+        if (displayBody) {
+            displayBody.innerHTML = renderDisplayStatus(display);
+        }
+
+        const batteryBody = fragment.querySelector('[data-battery-body]');
+        if (batteryBody) {
+            batteryBody.innerHTML = renderBattery(display.battery);
+        }
+
+        const powerBody = fragment.querySelector('[data-power-body]');
+        if (powerBody) {
+            powerBody.innerHTML = renderPowerOff(display.powerOff);
+        }
+
+        const gnssBody = fragment.querySelector('[data-gnss-body]');
+        if (gnssBody) {
+            gnssBody.innerHTML = renderGNSS(display.gnss);
+        }
+
+        fragment.querySelectorAll('[data-peripheral-toggle]').forEach((input) => {
+            const name = input.dataset.peripheralToggle;
+            if (!name) {
+                return;
+            }
+            const id = `peripheral-toggle-${name}`;
+            input.id = id;
+            const group = input.closest('[data-peripheral-group]');
+            const label = group ? group.querySelector(`[data-peripheral-label="${name}"]`) : null;
+            if (label) {
+                label.setAttribute('for', id);
+            }
+        });
+
+        statusContainer.replaceChildren(fragment);
+    } else {
+        statusContainer.innerHTML = renderStatusLayout(display);
+    }
+
+    updatePeripheralControls();
+}
+
+async function handlePeripheralToggle(event) {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement) || target.type !== 'checkbox') {
+        return;
+    }
+
+    const name = target.dataset.peripheralToggle;
+    if (!name || !Object.prototype.hasOwnProperty.call(peripheralState, name)) {
+        return;
+    }
+
+    const state = peripheralState[name];
+    if (state.busy) {
+        event.preventDefault();
+        return;
+    }
+
+    const previousEnabled = state.enabled;
+    const desiredState = target.checked;
+
+    state.enabled = desiredState;
+    state.busy = true;
+    updatePeripheralControls();
+
+    try {
+        const response = await updatePeripheral(name, desiredState);
+        if (typeof response?.enabled === 'boolean') {
+            state.enabled = response.enabled;
+        }
+        if (response?.csrf_token) {
+            syncCsrfToken(response.csrf_token);
+        }
+        const friendlyName = PERIPHERAL_LABELS[name] || name;
+        const statusText = state.enabled ? 'enabled' : 'disabled';
+        renderAlert(alertHost, `${friendlyName} ${statusText}.`, 'success');
+    } catch (error) {
+        state.enabled = previousEnabled;
+        const friendlyName = PERIPHERAL_LABELS[name] || name;
+        const message = `${friendlyName} update failed: ${escapeHtml(error?.message || 'Unexpected error')}`;
+        renderAlert(alertHost, message, 'danger');
+    } finally {
+        state.busy = false;
+        updatePeripheralControls();
+    }
 }
 
 function renderActivity(entries) {
@@ -274,6 +487,10 @@ function initialiseEventSubscriptions() {
     document.addEventListener(REALTIME_EVENTS.CONNECTION, (event) => {
         handleConnectionEvent(event.detail);
     });
+}
+
+if (statusContainer) {
+    statusContainer.addEventListener('change', handlePeripheralToggle);
 }
 
 initPage({ activeNav: 'status' });
