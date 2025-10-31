@@ -78,7 +78,16 @@ private:
                           const String &requestId = String());
     void handleThemePost(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
     String normaliseThemePreference(const String &theme) const;
-    void sendJsonToClient(AsyncWebSocketClient *client, DynamicJsonDocument &doc);
+    void sendJsonToClient(AsyncWebSocketClient *client, JsonDocument &doc);
+    bool ensureAuthenticated(AsyncWebServerRequest *request);
+    bool ensureCsrfToken(AsyncWebServerRequest *request);
+    String generateRandomToken(size_t length) const;
+    void regenerateCsrfToken();
+    void refreshCredentialsFromConfig();
+    void configureWebSocketAuthentication();
+    void startAccessPoint(const String &password);
+    void restartStationInterface();
+    bool stationModeRequested() const;
 
     bool spiffsMounted;
     bool wifiStarted;
@@ -89,6 +98,12 @@ private:
 
     String uiThemePreference;
     bool uiThemeOverride;
+    bool pairingRequired;
+    String temporaryApPassword;
+    String currentApPassword;
+    String basicAuthUsername;
+    String basicAuthPassword;
+    String csrfToken;
 
     AsyncWebServer server;
     AsyncWebSocket webSocket;
