@@ -14,6 +14,7 @@ namespace
 constexpr unsigned long BUTTON_DEBOUNCE_MS = 30UL;
 constexpr unsigned long POWER_OFF_WARNING_DELAY_MS = 750UL;
 constexpr unsigned long POWER_OFF_HOLD_MS = 3000UL;
+constexpr size_t MAX_EXTERNAL_COMMAND_LENGTH = 256;
 
 inline float clamp01(float value)
 {
@@ -214,9 +215,100 @@ String TNCManager::getStatus()
     return status;
 }
 
+TNCManager::StatusSnapshot TNCManager::getStatusSnapshot()
+{
+    StatusSnapshot snapshot;
+    snapshot.displayStatus = buildDisplayStatus();
+    snapshot.statusText = getStatus();
+    return snapshot;
+}
+
+DisplayManager::StatusData TNCManager::getDisplayStatusSnapshot()
+{
+    return buildDisplayStatus();
+}
+
 bool TNCManager::processConfigurationCommand(const String &command)
 {
     return configManager.processConfigCommand(command);
+}
+
+bool TNCManager::processConfigurationCommand(const char *command)
+{
+    if (command == nullptr)
+    {
+        return false;
+    }
+
+    size_t length = 0;
+    while (command[length] != '\0' && length <= MAX_EXTERNAL_COMMAND_LENGTH)
+    {
+        ++length;
+    }
+
+    if (length == 0 || length > MAX_EXTERNAL_COMMAND_LENGTH)
+    {
+        return false;
+    }
+
+    String safeCommand(command);
+    safeCommand.trim();
+    if (safeCommand.length() == 0)
+    {
+        return false;
+    }
+
+    return processConfigurationCommand(safeCommand);
+}
+
+TNCCommandResult TNCManager::executeCommand(const String &command)
+{
+    String sanitized = command;
+    sanitized.trim();
+
+    if (sanitized.length() == 0)
+    {
+        return TNCCommandResult::ERROR_INVALID_PARAMETER;
+    }
+
+    if (sanitized.length() > MAX_EXTERNAL_COMMAND_LENGTH)
+    {
+        return TNCCommandResult::ERROR_TOO_MANY_ARGS;
+    }
+
+    return commandSystem.processCommand(sanitized);
+}
+
+TNCCommandResult TNCManager::executeCommand(const char *command)
+{
+    if (command == nullptr)
+    {
+        return TNCCommandResult::ERROR_INVALID_PARAMETER;
+    }
+
+    size_t length = 0;
+    while (command[length] != '\0' && length <= MAX_EXTERNAL_COMMAND_LENGTH)
+    {
+        ++length;
+    }
+
+    if (length == 0)
+    {
+        return TNCCommandResult::ERROR_INVALID_PARAMETER;
+    }
+
+    if (length > MAX_EXTERNAL_COMMAND_LENGTH)
+    {
+        return TNCCommandResult::ERROR_TOO_MANY_ARGS;
+    }
+
+    String safeCommand(command);
+    return executeCommand(safeCommand);
+}
+
+String TNCManager::getConfigurationStatus() const
+{
+    return configManager.getConfigStatus();
 }
 
 void TNCManager::handleIncomingSerial()
