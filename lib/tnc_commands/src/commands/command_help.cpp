@@ -38,6 +38,7 @@ TNCCommandResult TNCCommands::handleHELP(const String args[], int argCount) {
         {"ECHO",        "Control local command echo", 1},
         {"LINECR",      "Enable/disable carriage return in responses", 1},
         {"LINELF",      "Enable/disable line feed in responses", 1},
+        {"WIFI",        "Configure WiFi STA/AP settings", 1},
 
         {"MYCALL",      "Show or set station callsign", 2},
         {"MYSSID",      "Show or set station SSID", 2},
@@ -169,6 +170,10 @@ TNCCommandResult TNCCommands::handleHELP(const String args[], int argCount) {
         } else if (cmd == "SAVED") {
             sendResponse("SAVED - Display configuration saved in flash");
             sendResponse("  Shows station, radio, protocol, and system settings");
+            handled = true;
+        } else if (cmd == "WIFI") {
+            sendResponse("WIFI [STATUS|LIST|ADD <SSID> <PASSWORD>|REMOVE <SSID>]");
+            sendResponse("  Manage station WiFi networks with AP fallback");
             handled = true;
         }
 

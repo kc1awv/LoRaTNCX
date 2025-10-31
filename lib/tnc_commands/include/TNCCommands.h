@@ -79,6 +79,16 @@ public:
 
     // Synchronize configuration with current peripheral state
     void setPeripheralStateDefaults(bool gnssEnabled, bool oledEnabled);
+
+    // WiFi management callbacks
+    typedef bool (*WiFiAddNetworkCallback)(const String &ssid, const String &password, String &message);
+    typedef bool (*WiFiRemoveNetworkCallback)(const String &ssid, String &message);
+    typedef void (*WiFiListNetworksCallback)(String &output);
+    typedef void (*WiFiStatusCallback)(String &output);
+    void setWiFiCallbacks(WiFiAddNetworkCallback addCb,
+                          WiFiRemoveNetworkCallback removeCb,
+                          WiFiListNetworksCallback listCb,
+                          WiFiStatusCallback statusCb);
     
     // Configuration management
     bool loadConfigurationFromFlash();
@@ -100,6 +110,10 @@ private:
     GNSSGetEnabledCallback gnssGetEnabledCallback;
     OLEDSetEnabledCallback oledSetEnabledCallback;
     OLEDGetEnabledCallback oledGetEnabledCallback;
+    WiFiAddNetworkCallback wifiAddCallback;
+    WiFiRemoveNetworkCallback wifiRemoveCallback;
+    WiFiListNetworksCallback wifiListCallback;
+    WiFiStatusCallback wifiStatusCallback;
     
     // Configuration storage (Arduino-compatible)
     struct TNCConfig {
@@ -249,6 +263,7 @@ private:
     TNCCommandResult handleVERSION(const String args[], int argCount);
     TNCCommandResult handleMODE(const String args[], int argCount);
     TNCCommandResult handleMYCALL(const String args[], int argCount);
+    TNCCommandResult handleWIFI(const String args[], int argCount);
     
     // Radio configuration commands
     TNCCommandResult handleFREQ(const String args[], int argCount);

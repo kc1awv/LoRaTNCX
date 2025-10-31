@@ -15,7 +15,9 @@
 TNCCommands::TNCCommands()
     : currentMode(TNCMode::COMMAND_MODE), echoEnabled(true), promptEnabled(true), radio(nullptr),
       gnssSetEnabledCallback(nullptr), gnssGetEnabledCallback(nullptr),
-      oledSetEnabledCallback(nullptr), oledGetEnabledCallback(nullptr) {
+      oledSetEnabledCallback(nullptr), oledGetEnabledCallback(nullptr),
+      wifiAddCallback(nullptr), wifiRemoveCallback(nullptr), wifiListCallback(nullptr),
+      wifiStatusCallback(nullptr) {
     
     // Initialize default configuration
     // Station configuration
@@ -250,6 +252,8 @@ TNCCommandResult TNCCommands::processCommand(const String& commandLine) {
         result = handleMODE(cmdArgs, cmdArgCount);
     } else if (command == "MYCALL") {
         result = handleMYCALL(cmdArgs, cmdArgCount);
+    } else if (command == "WIFI") {
+        result = handleWIFI(cmdArgs, cmdArgCount);
     } else if (command == "KISS") {
         setMode(TNCMode::KISS_MODE);
         result = TNCCommandResult::SUCCESS_SILENT;
@@ -543,6 +547,16 @@ void TNCCommands::setGNSSCallbacks(GNSSSetEnabledCallback setCallback, GNSSGetEn
 void TNCCommands::setOLEDCallbacks(OLEDSetEnabledCallback setCallback, OLEDGetEnabledCallback getCallback) {
     oledSetEnabledCallback = setCallback;
     oledGetEnabledCallback = getCallback;
+}
+
+void TNCCommands::setWiFiCallbacks(WiFiAddNetworkCallback addCb,
+                                   WiFiRemoveNetworkCallback removeCb,
+                                   WiFiListNetworksCallback listCb,
+                                   WiFiStatusCallback statusCb) {
+    wifiAddCallback = addCb;
+    wifiRemoveCallback = removeCb;
+    wifiListCallback = listCb;
+    wifiStatusCallback = statusCb;
 }
 
 void TNCCommands::setPeripheralStateDefaults(bool gnssState, bool oledState) {

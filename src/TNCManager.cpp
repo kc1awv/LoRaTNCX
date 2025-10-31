@@ -32,7 +32,7 @@ inline float clamp01(float value)
 // Static member definition
 TNCManager* TNCManager::instance = nullptr;
 
-TNCManager::TNCManager() : configManager(&radio), display(), batteryMonitor(), gnss()
+TNCManager::TNCManager() : configManager(&radio), display(), batteryMonitor(), gnss(), wifiManager()
 {
     initialized = false;
     lastStatus = 0;
@@ -143,7 +143,18 @@ bool TNCManager::begin()
     commandSystem.setGNSSCallbacks(gnssSetEnabledCallback, gnssGetEnabledCallback);
     commandSystem.setOLEDCallbacks(oledSetEnabledCallback, oledGetEnabledCallback);
     commandSystem.setPeripheralStateDefaults(isGNSSEnabled(), isOLEDEnabled());
+    commandSystem.setWiFiCallbacks(wifiAddNetworkCallback, wifiRemoveNetworkCallback,
+                                   wifiListNetworksCallback, wifiStatusCallback);
     Serial.println("✓ Command system hardware integration enabled");
+
+    if (wifiManager.begin())
+    {
+        Serial.println("✓ WiFi subsystem initialized");
+    }
+    else
+    {
+        Serial.println("✗ WiFi initialization failed");
+    }
 
     Serial.println("\n=== TNC Ready ===");
     Serial.println("Starting in Command mode...");
@@ -197,6 +208,8 @@ void TNCManager::update()
         lastBatteryPercent = batteryMonitor.computePercentage(lastBatteryVoltage);
         lastBatterySample = millis();
     }
+
+    wifiManager.update();
 
     handleUserButton();
 
@@ -863,3 +876,48 @@ bool TNCManager::gnssGetEnabledCallback() {
     }
     return false;
 }
+
+bool TNCManager::wifiAddNetworkCallback(const String &ssid, const String &password, String &message)
+{
+    if (instance)
+    {
+        return instance->wifiManager.addNetwork(ssid, password, message);
+    }
+    message = "WiFi manager unavailable";
+    return false;
+}
+
+bool TNCManager::wifiRemoveNetworkCallback(const String &ssid, String &message)
+{
+    if (instance)
+    {
+        return instance->wifiManager.removeNetwork(ssid, message);
+    }
+    message = "WiFi manager unavailable";
+    return false;
+}
+
+void TNCManager::wifiListNetworksCallback(String &output)
+{
+    if (instance)
+    {
+        output = instance->wifiManager.getNetworksSummary();
+    }
+    else
+    {
+        output = "WiFi manager unavailable";
+    }
+}
+
+void TNCManager::wifiStatusCallback(String &output)
+{
+    if (instance)
+    {
+        output = instance->wifiManager.getStatusSummary();
+    }
+    else
+    {
+        output = "WiFi manager unavailable";
+    }
+}
+
