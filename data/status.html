@@ -6,11 +6,24 @@
         <meta name="color-scheme" content="dark light" />
         <title>LoRaTNCX • Status</title>
         <link rel="stylesheet" href="./css/bootstrap.css" />
+        <link rel="stylesheet" href="./css/modern-theme.css" />
+        <!-- Bootstrap Icons -->
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" />
+        <style>
+            body {
+                background-color: var(--gray-50);
+            }
+            [data-bs-theme="dark"] body {
+                background-color: var(--gray-900);
+            }
+        </style>
     </head>
     <body class="d-flex flex-column min-vh-100">
-        <nav class="navbar navbar-expand-lg bg-body-tertiary border-bottom shadow-sm">
+        <nav class="navbar navbar-expand-lg modern-navbar sticky-top">
             <div class="container-fluid">
-                <a class="navbar-brand" href="/index.html">LoRaTNCX</a>
+                <a class="navbar-brand fw-bold" href="/index.html">
+                    <i class="bi bi-broadcast-pin me-2"></i>LoRaTNCX
+                </a>
                 <button
                     class="navbar-toggler"
                     type="button"
@@ -24,19 +37,40 @@
                 </button>
                 <div class="collapse navbar-collapse" id="mainNav">
                     <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                        <li class="nav-item"><a class="nav-link" data-nav="index" href="/index.html">Dashboard</a></li>
-                        <li class="nav-item"><a class="nav-link" data-nav="status" href="/status.html">Status</a></li>
-                        <li class="nav-item"><a class="nav-link" data-nav="config" href="/config.html">Configuration</a></li>
-                        <li class="nav-item"><a class="nav-link" data-nav="console" href="/console.html">Console</a></li>
+                        <li class="nav-item">
+                            <a class="nav-link modern-nav-link" data-nav="index" href="/index.html">
+                                <i class="bi bi-speedometer2 me-1"></i>Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link modern-nav-link active" data-nav="status" href="/status.html">
+                                <i class="bi bi-activity me-1"></i>Status
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link modern-nav-link" data-nav="config" href="/config.html">
+                                <i class="bi bi-gear me-1"></i>Configuration
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link modern-nav-link" data-nav="console" href="/console.html">
+                                <i class="bi bi-terminal me-1"></i>Console
+                            </a>
+                        </li>
                     </ul>
-                    <div class="d-flex align-items-center gap-2">
-                        <label class="form-label mb-0 small" for="themeSelect">Theme</label>
-                        <select class="form-select form-select-sm" id="themeSelect" data-theme-toggle>
-                            <option value="system">System</option>
-                            <option value="light">Light</option>
-                            <option value="dark">Dark</option>
-                        </select>
-                        <span class="badge text-bg-secondary" data-theme-indicator>system</span>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="status-indicator" data-connection-status>
+                            <div class="status-dot"></div>
+                            <span>Connecting...</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-palette"></i>
+                            <select class="form-select form-select-sm" id="themeSelect" data-theme-toggle style="width: auto;">
+                                <option value="system">Auto</option>
+                                <option value="light">Light</option>
+                                <option value="dark">Dark</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
             </div>

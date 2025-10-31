@@ -1,0 +1,19 @@
+/* Placeholder SVG icon for LoRaTNCX */
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2563eb;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1e40af;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="32" fill="url(#bg)"/>
+  <!-- Radio wave icon -->
+  <g fill="white" opacity="0.9">
+    <circle cx="96" cy="96" r="8" fill="white"/>
+    <circle cx="96" cy="96" r="24" fill="none" stroke="white" stroke-width="3"/>
+    <circle cx="96" cy="96" r="40" fill="none" stroke="white" stroke-width="3" opacity="0.7"/>
+    <circle cx="96" cy="96" r="56" fill="none" stroke="white" stroke-width="3" opacity="0.5"/>
+  </g>
+  <!-- TNC text -->
+  <text x="96" y="140" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="16" font-weight="bold">TNC</text>
+</svg>

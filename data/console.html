@@ -6,39 +6,15 @@
         <meta name="color-scheme" content="dark light" />
         <title>LoRaTNCX • Console</title>
         <link rel="stylesheet" href="./css/bootstrap.css" />
+        <link rel="stylesheet" href="./css/modern-theme.css" />
+        <!-- Bootstrap Icons -->
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" />
         <style>
             body {
-                min-height: 100vh;
+                background-color: var(--gray-50);
             }
-            .console-log {
-                display: flex;
-                flex-direction: column;
-                min-height: 320px;
-                max-height: 65vh;
-                overflow-y: auto;
-            }
-            .console-entry {
-                display: flex;
-                gap: 1rem;
-                padding: 0.75rem 1rem;
-                border-bottom: 1px solid var(--bs-border-color-translucent);
-            }
-            .console-entry:last-child {
-                border-bottom: none;
-            }
-            .console-entry__time {
-                width: 4.75rem;
-                flex-shrink: 0;
-            }
-            .console-entry__message {
-                white-space: pre-wrap;
-                word-break: break-word;
-                font-family: var(--bs-font-monospace);
-            }
-            .console-entry__details {
-                white-space: pre-wrap;
-                word-break: break-word;
-                font-family: var(--bs-font-monospace);
+            [data-bs-theme="dark"] body {
+                background-color: var(--gray-900);
             }
         </style>
     </head>
@@ -76,45 +52,167 @@
                 </div>
             </div>
         </nav>
-        <main class="container my-4 flex-grow-1 d-flex flex-column">
-            <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
-                <h1 class="h3 mb-0">Command console</h1>
-                <span class="badge text-bg-secondary" data-console-transport>Status unknown</span>
-                <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" data-console-clear>Clear log</button>
-            </div>
-            <section class="mb-4">
-                <form class="card card-body gap-3" data-console-form>
-                    <div>
-                        <label class="form-label" for="consoleCommand">Command</label>
-                        <input
-                            type="text"
-                            class="form-control"
-                            id="consoleCommand"
-                            name="command"
-                            autocomplete="off"
-                            placeholder="e.g. IDENT"
-                        />
-                        <div class="form-text">Commands are sent directly to the device firmware.</div>
-                    </div>
-                    <div class="d-flex flex-wrap gap-2 align-items-center">
-                        <button type="submit" class="btn btn-primary" data-console-send>Send command</button>
-                        <div class="small text-muted">Use ↑/↓ to navigate command history.</div>
-                    </div>
-                </form>
-            </section>
-            <section class="flex-grow-1 d-flex flex-column">
-                <h2 class="h5">Output</h2>
-                <div class="card flex-grow-1">
-                    <div class="card-body p-0">
-                        <div class="console-log bg-body-tertiary" data-console-log role="log" aria-live="polite">
-                            <div class="text-muted small text-center py-4" data-console-empty>No output yet.</div>
+        <main class="container-fluid my-4 flex-grow-1 d-flex flex-column">
+            <!-- Header -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h1 class="h3 mb-1">Console</h1>
+                            <p class="text-muted mb-0">Send commands and monitor real-time output</p>
+                        </div>
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="status-indicator" data-console-transport>
+                                <div class="status-dot"></div>
+                                <span>Connecting...</span>
+                            </div>
+                            <button type="button" class="btn btn-outline-danger btn-sm" data-console-clear>
+                                <i class="bi bi-trash me-1"></i>Clear
+                            </button>
                         </div>
                     </div>
                 </div>
-            </section>
+            </div>
+
+            <div class="row flex-grow-1">
+                <!-- Console Terminal -->
+                <div class="col-lg-8 d-flex flex-column">
+                    <div class="card modern-card flex-grow-1 d-flex flex-column">
+                        <div class="modern-console">
+                            <div class="console-header">
+                                <div class="console-dots">
+                                    <div class="console-dot red"></div>
+                                    <div class="console-dot yellow"></div>
+                                    <div class="console-dot green"></div>
+                                </div>
+                                <span class="text-muted small">LoRaTNCX Terminal</span>
+                                <div class="ms-auto">
+                                    <button class="btn btn-sm btn-outline-light" data-console-fullscreen>
+                                        <i class="bi bi-fullscreen"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="console-body flex-grow-1" data-console-log role="log" aria-live="polite">
+                                <div class="console-line">
+                                    <span class="console-prompt">LoRaTNCX $</span> <span class="text-success">System initialized</span>
+                                </div>
+                                <div class="console-line">
+                                    <span class="console-prompt">LoRaTNCX $</span> <span class="text-muted">Ready for commands...</span>
+                                </div>
+                                <div class="text-muted small text-center py-4" data-console-empty style="display: none;">
+                                    No output yet.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Command Panel -->
+                <div class="col-lg-4 d-flex flex-column">
+                    <!-- Command Input -->
+                    <div class="card modern-card mb-4">
+                        <div class="modern-card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-terminal me-2"></i>Send Command
+                            </h5>
+                        </div>
+                        <div class="modern-card-body">
+                            <form data-console-form>
+                                <div class="mb-3">
+                                    <label class="form-label" for="consoleCommand">
+                                        <i class="bi bi-code-slash me-1"></i>Command
+                                    </label>
+                                    <div class="input-group">
+                                        <input
+                                            type="text"
+                                            class="form-control modern-form-control"
+                                            id="consoleCommand"
+                                            name="command"
+                                            autocomplete="off"
+                                            placeholder="e.g. IDENT"
+                                        />
+                                        <button type="submit" class="btn btn-primary" data-console-send>
+                                            <i class="bi bi-send"></i>
+                                        </button>
+                                    </div>
+                                    <div class="form-text">
+                                        <i class="bi bi-info-circle me-1"></i>
+                                        Use ↑/↓ for command history
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Quick Commands -->
+                    <div class="card modern-card mb-4">
+                        <div class="modern-card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-lightning me-2"></i>Quick Commands
+                            </h5>
+                        </div>
+                        <div class="modern-card-body">
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-outline-primary btn-sm" data-quick-cmd="IDENT">
+                                    <i class="bi bi-person-badge me-1"></i>IDENT
+                                </button>
+                                <button class="btn btn-outline-primary btn-sm" data-quick-cmd="FREQ">
+                                    <i class="bi bi-broadcast me-1"></i>FREQ
+                                </button>
+                                <button class="btn btn-outline-primary btn-sm" data-quick-cmd="STATUS">
+                                    <i class="bi bi-info-circle me-1"></i>STATUS
+                                </button>
+                                <button class="btn btn-outline-primary btn-sm" data-quick-cmd="RESET">
+                                    <i class="bi bi-arrow-clockwise me-1"></i>RESET
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Statistics -->
+                    <div class="card modern-card">
+                        <div class="modern-card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-graph-up me-2"></i>Session Stats
+                            </h5>
+                        </div>
+                        <div class="modern-card-body">
+                            <div class="row text-center">
+                                <div class="col-6">
+                                    <div class="fw-bold fs-5" data-commands-sent>0</div>
+                                    <div class="small text-muted">Commands</div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="fw-bold fs-5" data-responses-received>0</div>
+                                    <div class="small text-muted">Responses</div>
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="small">Session time:</span>
+                                <span class="fw-medium" data-session-time>00:00:00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </main>
-        <footer class="border-top py-3 mt-auto">
-            <div class="container text-center text-muted small">LoRaTNCX Web Interface</div>
+        <footer class="border-top py-3 mt-auto bg-body-tertiary">
+            <div class="container-fluid">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <p class="text-muted small mb-0">
+                            <i class="bi bi-broadcast-pin me-1"></i>
+                            LoRaTNCX Web Interface v2.0
+                        </p>
+                    </div>
+                    <div class="col-md-6 text-md-end">
+                        <small class="text-muted">
+                            Console session active
+                        </small>
+                    </div>
+                </div>
+            </div>
         </footer>
         <script src="./js/bootstrap.js" defer></script>
         <script type="module" src="./js/console.js" defer></script>

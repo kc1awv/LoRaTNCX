@@ -6,6 +6,17 @@
         <meta name="color-scheme" content="dark light" />
         <title>LoRaTNCX • Configuration</title>
         <link rel="stylesheet" href="./css/bootstrap.css" />
+        <link rel="stylesheet" href="./css/modern-theme.css" />
+        <!-- Bootstrap Icons -->
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" />
+        <style>
+            body {
+                background-color: var(--gray-50);
+            }
+            [data-bs-theme="dark"] body {
+                background-color: var(--gray-900);
+            }
+        </style>
     </head>
     <body class="d-flex flex-column min-vh-100">
         <nav class="navbar navbar-expand-lg bg-body-tertiary border-bottom shadow-sm">
@@ -41,51 +52,216 @@
                 </div>
             </div>
         </nav>
-        <main class="container my-4 flex-grow-1">
-            <div class="d-flex align-items-center mb-3">
-                <h1 class="h3 mb-0">Configuration</h1>
-            </div>
-            <div data-alert-host></div>
-            <section class="mb-4">
-                <h2 class="h5">Current state</h2>
-                <div class="card">
-                    <div class="card-body" data-config-status>
-                        <div class="text-center py-4 text-muted">
-                            <div class="spinner-border" role="status" aria-hidden="true"></div>
-                            <p class="mt-3 mb-0">Loading configuration…</p>
+        <main class="container-fluid my-4 flex-grow-1">
+            <!-- Header -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h1 class="h3 mb-1">Configuration</h1>
+                            <p class="text-muted mb-0">Manage device settings and radio parameters</p>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-outline-success btn-sm" data-save-config>
+                                <i class="bi bi-download me-1"></i>Export Config
+                            </button>
+                            <button class="btn btn-outline-primary btn-sm" data-load-config>
+                                <i class="bi bi-upload me-1"></i>Import Config
+                            </button>
                         </div>
                     </div>
                 </div>
-            </section>
-            <section class="mb-4">
-                <h2 class="h5">Configuration presets</h2>
-                <div class="card">
-                    <div class="card-body">
-                        <div data-preset-feedback></div>
-                        <div data-preset-list>
-                            <div class="text-center py-4 text-muted">
-                                <div class="spinner-border" role="status" aria-hidden="true"></div>
-                                <p class="mt-3 mb-0">Loading presets…</p>
+            </div>
+
+            <div data-alert-host></div>
+
+            <div class="row">
+                <!-- Current Configuration Status -->
+                <div class="col-lg-4 mb-4">
+                    <div class="card modern-card h-100">
+                        <div class="modern-card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-info-circle me-2"></i>Current Status
+                            </h5>
+                        </div>
+                        <div class="modern-card-body" data-config-status>
+                            <div class="text-center py-4">
+                                <div class="skeleton" style="height: 20px; margin-bottom: 10px;"></div>
+                                <div class="skeleton" style="height: 20px; margin-bottom: 10px; width: 80%;"></div>
+                                <div class="skeleton" style="height: 20px; width: 60%;"></div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </section>
-            <section>
-                <h2 class="h5">Send configuration command</h2>
-                <form data-config-form class="card card-body gap-3">
-                    <div>
-                        <label class="form-label" for="configCommand">Command</label>
-                        <input type="text" class="form-control" id="configCommand" name="command" placeholder="e.g. SET FREQ 915.0" />
-                        <div class="form-text">Commands are relayed to the firmware as-is. Refer to the device manual for supported values.</div>
+
+                <!-- Quick Settings -->
+                <div class="col-lg-8 mb-4">
+                    <div class="card modern-card">
+                        <div class="modern-card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-sliders me-2"></i>Quick Settings
+                            </h5>
+                        </div>
+                        <div class="modern-card-body">
+                            <form data-quick-settings-form>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label" for="callsign">
+                                            <i class="bi bi-person-badge me-1"></i>Call Sign
+                                        </label>
+                                        <input type="text" class="form-control modern-form-control" id="callsign" name="callsign" placeholder="Enter your call sign">
+                                        <div class="form-text">Your amateur radio call sign</div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label" for="frequency">
+                                            <i class="bi bi-broadcast me-1"></i>Frequency (MHz)
+                                        </label>
+                                        <input type="number" class="form-control modern-form-control" id="frequency" name="frequency" step="0.1" placeholder="915.0">
+                                        <div class="form-text">Operating frequency in MHz</div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label" for="bandwidth">
+                                            <i class="bi bi-speedometer me-1"></i>Bandwidth (kHz)
+                                        </label>
+                                        <select class="form-select modern-form-control" id="bandwidth" name="bandwidth">
+                                            <option value="">Select...</option>
+                                            <option value="7.8">7.8 kHz</option>
+                                            <option value="10.4">10.4 kHz</option>
+                                            <option value="15.6">15.6 kHz</option>
+                                            <option value="20.8">20.8 kHz</option>
+                                            <option value="31.25">31.25 kHz</option>
+                                            <option value="41.7">41.7 kHz</option>
+                                            <option value="62.5">62.5 kHz</option>
+                                            <option value="125">125 kHz</option>
+                                            <option value="250">250 kHz</option>
+                                            <option value="500">500 kHz</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label" for="spreading_factor">
+                                            <i class="bi bi-layers me-1"></i>Spreading Factor
+                                        </label>
+                                        <select class="form-select modern-form-control" id="spreading_factor" name="spreading_factor">
+                                            <option value="">Select...</option>
+                                            <option value="6">SF6</option>
+                                            <option value="7">SF7</option>
+                                            <option value="8">SF8</option>
+                                            <option value="9">SF9</option>
+                                            <option value="10">SF10</option>
+                                            <option value="11">SF11</option>
+                                            <option value="12">SF12</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label" for="tx_power">
+                                            <i class="bi bi-lightning me-1"></i>TX Power (dBm)
+                                        </label>
+                                        <input type="number" class="form-control modern-form-control" id="tx_power" name="tx_power" min="2" max="20" placeholder="14">
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn modern-btn modern-btn-primary">
+                                        <i class="bi bi-check-circle me-1"></i>Apply Settings
+                                    </button>
+                                    <button type="reset" class="btn btn-outline-secondary">
+                                        <i class="bi bi-arrow-clockwise me-1"></i>Reset
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary">Send command</button>
-                        <button type="reset" class="btn btn-outline-secondary">Clear</button>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Configuration Presets -->
+                <div class="col-lg-6 mb-4">
+                    <div class="card modern-card">
+                        <div class="modern-card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-collection me-2"></i>Configuration Presets
+                            </h5>
+                        </div>
+                        <div class="modern-card-body">
+                            <div data-preset-feedback></div>
+                            <div data-preset-list>
+                                <div class="text-center py-4">
+                                    <div class="skeleton" style="height: 60px; margin-bottom: 10px;"></div>
+                                    <div class="skeleton" style="height: 60px; margin-bottom: 10px;"></div>
+                                    <div class="skeleton" style="height: 60px;"></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div data-config-result></div>
-                </form>
-            </section>
+                </div>
+
+                <!-- Advanced Commands -->
+                <div class="col-lg-6 mb-4">
+                    <div class="card modern-card">
+                        <div class="modern-card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-terminal me-2"></i>Advanced Commands
+                            </h5>
+                        </div>
+                        <div class="modern-card-body">
+                            <form data-config-form>
+                                <div class="mb-3">
+                                    <label class="form-label" for="configCommand">
+                                        <i class="bi bi-code-slash me-1"></i>Command
+                                    </label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control modern-form-control" id="configCommand" name="command" placeholder="e.g. SET FREQ 915.0" autocomplete="off">
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="bi bi-send"></i>
+                                        </button>
+                                    </div>
+                                    <div class="form-text">
+                                        <i class="bi bi-info-circle me-1"></i>
+                                        Commands are sent directly to the firmware. See documentation for available commands.
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-2 mb-3">
+                                    <button type="reset" class="btn btn-outline-secondary btn-sm">
+                                        <i class="bi bi-x-circle me-1"></i>Clear
+                                    </button>
+                                    <button type="button" class="btn btn-outline-info btn-sm" data-show-help>
+                                        <i class="bi bi-question-circle me-1"></i>Help
+                                    </button>
+                                </div>
+                                <div data-config-result></div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Command History -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card modern-card">
+                        <div class="modern-card-header">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">
+                                    <i class="bi bi-clock-history me-2"></i>Command History
+                                </h5>
+                                <button class="btn btn-outline-danger btn-sm" data-clear-history>
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="modern-card-body p-0">
+                            <div class="list-group list-group-flush" data-command-history>
+                                <div class="list-group-item text-center py-4 text-muted">
+                                    <i class="bi bi-clock fs-1 mb-2 d-block"></i>
+                                    No commands executed yet
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </main>
         <footer class="border-top py-3 mt-auto">
             <div class="container text-center text-muted small">LoRaTNCX Web Interface</div>
