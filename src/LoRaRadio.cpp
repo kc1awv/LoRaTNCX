@@ -6,11 +6,14 @@
  */
 
 #include "LoRaRadio.h"
+#include <math.h>
 
 LoRaRadio::LoRaRadio()
 {
     radio = nullptr;
     initialized = false;
+    spiInitialized = false;
+    paInitialized = false;
     txCount = 0;
     rxCount = 0;
     lastRSSI = 0;
@@ -27,18 +30,29 @@ LoRaRadio::LoRaRadio()
 
 bool LoRaRadio::begin()
 {
-    Serial.println("Initializing LoRa radio...");
+    const bool reconfiguring = initialized;
+    Serial.println(reconfiguring ? "Reconfiguring LoRa radio with default configuration..."
+                                 : "Initializing LoRa radio...");
 
-    // Initialize SPI
-    initializeSPI();
+    // Initialize SPI and PA control only once
+    if (!spiInitialized)
+    {
+        initializeSPI();
+    }
 
-    // Initialize PA control using proven methods
-    initializePAControl();
+    if (!paInitialized)
+    {
+        initializePAControl();
+    }
 
     // Initialize radio instance - using same pins as working ping/pong
-    radio = new SX1262(new Module(LORA_SS_PIN, LORA_DIO0_PIN, LORA_RST_PIN, LORA_BUSY_PIN));
+    if (radio == nullptr)
+    {
+        radio = new SX1262(new Module(LORA_SS_PIN, LORA_DIO0_PIN, LORA_RST_PIN, LORA_BUSY_PIN));
+    }
 
     // Configure radio with proven settings
+    initialized = false;
     int state = radio->begin(
         LORA_FREQUENCY,
         LORA_BANDWIDTH,
@@ -50,7 +64,16 @@ bool LoRaRadio::begin()
 
     if (state == RADIOLIB_ERR_NONE)
     {
-        Serial.println("✓ LoRa radio initialized successfully!");
+        // Store current parameters
+        currentFrequency = LORA_FREQUENCY;
+        currentBandwidth = LORA_BANDWIDTH;
+        currentSpreadingFactor = LORA_SPREADING_FACTOR;
+        currentCodingRate = LORA_CODING_RATE;
+        currentSyncWord = LORA_SYNC_WORD;
+        currentTxPower = LORA_OUTPUT_POWER;
+
+        Serial.println(reconfiguring ? "✓ LoRa radio reconfigured successfully!"
+                                     : "✓ LoRa radio initialized successfully!");
 
         // Set PA to receive mode after initialization
         setPA(false);
@@ -71,16 +94,17 @@ bool LoRaRadio::begin()
 
         // Print configuration
         Serial.println("LoRa Configuration:");
-        Serial.printf("  Frequency: %.1f MHz\r\n", LORA_FREQUENCY);
-        Serial.printf("  Bandwidth: %.1f kHz\r\n", LORA_BANDWIDTH);
-        Serial.printf("  Spreading Factor: %d\r\n", LORA_SPREADING_FACTOR);
-        Serial.printf("  Coding Rate: 4/%d\r\n", LORA_CODING_RATE);
-        Serial.printf("  Output Power: %d dBm\r\n", LORA_OUTPUT_POWER);
-        Serial.printf("  Sync Word: 0x%02X\r\n", LORA_SYNC_WORD);
+        Serial.printf("  Frequency: %.1f MHz\r\n", currentFrequency);
+        Serial.printf("  Bandwidth: %.1f kHz\r\n", currentBandwidth);
+        Serial.printf("  Spreading Factor: %d\r\n", currentSpreadingFactor);
+        Serial.printf("  Coding Rate: 4/%d\r\n", currentCodingRate);
+        Serial.printf("  Output Power: %d dBm\r\n", currentTxPower);
+        Serial.printf("  Sync Word: 0x%02X\r\n", currentSyncWord);
     }
     else
     {
-        Serial.print("✗ LoRa radio initialization failed! Error: ");
+        Serial.print(reconfiguring ? "✗ LoRa radio reconfiguration failed! Error: "
+                                   : "✗ LoRa radio initialization failed! Error: ");
         Serial.println(state);
         return false;
     }
@@ -90,18 +114,29 @@ bool LoRaRadio::begin()
 
 bool LoRaRadio::begin(float frequency, float bandwidth, uint8_t spreadingFactor, uint8_t codingRate)
 {
-    Serial.println("Initializing LoRa radio with custom configuration...");
+    const bool reconfiguring = initialized;
+    Serial.println(reconfiguring ? "Reconfiguring LoRa radio with custom configuration..."
+                                 : "Initializing LoRa radio with custom configuration...");
 
-    // Initialize SPI
-    initializeSPI();
+    // Initialize SPI and PA control only once
+    if (!spiInitialized)
+    {
+        initializeSPI();
+    }
 
-    // Initialize PA control using proven methods
-    initializePAControl();
+    if (!paInitialized)
+    {
+        initializePAControl();
+    }
 
     // Initialize radio instance - using same pins as working ping/pong
-    radio = new SX1262(new Module(LORA_SS_PIN, LORA_DIO0_PIN, LORA_RST_PIN, LORA_BUSY_PIN));
+    if (radio == nullptr)
+    {
+        radio = new SX1262(new Module(LORA_SS_PIN, LORA_DIO0_PIN, LORA_RST_PIN, LORA_BUSY_PIN));
+    }
 
     // Configure radio with custom settings
+    initialized = false;
     int state = radio->begin(
         frequency,
         bandwidth,
@@ -121,7 +156,8 @@ bool LoRaRadio::begin(float frequency, float bandwidth, uint8_t spreadingFactor,
         currentSyncWord = LORA_SYNC_WORD;
         currentTxPower = LORA_OUTPUT_POWER;
 
-        Serial.println("✓ LoRa radio initialized successfully!");
+        Serial.println(reconfiguring ? "✓ LoRa radio reconfigured successfully!"
+                                     : "✓ LoRa radio initialized successfully!");
 
         // Set PA to receive mode after initialization
         setPA(false);
@@ -142,16 +178,17 @@ bool LoRaRadio::begin(float frequency, float bandwidth, uint8_t spreadingFactor,
 
         // Print configuration
         Serial.println("LoRa Configuration:");
-        Serial.printf("  Frequency: %.1f MHz\r\n", frequency);
-        Serial.printf("  Bandwidth: %.1f kHz\r\n", bandwidth);
-        Serial.printf("  Spreading Factor: %d\r\n", spreadingFactor);
-        Serial.printf("  Coding Rate: 4/%d\r\n", codingRate);
-        Serial.printf("  Output Power: %d dBm\r\n", LORA_OUTPUT_POWER);
-        Serial.printf("  Sync Word: 0x%02X\r\n", LORA_SYNC_WORD);
+        Serial.printf("  Frequency: %.1f MHz\r\n", currentFrequency);
+        Serial.printf("  Bandwidth: %.1f kHz\r\n", currentBandwidth);
+        Serial.printf("  Spreading Factor: %d\r\n", currentSpreadingFactor);
+        Serial.printf("  Coding Rate: 4/%d\r\n", currentCodingRate);
+        Serial.printf("  Output Power: %d dBm\r\n", currentTxPower);
+        Serial.printf("  Sync Word: 0x%02X\r\n", currentSyncWord);
     }
     else
     {
-        Serial.print("✗ LoRa radio initialization failed! Error: ");
+        Serial.print(reconfiguring ? "✗ LoRa radio reconfiguration failed! Error: "
+                                   : "✗ LoRa radio initialization failed! Error: ");
         Serial.println(state);
         return false;
     }
@@ -347,6 +384,7 @@ void LoRaRadio::initializePAControl()
 
     // Power stabilization delay
     delay(200);
+    paInitialized = true;
 }
 
 void LoRaRadio::setPA(bool transmit)
@@ -374,9 +412,38 @@ void LoRaRadio::initializeSPI()
     Serial.println("Initializing SPI...");
     SPI.begin(LORA_SCK_PIN, LORA_MISO_PIN, LORA_MOSI_PIN, LORA_SS_PIN);
     Serial.println("✓ SPI initialized");
+    spiInitialized = true;
 }
 
-// Parameter setter methods - these reinitialize the radio with new parameters
+bool LoRaRadio::applyConfiguration(float frequency, float bandwidth, uint8_t spreadingFactor, uint8_t codingRate, int8_t txPower, uint8_t syncWord)
+{
+    bool modemOk = applyModemConfiguration(frequency, bandwidth, spreadingFactor, codingRate);
+
+    bool txPowerOk = setTxPower(txPower);
+    bool syncWordOk = setSyncWord(syncWord);
+
+    return modemOk && txPowerOk && syncWordOk;
+}
+
+bool LoRaRadio::applyModemConfiguration(float frequency, float bandwidth, uint8_t spreadingFactor, uint8_t codingRate)
+{
+    if (initialized)
+    {
+        const float freqDiff = fabsf(currentFrequency - frequency);
+        const float bwDiff = fabsf(currentBandwidth - bandwidth);
+        if (freqDiff < 0.001f && bwDiff < 0.001f &&
+            currentSpreadingFactor == spreadingFactor &&
+            currentCodingRate == codingRate)
+        {
+            // Configuration already matches requested values
+            return true;
+        }
+    }
+
+    return begin(frequency, bandwidth, spreadingFactor, codingRate);
+}
+
+// Parameter setter methods - these may reinitialize the radio with new parameters
 bool LoRaRadio::setFrequency(float frequency)
 {
     if (!initialized || radio == nullptr)
@@ -384,8 +451,7 @@ bool LoRaRadio::setFrequency(float frequency)
         return false;
     }
 
-    // Reinitialize radio with new frequency
-    return begin(frequency, currentBandwidth, currentSpreadingFactor, currentCodingRate);
+    return applyModemConfiguration(frequency, currentBandwidth, currentSpreadingFactor, currentCodingRate);
 }
 
 bool LoRaRadio::setTxPower(int8_t power)
@@ -412,8 +478,7 @@ bool LoRaRadio::setSpreadingFactor(uint8_t sf)
         return false;
     }
 
-    // Reinitialize radio with new spreading factor
-    return begin(currentFrequency, currentBandwidth, sf, currentCodingRate);
+    return applyModemConfiguration(currentFrequency, currentBandwidth, sf, currentCodingRate);
 }
 
 bool LoRaRadio::setBandwidth(float bw)
@@ -423,8 +488,7 @@ bool LoRaRadio::setBandwidth(float bw)
         return false;
     }
 
-    // Reinitialize radio with new bandwidth
-    return begin(currentFrequency, bw, currentSpreadingFactor, currentCodingRate);
+    return applyModemConfiguration(currentFrequency, bw, currentSpreadingFactor, currentCodingRate);
 }
 
 bool LoRaRadio::setCodingRate(uint8_t cr)
@@ -434,8 +498,7 @@ bool LoRaRadio::setCodingRate(uint8_t cr)
         return false;
     }
 
-    // Reinitialize radio with new coding rate
-    return begin(currentFrequency, currentBandwidth, currentSpreadingFactor, cr);
+    return applyModemConfiguration(currentFrequency, currentBandwidth, currentSpreadingFactor, cr);
 }
 
 bool LoRaRadio::setSyncWord(uint8_t syncWord)
