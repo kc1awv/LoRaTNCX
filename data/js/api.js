@@ -2,6 +2,20 @@ const DEFAULT_HEADERS = {
     'Content-Type': 'application/json'
 };
 
+let latestCsrfToken = null;
+
+function buildHeaders(includeJson = true) {
+    const headers = includeJson ? { ...DEFAULT_HEADERS } : {};
+    if (latestCsrfToken) {
+        headers['X-CSRF-Token'] = latestCsrfToken;
+    }
+    return headers;
+}
+
+export function setCsrfToken(token) {
+    latestCsrfToken = token || null;
+}
+
 async function handleResponse(response) {
     if (!response.ok) {
         const contentType = response.headers.get('content-type') || '';
@@ -47,7 +61,7 @@ export async function postConfigCommand(command) {
     return handleResponse(
         await fetch('/api/config', {
             method: 'POST',
-            headers: DEFAULT_HEADERS,
+            headers: buildHeaders(true),
             body: JSON.stringify({ command })
         })
     );
@@ -57,7 +71,7 @@ export async function postCommand(command) {
     return handleResponse(
         await fetch('/api/command', {
             method: 'POST',
-            headers: DEFAULT_HEADERS,
+            headers: buildHeaders(true),
             body: JSON.stringify({ command })
         })
     );
@@ -71,8 +85,31 @@ export async function postThemePreference(theme, source = 'user') {
     return handleResponse(
         await fetch('/api/ui/theme', {
             method: 'POST',
-            headers: DEFAULT_HEADERS,
+            headers: buildHeaders(true),
             body: JSON.stringify({ theme, source })
+        })
+    );
+}
+
+const PERIPHERAL_ENDPOINTS = Object.freeze({
+    gnss: 'gnss',
+    oled: 'oled'
+});
+
+export async function updatePeripheral(name, enabled) {
+    const key = String(name || '').toLowerCase();
+    if (!(key in PERIPHERAL_ENDPOINTS)) {
+        throw new Error(`Unsupported peripheral: ${name}`);
+    }
+    if (typeof enabled !== 'boolean') {
+        throw new TypeError('Peripheral enabled state must be a boolean.');
+    }
+
+    return handleResponse(
+        await fetch(`/api/peripherals/${PERIPHERAL_ENDPOINTS[key]}`, {
+            method: 'POST',
+            headers: buildHeaders(true),
+            body: JSON.stringify({ enabled })
         })
     );
 }
