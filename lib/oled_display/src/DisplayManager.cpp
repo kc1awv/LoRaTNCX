@@ -49,6 +49,7 @@ bool doublesDiffer(double a, double b, double epsilon = 0.0001)
 DisplayManager::DisplayManager()
     : u8g2(U8G2_R0, OLED_RST_PIN),
       enabled(false),
+      hardwarePresent(false),
       currentScreen(Screen::MAIN),
       lastRenderedScreen(Screen::MAIN),
       hasLastStatus(false),
@@ -60,21 +61,14 @@ DisplayManager::DisplayManager()
 
 bool DisplayManager::begin()
 {
-    if (!DISPLAY_ENABLED)
+    hardwarePresent = DISPLAY_ENABLED;
+    if (!hardwarePresent)
     {
+        enabled = false;
         return false;
     }
 
-    pinMode(POWER_CTRL_PIN, OUTPUT);
-    digitalWrite(POWER_CTRL_PIN, POWER_ON);
-    delay(10);
-
-    Wire.begin(OLED_SDA_PIN, OLED_SCL_PIN);
-
-    u8g2.begin();
-    u8g2.setI2CAddress(OLED_ADDRESS << 1);
-    u8g2.setFontMode(1);
-    u8g2.setDrawColor(1);
+    initializeHardware();
 
     enabled = true;
     currentScreen = Screen::MAIN;
@@ -221,6 +215,41 @@ void DisplayManager::updateStatus(const StatusData &status)
 
     forceFullRefresh = false;
     u8g2.sendBuffer();
+}
+
+bool DisplayManager::setEnabled(bool enable)
+{
+    if (!hardwarePresent)
+    {
+        enabled = false;
+        return false;
+    }
+
+    if (enable == enabled)
+    {
+        return true;
+    }
+
+    if (enable)
+    {
+        initializeHardware();
+        enabled = true;
+        currentScreen = Screen::MAIN;
+        lastRenderedScreen = Screen::MAIN;
+        hasLastStatus = false;
+        forceFullRefresh = true;
+        lastStatus = StatusData();
+        lastRefresh = 0;
+    }
+    else
+    {
+        shutdownHardware();
+        enabled = false;
+        hasLastStatus = false;
+        forceFullRefresh = true;
+    }
+
+    return true;
 }
 
 void DisplayManager::nextScreen()
@@ -594,4 +623,29 @@ void DisplayManager::formatUptime(char *buffer, size_t length, unsigned long mil
     }
 
     snprintf(buffer, length, "%02lu:%02lu:%02lu", hours, minutes, seconds);
+}
+
+void DisplayManager::initializeHardware()
+{
+    pinMode(POWER_CTRL_PIN, OUTPUT);
+    digitalWrite(POWER_CTRL_PIN, POWER_ON);
+    delay(10);
+
+    Wire.begin(OLED_SDA_PIN, OLED_SCL_PIN);
+
+    u8g2.begin();
+    u8g2.setI2CAddress(OLED_ADDRESS << 1);
+    u8g2.setFontMode(1);
+    u8g2.setDrawColor(1);
+    u8g2.setPowerSave(0);
+    u8g2.clearBuffer();
+    u8g2.sendBuffer();
+}
+
+void DisplayManager::shutdownHardware()
+{
+    u8g2.clearBuffer();
+    u8g2.sendBuffer();
+    u8g2.setPowerSave(1);
+    digitalWrite(POWER_CTRL_PIN, POWER_OFF);
 }
