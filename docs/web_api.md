@@ -128,6 +128,46 @@ with `success: false` and a message indicating that the command was rejected.
 Other HTTP status codes (for example `503` when the TNC manager is offline)
 reflect transport-level or firmware errors.
 
+## `GET /api/config/presets`
+
+Returns the catalog of built-in LoRa presets shipped with the firmware. Each
+entry exposes the fields necessary for tooling to present a selection UI or to
+construct a `SETCONFIG` command.
+
+```json
+{
+  "presets": [
+    {
+      "index": 0,
+      "name": "High Speed (SF7, BW500kHz)",
+      "frequency_mhz": 915.0,
+      "bandwidth_khz": 500.0,
+      "spreading_factor": 7,
+      "coding_rate": 5,
+      "max_payload_bytes": 222,
+      "range": "2-8 km",
+      "throughput": "20,420 bps",
+      "use_case": "Fast file transfer, streaming data"
+    }
+  ]
+}
+```
+
+The `index` field matches the numeric argument accepted by `SETCONFIG`. The
+other fields mirror the documentation printed by the serial `LISTCONFIG`
+command. Clients should treat this endpoint as read-only and rely on
+`POST /api/config` to apply changes.
+
+## Configuration presets UI
+
+The configuration page (`/config.html`) now uses `/api/config/presets` to render
+an interactive preset gallery. Each preset card shows the advertised frequency,
+bandwidth, throughput, range, and recommended use case. Selecting “Apply preset”
+triggers `POST /api/config` with the appropriate `SETCONFIG <index>` command,
+refreshes the status display, and surfaces inline success or error alerts. The
+manual command input remains available for advanced or custom configuration
+strings.
+
 ## `POST /api/command`
 
 Executes a general console command through the TNC command subsystem. The body
