@@ -41,6 +41,8 @@ private:
     void setupWebSocket();
     void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg,
                           uint8_t *data, size_t len);
+    void handleThemePost(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
+    String normaliseThemePreference(const String &theme) const;
 
     bool spiffsMounted;
     bool wifiStarted;
@@ -48,6 +50,9 @@ private:
     bool captivePortalActive;
     bool staConnected;
     unsigned long lastWiFiReconnectAttempt;
+
+    String uiThemePreference;
+    bool uiThemeOverride;
 
     AsyncWebServer server;
     AsyncWebSocket webSocket;
