@@ -19,6 +19,7 @@
 #include <DisplayManager.h>
 #include <BatteryMonitor.h>
 #include <GNSSManager.h>
+#include "TNCWiFiManager.h"
 
 class TNCManager
 {
@@ -79,6 +80,10 @@ public:
     static bool gnssGetEnabledCallback();
     static bool oledSetEnabledCallback(bool enable);
     static bool oledGetEnabledCallback();
+    static bool wifiAddNetworkCallback(const String &ssid, const String &password, String &message);
+    static bool wifiRemoveNetworkCallback(const String &ssid, String &message);
+    static void wifiListNetworksCallback(String &output);
+    static void wifiStatusCallback(String &output);
 
 private:
     static TNCManager* instance; // Static instance for callbacks
@@ -89,6 +94,7 @@ private:
     DisplayManager display;             // OLED display manager
     BatteryMonitor batteryMonitor;      // Battery monitoring helper
     GNSSManager gnss;                   // GNSS module interface
+    TNCWiFiManager wifiManager;         // WiFi management with AP fallback
 
     bool gnssEnabled;
     bool gnssInitialised;
