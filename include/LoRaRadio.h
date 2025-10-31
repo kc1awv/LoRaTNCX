@@ -150,6 +150,18 @@ public:
     bool setSyncWord(uint8_t syncWord);
 
     /**
+     * @brief Apply a full radio configuration in a single operation
+     * @param frequency Frequency in MHz
+     * @param bandwidth Bandwidth in kHz
+     * @param spreadingFactor Spreading factor (5-12)
+     * @param codingRate Coding rate (5-8)
+     * @param txPower TX power in dBm
+     * @param syncWord Sync word (0x00-0xFF)
+     * @return true if configuration applied successfully, false otherwise
+     */
+    bool applyConfiguration(float frequency, float bandwidth, uint8_t spreadingFactor, uint8_t codingRate, int8_t txPower, uint8_t syncWord);
+
+    /**
      * @brief Get current frequency
      * @return Current frequency in MHz
      */
@@ -200,6 +212,8 @@ public:
 private:
     SX1262 *radio;         // RadioLib SX1262 instance pointer
     bool initialized;      // Initialization status
+    bool spiInitialized;   // Tracks SPI initialization state
+    bool paInitialized;    // Tracks PA control initialization state
     unsigned long txCount; // Transmission counter
     unsigned long rxCount; // Reception counter
     float lastRSSI;        // Last RSSI reading
@@ -233,6 +247,12 @@ private:
      * @brief Initialize SPI interface
      */
     void initializeSPI();
+
+    /**
+     * @brief Apply modem configuration to the radio
+     * @return true if configuration succeeded, false otherwise
+     */
+    bool applyModemConfiguration(float frequency, float bandwidth, uint8_t spreadingFactor, uint8_t codingRate);
 };
 
 #endif // LORA_RADIO_H
