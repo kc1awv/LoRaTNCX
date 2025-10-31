@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <AsyncTCP.h>
+#include <ArduinoJson.h>
 #include <DNSServer.h>
 #include <ESPAsyncWebServer.h>
 #include <DisplayManager.h>
