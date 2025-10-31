@@ -414,19 +414,21 @@ void WebInterfaceManager::restartStationInterface()
         WiFi.setAutoReconnect(true);
         const String ssid = tncManager->getWiFiSSID();
         const String password = tncManager->getWiFiPassword();
+        Serial.print("[WebInterface] Attempting station connection to SSID: ");
+        Serial.println(ssid);
+
         WiFi.begin(ssid.c_str(), password.c_str());
 
-        unsigned long start = millis();
-        while (WiFi.status() != WL_CONNECTED && millis() - start < WIFI_CONNECT_TIMEOUT_MS)
-        {
-            delay(100);
-        }
-
         staConnected = WiFi.status() == WL_CONNECTED;
+        lastWiFiReconnectAttempt = millis();
         if (staConnected)
         {
             Serial.print("[WebInterface] Station mode connected, IP: ");
             Serial.println(WiFi.localIP());
+        }
+        else
+        {
+            Serial.println("[WebInterface] Station connection in progress.");
         }
     }
 
