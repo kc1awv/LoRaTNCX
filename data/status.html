@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="color-scheme" content="dark light" />
+        <title>LoRaTNCX • Status</title>
+        <link rel="stylesheet" href="/vendor/bootstrap/bootstrap.min.css" />
+    </head>
+    <body class="d-flex flex-column min-vh-100">
+        <nav class="navbar navbar-expand-lg bg-body-tertiary border-bottom shadow-sm">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="/index.html">LoRaTNCX</a>
+                <button
+                    class="navbar-toggler"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#mainNav"
+                    aria-controls="mainNav"
+                    aria-expanded="false"
+                    aria-label="Toggle navigation"
+                >
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="mainNav">
+                    <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                        <li class="nav-item"><a class="nav-link" data-nav="index" href="/index.html">Dashboard</a></li>
+                        <li class="nav-item"><a class="nav-link" data-nav="status" href="/status.html">Status</a></li>
+                        <li class="nav-item"><a class="nav-link" data-nav="config" href="/config.html">Configuration</a></li>
+                    </ul>
+                    <div class="d-flex align-items-center gap-2">
+                        <label class="form-label mb-0 small" for="themeSelect">Theme</label>
+                        <select class="form-select form-select-sm" id="themeSelect" data-theme-toggle>
+                            <option value="system">System</option>
+                            <option value="light">Light</option>
+                            <option value="dark">Dark</option>
+                        </select>
+                        <span class="badge text-bg-secondary" data-theme-indicator>system</span>
+                    </div>
+                </div>
+            </div>
+        </nav>
+        <main class="container my-4 flex-grow-1">
+            <div class="d-flex align-items-center mb-3">
+                <h1 class="h3 mb-0">Status detail</h1>
+            </div>
+            <div data-alert-host></div>
+            <section data-status-details>
+                <div class="text-center py-5 text-muted">
+                    <div class="spinner-border" role="status" aria-hidden="true"></div>
+                    <p class="mt-3 mb-0">Fetching telemetry…</p>
+                </div>
+            </section>
+        </main>
+        <footer class="border-top py-3 mt-auto">
+            <div class="container text-center text-muted small">LoRaTNCX Web Interface</div>
+        </footer>
+        <script src="/vendor/bootstrap/bootstrap.bundle.min.js" defer></script>
+        <script type="module" src="/js/status.js" defer></script>
+    </body>
+</html>

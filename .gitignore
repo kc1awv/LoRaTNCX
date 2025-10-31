@@ -19,3 +19,4 @@
 .vscode/launch.json
 
 lora_chat_config*
+build/

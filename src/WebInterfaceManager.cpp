@@ -97,6 +97,25 @@ const char *commandResultToString(TNCCommandResult result)
 }
 } // namespace
 
+String WebInterfaceManager::normaliseThemePreference(const String &theme) const
+{
+    String value = theme;
+    value.trim();
+    value.toLowerCase();
+
+    if (value == "auto")
+    {
+        value = "system";
+    }
+
+    if (value == "light" || value == "dark" || value == "system")
+    {
+        return value;
+    }
+
+    return String();
+}
+
 WebInterfaceManager::WebInterfaceManager()
     : spiffsMounted(false),
       wifiStarted(false),
@@ -104,6 +123,8 @@ WebInterfaceManager::WebInterfaceManager()
       captivePortalActive(false),
       staConnected(false),
       lastWiFiReconnectAttempt(0),
+      uiThemePreference("system"),
+      uiThemeOverride(false),
       server(80),
       webSocket("/ws"),
       apIP(192, 168, 4, 1),
@@ -288,7 +309,9 @@ void WebInterfaceManager::setupWebServer()
     }
     else
     {
-        server.serveStatic("/", SPIFFS, "/").setDefaultFile("index.html");
+        AsyncStaticWebHandler &staticHandler = server.serveStatic("/", SPIFFS, "/");
+        staticHandler.setDefaultFile("index.html");
+        staticHandler.setCacheControl("public, max-age=86400, immutable");
     }
 
     server.on(
@@ -378,6 +401,10 @@ void WebInterfaceManager::setupWebServer()
                 tnc["available"] = false;
                 tnc["status_text"] = "TNC manager unavailable";
             }
+
+            JsonObject ui = doc.createNestedObject("ui");
+            ui["theme"] = uiThemeOverride ? uiThemePreference : "system";
+            ui["override"] = uiThemeOverride;
 
             String payload;
             serializeJson(doc, payload);
@@ -547,21 +574,135 @@ void WebInterfaceManager::setupWebServer()
             }
         });
 
+    server.on(
+        "/api/ui/theme", HTTP_GET, [this](AsyncWebServerRequest *request) {
+            DynamicJsonDocument doc(128);
+            doc["theme"] = uiThemeOverride ? uiThemePreference : "system";
+            doc["override"] = uiThemeOverride;
+
+            String payload;
+            serializeJson(doc, payload);
+            request->send(200, "application/json", payload);
+        });
+
+    server.on(
+        "/api/ui/theme", HTTP_POST,
+        [](AsyncWebServerRequest *request) {
+            if (!request->_tempObject)
+            {
+                request->_tempObject = new String();
+            }
+        },
+        nullptr,
+        [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+            handleThemePost(request, data, len, index, total);
+        });
+
     server.onNotFound([this](AsyncWebServerRequest *request) {
-        if (request->host() != WiFi.softAPIP().toString())
+        if (captivePortalActive && request->host() != WiFi.softAPIP().toString())
         {
             String redirectUrl = String("http://") + WiFi.softAPIP().toString();
             request->redirect(redirectUrl);
         }
         else if (spiffsMounted)
         {
-            request->send(SPIFFS, "/index.html", String(), false);
+            String path = request->url();
+            if (!path.startsWith("/"))
+            {
+                path = "/" + path;
+            }
+
+            if (path.endsWith("/"))
+            {
+                path += "index.html";
+            }
+
+            if (SPIFFS.exists(path))
+            {
+                AsyncWebServerResponse *response = request->beginResponse(SPIFFS, path, String(), false);
+                response->addHeader("Cache-Control", "public, max-age=86400, immutable");
+                request->send(response);
+                return;
+            }
+
+            AsyncWebServerResponse *response = request->beginResponse(SPIFFS, "/index.html", String(), false);
+            response->addHeader("Cache-Control", "no-cache");
+            request->send(response);
         }
         else
         {
             request->send(404, "text/plain", "Resource not found.");
         }
-    });
+        });
+}
+
+void WebInterfaceManager::handleThemePost(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
+{
+    String *body = static_cast<String *>(request->_tempObject);
+    if (index == 0 && !body)
+    {
+        body = new String();
+        size_t reserveSize = total > 256 ? 256 : total;
+        body->reserve(reserveSize);
+        request->_tempObject = body;
+    }
+
+    if (!body)
+    {
+        request->send(500, "application/json", "{\"error\":\"Internal buffer error\"}");
+        return;
+    }
+
+    body->concat(reinterpret_cast<const char *>(data), len);
+
+    if (index + len != total)
+    {
+        return;
+    }
+
+    DynamicJsonDocument doc(256);
+    DeserializationError error = deserializeJson(doc, *body);
+    delete body;
+    request->_tempObject = nullptr;
+
+    if (error)
+    {
+        request->send(400, "application/json", "{\"error\":\"Invalid JSON payload\"}");
+        return;
+    }
+
+    if (!doc.containsKey("theme"))
+    {
+        request->send(400, "application/json", "{\"error\":\"Missing theme field\"}");
+        return;
+    }
+
+    String incoming = doc["theme"].as<String>();
+    String normalised = normaliseThemePreference(incoming);
+    if (normalised.isEmpty())
+    {
+        request->send(400, "application/json", "{\"error\":\"Unsupported theme value\"}");
+        return;
+    }
+
+    uiThemeOverride = normalised != "system";
+    uiThemePreference = uiThemeOverride ? normalised : "system";
+
+    DynamicJsonDocument response(192);
+    response["theme"] = uiThemeOverride ? uiThemePreference : "system";
+    response["override"] = uiThemeOverride;
+    if (doc.containsKey("source") && doc["source"].is<const char *>())
+    {
+        response["source"] = doc["source"].as<const char *>();
+    }
+    else
+    {
+        response["source"] = "user";
+    }
+
+    String payload;
+    serializeJson(response, payload);
+    request->send(200, "application/json", payload);
 }
 
 void WebInterfaceManager::setupWebSocket()
@@ -589,6 +730,8 @@ void WebInterfaceManager::onWebSocketEvent(AsyncWebSocket *serverInstance, Async
         {
             doc["tnc_status"] = tncManager->getStatus();
         }
+        doc["ui_theme"] = uiThemeOverride ? uiThemePreference : "system";
+        doc["ui_theme_override"] = uiThemeOverride;
 
         String payload;
         serializeJson(doc, payload);
