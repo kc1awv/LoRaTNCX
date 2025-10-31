@@ -64,9 +64,21 @@ public:
      */
     bool isGNSSEnabled() const { return gnssEnabled && gnssInitialised; }
 
+    /**
+     * @brief Enable or disable the OLED display
+     */
+    bool setOLEDEnabled(bool enable);
+
+    /**
+     * @brief Query whether the OLED display is active.
+     */
+    bool isOLEDEnabled() const { return oledEnabled && display.isEnabled(); }
+
     // Static callback functions for TNCCommands
     static bool gnssSetEnabledCallback(bool enable);
     static bool gnssGetEnabledCallback();
+    static bool oledSetEnabledCallback(bool enable);
+    static bool oledGetEnabledCallback();
 
 private:
     static TNCManager* instance; // Static instance for callbacks
@@ -80,6 +92,7 @@ private:
 
     bool gnssEnabled;
     bool gnssInitialised;
+    bool oledEnabled;
 
     bool initialized;
     unsigned long lastStatus;

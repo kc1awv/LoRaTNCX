@@ -57,6 +57,8 @@ TNCCommandResult TNCCommands::handleSAVE(const String args[], int argCount) {
         
         // System settings
         preferences.putUChar("debugLevel", config.debugLevel);
+        preferences.putBool("gnssEnabled", config.gnssEnabled);
+        preferences.putBool("oledEnabled", config.oledEnabled);
 
         preferences.end();
         sendResponse("Configuration saved to flash");

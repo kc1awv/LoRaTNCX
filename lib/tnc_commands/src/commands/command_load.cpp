@@ -58,6 +58,8 @@ TNCCommandResult TNCCommands::handleLOAD(const String args[], int argCount) {
 
         // System settings
         config.debugLevel = preferences.getUChar("debugLevel", config.debugLevel);
+        config.gnssEnabled = preferences.getBool("gnssEnabled", config.gnssEnabled);
+        config.oledEnabled = preferences.getBool("oledEnabled", config.oledEnabled);
 
         preferences.end();
 
@@ -120,9 +122,27 @@ TNCCommandResult TNCCommands::handleLOAD(const String args[], int argCount) {
         } else {
             sendResponse("Configuration loaded (radio not available for hardware update)");
         }
-        
+
+        if (gnssSetEnabledCallback) {
+            if (!gnssSetEnabledCallback(config.gnssEnabled)) {
+                sendResponse("WARNING: Failed to apply GNSS setting");
+            }
+            if (gnssGetEnabledCallback) {
+                config.gnssEnabled = gnssGetEnabledCallback();
+            }
+        }
+
+        if (oledSetEnabledCallback) {
+            if (!oledSetEnabledCallback(config.oledEnabled)) {
+                sendResponse("WARNING: Failed to apply OLED setting");
+            }
+            if (oledGetEnabledCallback) {
+                config.oledEnabled = oledGetEnabledCallback();
+            }
+        }
+
         return TNCCommandResult::SUCCESS;
-        
+
     } catch (...) {
         preferences.end();
         sendResponse("ERROR: Failed to load configuration");

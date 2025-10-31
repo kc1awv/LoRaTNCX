@@ -107,6 +107,7 @@ TNCCommandResult TNCCommands::handleHELP(const String args[], int argCount) {
         {"SELFTEST",    "Run self-test suite", 8},
         {"DEBUG",       "Set debug verbosity", 8},
         {"GNSS",        "Control GNSS module", 8},
+        {"OLED",        "Control OLED display", 8},
 
         {"SAVE",        "Save settings to flash", 9},
         {"SAVED",       "Show settings stored in flash", 9},
