@@ -20,6 +20,8 @@
 #include <BatteryMonitor.h>
 #include <GNSSManager.h>
 
+class WebInterfaceManager;
+
 class TNCManager
 {
 public:
@@ -110,6 +112,11 @@ public:
      */
     bool isOLEDEnabled() const { return oledEnabled && display.isEnabled(); }
 
+    /**
+     * @brief Register the web interface for real-time telemetry callbacks.
+     */
+    void setWebInterface(WebInterfaceManager *interface);
+
     // Static callback functions for TNCCommands
     static bool gnssSetEnabledCallback(bool enable);
     static bool gnssGetEnabledCallback();
@@ -129,6 +136,8 @@ private:
     bool gnssEnabled;
     bool gnssInitialised;
     bool oledEnabled;
+
+    WebInterfaceManager *webInterface;
 
     bool initialized;
     unsigned long lastStatus;

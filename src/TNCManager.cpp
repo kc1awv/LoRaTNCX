@@ -8,6 +8,7 @@
 #include "TNCManager.h"
 
 #include "HardwareConfig.h"
+#include "WebInterfaceManager.h"
 
 namespace
 {
@@ -33,7 +34,7 @@ inline float clamp01(float value)
 // Static member definition
 TNCManager* TNCManager::instance = nullptr;
 
-TNCManager::TNCManager() : configManager(&radio), display(), batteryMonitor(), gnss()
+TNCManager::TNCManager() : configManager(&radio), display(), batteryMonitor(), gnss(), webInterface(nullptr)
 {
     initialized = false;
     lastStatus = 0;
@@ -155,7 +156,12 @@ bool TNCManager::begin()
 
     initialized = true;
 
-    display.updateStatus(buildDisplayStatus());
+    DisplayManager::StatusData status = buildDisplayStatus();
+    display.updateStatus(status);
+    if (webInterface)
+    {
+        webInterface->broadcastStatus(status);
+    }
     return true;
 }
 
@@ -201,7 +207,12 @@ void TNCManager::update()
 
     handleUserButton();
 
-    display.updateStatus(buildDisplayStatus());
+    DisplayManager::StatusData status = buildDisplayStatus();
+    display.updateStatus(status);
+    if (webInterface)
+    {
+        webInterface->broadcastStatus(status);
+    }
 }
 
 String TNCManager::getStatus()
@@ -630,11 +641,14 @@ void TNCManager::handleIncomingRadio()
             {
                 kiss.sendData(buffer, length);
             }
-            else if (commandSystem.isMonitorEnabled() || commandSystem.getDebugLevel() >= 2)
+            const bool needMonitorPreview = commandSystem.isMonitorEnabled() || commandSystem.getDebugLevel() >= 2;
+            const bool needWebPreview = webInterface != nullptr;
+            String preview;
+
+            if (needMonitorPreview || needWebPreview)
             {
                 const size_t maxPreview = 120;
                 size_t previewLength = length < maxPreview ? length : maxPreview;
-                String preview;
                 preview.reserve(static_cast<unsigned int>(previewLength));
                 for (size_t i = 0; i < previewLength; i++)
                 {
@@ -652,10 +666,18 @@ void TNCManager::handleIncomingRadio()
                 {
                     preview += "...";
                 }
+            }
 
+            if (needMonitorPreview)
+            {
                 String monitorLine = "MON RX (" + String(length) + " bytes, RSSI " + String(rssi, 1) +
                                       " dBm, SNR " + String(snr, 1) + " dB): " + preview;
                 commandSystem.sendResponse(monitorLine);
+            }
+
+            if (webInterface)
+            {
+                webInterface->broadcastPacketNotification(length, rssi, snr, preview);
             }
         }
     }
@@ -819,6 +841,7 @@ void TNCManager::performPowerOff()
 
 bool TNCManager::setGNSSEnabled(bool enable)
 {
+    bool previousState = isGNSSEnabled();
     bool result = true;
 
     if (enable)
@@ -857,16 +880,42 @@ bool TNCManager::setGNSSEnabled(bool enable)
     }
 
     commandSystem.setPeripheralStateDefaults(isGNSSEnabled(), isOLEDEnabled());
+
+    bool currentState = isGNSSEnabled();
+    if (webInterface && (currentState != previousState || !result))
+    {
+        String message;
+        if (!result)
+        {
+            message = enable ? "Failed to enable GNSS module" : "Failed to disable GNSS module";
+        }
+        else if (currentState)
+        {
+            message = "GNSS module enabled";
+        }
+        else
+        {
+            message = "GNSS module disabled";
+        }
+
+        webInterface->broadcastAlert("gnss", message, currentState);
+    }
+
     return result;
 }
 
 bool TNCManager::setOLEDEnabled(bool enable)
 {
+    bool previousState = display.isEnabled();
     if (!display.isAvailable())
     {
         Serial.println("OLED display hardware not available");
         oledEnabled = false;
         commandSystem.setPeripheralStateDefaults(isGNSSEnabled(), isOLEDEnabled());
+        if (webInterface && previousState)
+        {
+            webInterface->broadcastAlert("oled", "OLED display hardware not available", false);
+        }
         return false;
     }
 
@@ -924,7 +973,33 @@ bool TNCManager::setOLEDEnabled(bool enable)
 
     oledEnabled = display.isEnabled();
     commandSystem.setPeripheralStateDefaults(isGNSSEnabled(), isOLEDEnabled());
+
+    bool currentState = display.isEnabled();
+    if (webInterface && (currentState != previousState || !result))
+    {
+        String message;
+        if (!result)
+        {
+            message = enable ? "Failed to enable OLED display" : "Failed to disable OLED display";
+        }
+        else if (currentState)
+        {
+            message = "OLED display enabled";
+        }
+        else
+        {
+            message = "OLED display disabled";
+        }
+
+        webInterface->broadcastAlert("oled", message, currentState);
+    }
+
     return result;
+}
+
+void TNCManager::setWebInterface(WebInterfaceManager *interface)
+{
+    webInterface = interface;
 }
 
 // Static callback functions for TNCCommands
