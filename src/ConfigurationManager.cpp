@@ -238,6 +238,11 @@ LoRaConfiguration ConfigurationManager::getPresetConfiguration(LoRaConfigPreset 
     return presetConfigurations[static_cast<int>(LoRaConfigPreset::BALANCED)];
 }
 
+size_t ConfigurationManager::getPresetCount()
+{
+    return sizeof(presetConfigurations) / sizeof(presetConfigurations[0]);
+}
+
 void ConfigurationManager::listAllPresets()
 {
     Serial.println("\nAvailable LoRa Configuration Presets:");

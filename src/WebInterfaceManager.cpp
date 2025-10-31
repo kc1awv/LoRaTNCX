@@ -8,6 +8,7 @@
 #include <functional>
 
 #include "TNCManager.h"
+#include "ConfigurationManager.h"
 
 namespace
 {
@@ -806,6 +807,38 @@ void WebInterfaceManager::setupWebServer()
             {
                 config["available"] = false;
                 config["status_text"] = "TNC manager unavailable";
+            }
+
+            String payload;
+            serializeJson(doc, payload);
+            request->send(200, "application/json", payload);
+        });
+
+    server.on(
+        "/api/config/presets", HTTP_GET, [this](AsyncWebServerRequest *request) {
+            if (!ensureAuthenticated(request))
+            {
+                return;
+            }
+
+            JsonDocument doc;
+            JsonArray presets = doc["presets"].to<JsonArray>();
+
+            size_t presetCount = ConfigurationManager::getPresetCount();
+            for (size_t i = 0; i < presetCount; ++i)
+            {
+                LoRaConfiguration config = ConfigurationManager::getPresetConfiguration(static_cast<LoRaConfigPreset>(i));
+                JsonObject preset = presets.add<JsonObject>();
+                preset["index"] = static_cast<uint8_t>(i);
+                preset["name"] = config.name;
+                preset["frequency_mhz"] = config.frequency;
+                preset["bandwidth_khz"] = config.bandwidth;
+                preset["spreading_factor"] = config.spreadingFactor;
+                preset["coding_rate"] = config.codingRate;
+                preset["max_payload_bytes"] = config.maxPayload;
+                preset["range"] = config.expectedRange;
+                preset["throughput"] = config.expectedThroughput;
+                preset["use_case"] = config.useCase;
             }
 
             String payload;

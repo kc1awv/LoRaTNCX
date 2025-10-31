@@ -66,6 +66,7 @@ public:
     // Preset utilities
     static String getPresetName(LoRaConfigPreset preset);
     static LoRaConfiguration getPresetConfiguration(LoRaConfigPreset preset);
+    static size_t getPresetCount();
     static void listAllPresets();
 
     // Command interface

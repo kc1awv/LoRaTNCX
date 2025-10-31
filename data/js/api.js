@@ -84,6 +84,10 @@ export async function getConfig() {
     return handleResponse(await fetch('/api/config', { cache: 'no-store' }));
 }
 
+export async function getConfigPresets() {
+    return handleResponse(await fetch('/api/config/presets', { cache: 'no-store' }));
+}
+
 export async function postConfigCommand(command) {
     return handleResponse(
         await fetch('/api/config', {
