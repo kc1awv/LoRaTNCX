@@ -3,7 +3,9 @@
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
 #include <WiFi.h>
+#include <esp_system.h>
 #include <math.h>
+#include <functional>
 
 #include "TNCManager.h"
 
@@ -144,6 +146,12 @@ WebInterfaceManager::WebInterfaceManager()
       lastWiFiReconnectAttempt(0),
       uiThemePreference("system"),
       uiThemeOverride(false),
+      pairingRequired(false),
+      temporaryApPassword(),
+      currentApPassword(),
+      basicAuthUsername(),
+      basicAuthPassword(),
+      csrfToken(),
       server(80),
       webSocket("/ws"),
       apIP(192, 168, 4, 1),
@@ -157,6 +165,9 @@ bool WebInterfaceManager::begin(TNCManager &tnc)
 {
     tncManager = &tnc;
     tncManager->setWebInterface(this);
+
+    refreshCredentialsFromConfig();
+    regenerateCsrfToken();
 
     if (!mountSPIFFS())
     {
@@ -184,19 +195,26 @@ void WebInterfaceManager::loop()
 
     if (wifiStarted)
     {
-        if (WiFi.status() == WL_CONNECTED)
+        if (stationModeRequested())
         {
-            staConnected = true;
+            if (WiFi.status() == WL_CONNECTED)
+            {
+                staConnected = true;
+            }
+            else if (staConnected)
+            {
+                staConnected = false;
+                lastWiFiReconnectAttempt = millis();
+            }
+            else if (millis() - lastWiFiReconnectAttempt > WIFI_CHECK_INTERVAL_MS)
+            {
+                lastWiFiReconnectAttempt = millis();
+                WiFi.reconnect();
+            }
         }
-        else if (staConnected)
+        else
         {
             staConnected = false;
-            lastWiFiReconnectAttempt = millis();
-        }
-        else if (millis() - lastWiFiReconnectAttempt > WIFI_CHECK_INTERVAL_MS)
-        {
-            lastWiFiReconnectAttempt = millis();
-            WiFi.reconnect();
         }
     }
 
@@ -264,48 +282,299 @@ void WebInterfaceManager::setupWiFi()
         return;
     }
 
-    WiFi.mode(WIFI_AP_STA);
-    WiFi.setAutoReconnect(true);
-    WiFi.begin();
-
-    unsigned long start = millis();
-    while (WiFi.status() != WL_CONNECTED && millis() - start < WIFI_CONNECT_TIMEOUT_MS)
-    {
-        delay(100);
-    }
-
-    if (WiFi.status() == WL_CONNECTED)
-    {
-        staConnected = true;
-        Serial.print("[WebInterface] Connected to Wi-Fi network, IP: ");
-        Serial.println(WiFi.localIP());
-    }
-    else
-    {
-        staConnected = false;
-        Serial.println("[WebInterface] Unable to join saved Wi-Fi network; operating in AP-only mode.");
-    }
-
-    IPAddress netMask(255, 255, 255, 0);
-    WiFi.softAPConfig(apIP, apIP, netMask);
-
     uint32_t shortId = (uint32_t)(ESP.getEfuseMac() & 0xFFFFFF);
     apSSID = String("LoRaTNCX-") + String(shortId, HEX);
     apSSID.toUpperCase();
 
-    if (WiFi.softAP(apSSID.c_str(), DEFAULT_AP_PASSWORD))
+    bool startStation = stationModeRequested();
+    if (startStation)
     {
+        WiFi.mode(WIFI_AP_STA);
+        WiFi.setAutoReconnect(true);
+        const String ssid = tncManager->getWiFiSSID();
+        const String password = tncManager->getWiFiPassword();
+        WiFi.begin(ssid.c_str(), password.c_str());
+
+        unsigned long start = millis();
+        while (WiFi.status() != WL_CONNECTED && millis() - start < WIFI_CONNECT_TIMEOUT_MS)
+        {
+            delay(100);
+        }
+
+        if (WiFi.status() == WL_CONNECTED)
+        {
+            staConnected = true;
+            Serial.print("[WebInterface] Connected to Wi-Fi network, IP: ");
+            Serial.println(WiFi.localIP());
+        }
+        else
+        {
+            staConnected = false;
+            Serial.println("[WebInterface] Unable to join saved Wi-Fi network; remaining in AP-only mode.");
+        }
+    }
+    else
+    {
+        WiFi.mode(WIFI_AP);
+        staConnected = false;
+    }
+
+    String apPassword;
+    if (pairingRequired)
+    {
+        if (temporaryApPassword.isEmpty())
+        {
+            temporaryApPassword = generateRandomToken(12);
+        }
+        apPassword = temporaryApPassword;
+    }
+    else if (tncManager && tncManager->hasWiFiCredentials() && tncManager->getWiFiPassword().length() >= 8)
+    {
+        apPassword = tncManager->getWiFiPassword();
+    }
+    else
+    {
+        apPassword = DEFAULT_AP_PASSWORD;
+    }
+
+    startAccessPoint(apPassword);
+
+    if (pairingRequired)
+    {
+        Serial.print("[WebInterface] Pairing required. Temporary AP password: ");
+        Serial.println(temporaryApPassword);
+    }
+
+    wifiStarted = true;
+}
+
+void WebInterfaceManager::startAccessPoint(const String &password)
+{
+    IPAddress netMask(255, 255, 255, 0);
+    WiFi.softAPdisconnect(true);
+    WiFi.softAPConfig(apIP, apIP, netMask);
+
+    String appliedPassword = password;
+    if (appliedPassword.length() < 8)
+    {
+        appliedPassword = DEFAULT_AP_PASSWORD;
+    }
+
+    if (WiFi.softAP(apSSID.c_str(), appliedPassword.c_str()))
+    {
+        currentApPassword = appliedPassword;
         Serial.print("[WebInterface] Access point started: ");
         Serial.print(apSSID);
-        Serial.print(" password: ");
-        Serial.println(DEFAULT_AP_PASSWORD);
+        if (pairingRequired)
+        {
+            Serial.print(" password: ");
+            Serial.println(appliedPassword);
+        }
+        else if (appliedPassword == DEFAULT_AP_PASSWORD)
+        {
+            Serial.print(" password: ");
+            Serial.println(DEFAULT_AP_PASSWORD);
+        }
+        else
+        {
+            Serial.println(" password set to user-defined value.");
+        }
     }
     else
     {
         Serial.println("[WebInterface] Failed to start access point.");
     }
+}
 
-    wifiStarted = true;
+bool WebInterfaceManager::stationModeRequested() const
+{
+    return tncManager && !pairingRequired && tncManager->hasWiFiCredentials();
+}
+
+void WebInterfaceManager::restartStationInterface()
+{
+    if (!wifiStarted)
+    {
+        return;
+    }
+
+    bool enableStation = stationModeRequested();
+
+    if (!enableStation)
+    {
+        WiFi.disconnect(true);
+        WiFi.mode(WIFI_AP);
+        staConnected = false;
+    }
+    else
+    {
+        WiFi.disconnect(true);
+        WiFi.mode(WIFI_AP_STA);
+        WiFi.setAutoReconnect(true);
+        const String ssid = tncManager->getWiFiSSID();
+        const String password = tncManager->getWiFiPassword();
+        WiFi.begin(ssid.c_str(), password.c_str());
+
+        unsigned long start = millis();
+        while (WiFi.status() != WL_CONNECTED && millis() - start < WIFI_CONNECT_TIMEOUT_MS)
+        {
+            delay(100);
+        }
+
+        staConnected = WiFi.status() == WL_CONNECTED;
+        if (staConnected)
+        {
+            Serial.print("[WebInterface] Station mode connected, IP: ");
+            Serial.println(WiFi.localIP());
+        }
+    }
+
+    String apPassword;
+    if (pairingRequired)
+    {
+        apPassword = temporaryApPassword;
+    }
+    else if (tncManager && tncManager->hasWiFiCredentials() && tncManager->getWiFiPassword().length() >= 8)
+    {
+        apPassword = tncManager->getWiFiPassword();
+    }
+    else
+    {
+        apPassword = DEFAULT_AP_PASSWORD;
+    }
+
+    startAccessPoint(apPassword);
+}
+
+void WebInterfaceManager::refreshCredentialsFromConfig()
+{
+    if (!tncManager)
+    {
+        pairingRequired = true;
+        basicAuthUsername = String();
+        basicAuthPassword = String();
+        uiThemePreference = "system";
+        uiThemeOverride = false;
+        return;
+    }
+
+    bool overrideEnabled = false;
+    String storedTheme = "system";
+    tncManager->getUIThemePreference(storedTheme, overrideEnabled);
+
+    if (storedTheme.isEmpty())
+    {
+        storedTheme = "system";
+    }
+
+    uiThemePreference = storedTheme;
+    uiThemeOverride = overrideEnabled && storedTheme != "system";
+
+    pairingRequired = !tncManager->hasUICredentials();
+
+    if (!pairingRequired)
+    {
+        basicAuthUsername = tncManager->getUIUsername();
+        basicAuthPassword = tncManager->getUIPassword();
+    }
+    else
+    {
+        basicAuthUsername = String();
+        basicAuthPassword = String();
+    }
+
+    configureWebSocketAuthentication();
+}
+
+void WebInterfaceManager::configureWebSocketAuthentication()
+{
+    if (pairingRequired || basicAuthUsername.isEmpty())
+    {
+        webSocket.setAuthentication("", "");
+    }
+    else
+    {
+        webSocket.setAuthentication(basicAuthUsername.c_str(), basicAuthPassword.c_str());
+    }
+}
+
+String WebInterfaceManager::generateRandomToken(size_t length) const
+{
+    static const char alphabet[] = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+    const size_t alphabetLength = sizeof(alphabet) - 1;
+
+    String token;
+    token.reserve(length);
+
+    while (token.length() < length)
+    {
+        uint32_t value = esp_random();
+        for (int i = 0; i < 4 && token.length() < length; ++i)
+        {
+            token += alphabet[value % alphabetLength];
+            value /= alphabetLength;
+        }
+    }
+
+    return token;
+}
+
+void WebInterfaceManager::regenerateCsrfToken()
+{
+    csrfToken = generateRandomToken(32);
+    if (webSocket.count() > 0)
+    {
+        JsonDocument doc;
+        doc["type"] = "csrf_token";
+        doc["token"] = csrfToken;
+        doc["timestamp"] = millis();
+        sendJsonToClient(nullptr, doc);
+    }
+}
+
+bool WebInterfaceManager::ensureAuthenticated(AsyncWebServerRequest *request)
+{
+    if (pairingRequired)
+    {
+        return true;
+    }
+
+    if (basicAuthUsername.isEmpty() || basicAuthPassword.isEmpty())
+    {
+        request->send(503, "application/json", "{\"error\":\"Credentials not configured\"}");
+        return false;
+    }
+
+    if (request->authenticate(basicAuthUsername.c_str(), basicAuthPassword.c_str()))
+    {
+        return true;
+    }
+
+    request->requestAuthentication("LoRaTNCX");
+    return false;
+}
+
+bool WebInterfaceManager::ensureCsrfToken(AsyncWebServerRequest *request)
+{
+    if (pairingRequired)
+    {
+        return true;
+    }
+
+    if (!request->hasHeader("X-CSRF-Token"))
+    {
+        request->send(403, "application/json", "{\"error\":\"Missing CSRF token\"}");
+        return false;
+    }
+
+    AsyncWebHeader *header = request->getHeader("X-CSRF-Token");
+    if (!header || header->value() != csrfToken)
+    {
+        request->send(403, "application/json", "{\"error\":\"Invalid CSRF token\"}");
+        return false;
+    }
+
+    return true;
 }
 
 void WebInterfaceManager::setupCaptivePortal()
@@ -327,6 +596,10 @@ void WebInterfaceManager::setupWebServer()
     {
         server.on(
             "/", HTTP_GET, [this](AsyncWebServerRequest *request) {
+                if (!ensureAuthenticated(request))
+                {
+                    return;
+                }
                 String response = F("LoRaTNCX Web Interface\n");
                 if (tncManager)
                 {
@@ -340,58 +613,99 @@ void WebInterfaceManager::setupWebServer()
         AsyncStaticWebHandler &staticHandler = server.serveStatic("/", SPIFFS, "/");
         staticHandler.setDefaultFile("index.html");
         staticHandler.setCacheControl("public, max-age=86400, immutable");
-        
+        staticHandler.setFilter([this](AsyncWebServerRequest *request) {
+            return ensureAuthenticated(request);
+        });
+
         // Explicitly handle CSS files with correct MIME type
-        server.on("/css/bootstrap.css", HTTP_GET, [](AsyncWebServerRequest *request) {
+        server.on("/css/bootstrap.css", HTTP_GET, [this](AsyncWebServerRequest *request) {
+            if (!ensureAuthenticated(request))
+            {
+                return;
+            }
             request->send(SPIFFS, "/css/bootstrap.css", "text/css");
         });
         
         // Explicitly handle JS files with correct MIME type
-        server.on("/js/bootstrap.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+        server.on("/js/bootstrap.js", HTTP_GET, [this](AsyncWebServerRequest *request) {
+            if (!ensureAuthenticated(request))
+            {
+                return;
+            }
             request->send(SPIFFS, "/js/bootstrap.js", "application/javascript");
         });
-        
+
         // Handle other common JS files
-        server.on("/js/api.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+        server.on("/js/api.js", HTTP_GET, [this](AsyncWebServerRequest *request) {
+            if (!ensureAuthenticated(request))
+            {
+                return;
+            }
             request->send(SPIFFS, "/js/api.js", "application/javascript");
         });
-        
-        server.on("/js/common.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+
+        server.on("/js/common.js", HTTP_GET, [this](AsyncWebServerRequest *request) {
+            if (!ensureAuthenticated(request))
+            {
+                return;
+            }
             request->send(SPIFFS, "/js/common.js", "application/javascript");
         });
-        
-        server.on("/js/config.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+
+        server.on("/js/config.js", HTTP_GET, [this](AsyncWebServerRequest *request) {
+            if (!ensureAuthenticated(request))
+            {
+                return;
+            }
             request->send(SPIFFS, "/js/config.js", "application/javascript");
         });
-        
-        server.on("/js/index.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+
+        server.on("/js/index.js", HTTP_GET, [this](AsyncWebServerRequest *request) {
+            if (!ensureAuthenticated(request))
+            {
+                return;
+            }
             request->send(SPIFFS, "/js/index.js", "application/javascript");
         });
-        
-        server.on("/js/status.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+
+        server.on("/js/status.js", HTTP_GET, [this](AsyncWebServerRequest *request) {
+            if (!ensureAuthenticated(request))
+            {
+                return;
+            }
             request->send(SPIFFS, "/js/status.js", "application/javascript");
         });
-        
-        server.on("/js/theme.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+
+        server.on("/js/theme.js", HTTP_GET, [this](AsyncWebServerRequest *request) {
+            if (!ensureAuthenticated(request))
+            {
+                return;
+            }
             request->send(SPIFFS, "/js/theme.js", "application/javascript");
         });
     }
 
     server.on(
         "/api/status", HTTP_GET, [this](AsyncWebServerRequest *request) {
-            DynamicJsonDocument doc(4096);
-            JsonObject wifi = doc.createNestedObject("wifi");
+            if (!ensureAuthenticated(request))
+            {
+                return;
+            }
+
+            JsonDocument doc;
+            JsonObject wifi = doc["wifi"].to<JsonObject>();
             wifi["sta_connected"] = staConnected;
             wifi["ap_ssid"] = apSSID;
+            wifi["pairing_required"] = pairingRequired;
 
-            JsonObject tnc = doc.createNestedObject("tnc");
+            JsonObject tnc = doc["tnc"].to<JsonObject>();
             if (tncManager)
             {
                 TNCManager::StatusSnapshot snapshot = tncManager->getStatusSnapshot();
                 tnc["available"] = true;
                 tnc["status_text"] = snapshot.statusText;
 
-                JsonObject display = tnc.createNestedObject("display");
+                JsonObject display = tnc["display"].to<JsonObject>();
                 display["mode"] = modeToString(snapshot.displayStatus.mode);
                 display["tx_count"] = snapshot.displayStatus.txCount;
                 display["rx_count"] = snapshot.displayStatus.rxCount;
@@ -406,16 +720,16 @@ void WebInterfaceManager::setupWebServer()
                 display["tx_power_dbm"] = snapshot.displayStatus.txPower;
                 display["uptime_ms"] = snapshot.displayStatus.uptimeMillis;
 
-                JsonObject battery = display.createNestedObject("battery");
+                JsonObject battery = display["battery"].to<JsonObject>();
                 battery["voltage"] = snapshot.displayStatus.batteryVoltage;
                 battery["percent"] = snapshot.displayStatus.batteryPercent;
 
-                JsonObject powerOff = display.createNestedObject("power_off");
+                JsonObject powerOff = display["power_off"].to<JsonObject>();
                 powerOff["active"] = snapshot.displayStatus.powerOffActive;
                 powerOff["progress"] = snapshot.displayStatus.powerOffProgress;
                 powerOff["complete"] = snapshot.displayStatus.powerOffComplete;
 
-                JsonObject gnss = display.createNestedObject("gnss");
+                JsonObject gnss = display["gnss"].to<JsonObject>();
                 gnss["enabled"] = snapshot.displayStatus.gnssEnabled;
                 gnss["has_fix"] = snapshot.displayStatus.gnssHasFix;
                 gnss["is_3d_fix"] = snapshot.displayStatus.gnssIs3DFix;
@@ -465,9 +779,10 @@ void WebInterfaceManager::setupWebServer()
                 tnc["status_text"] = "TNC manager unavailable";
             }
 
-            JsonObject ui = doc.createNestedObject("ui");
+            JsonObject ui = doc["ui"].to<JsonObject>();
             ui["theme"] = uiThemeOverride ? uiThemePreference : "system";
             ui["override"] = uiThemeOverride;
+            ui["csrf_token"] = csrfToken;
 
             String payload;
             serializeJson(doc, payload);
@@ -476,8 +791,12 @@ void WebInterfaceManager::setupWebServer()
 
     server.on(
         "/api/config", HTTP_GET, [this](AsyncWebServerRequest *request) {
-            DynamicJsonDocument doc(1024);
-            JsonObject config = doc.createNestedObject("config");
+            if (!ensureAuthenticated(request))
+            {
+                return;
+            }
+            JsonDocument doc;
+            JsonObject config = doc["config"].to<JsonObject>();
             if (tncManager)
             {
                 config["available"] = true;
@@ -497,6 +816,10 @@ void WebInterfaceManager::setupWebServer()
     server.on(
         "/api/config", HTTP_POST,
         [this](AsyncWebServerRequest *request) {
+            if (!ensureAuthenticated(request) || !ensureCsrfToken(request))
+            {
+                return;
+            }
             if (!request->_tempObject)
             {
                 request->send(400, "application/json", "{\"error\":\"Missing JSON body\"}");
@@ -504,6 +827,10 @@ void WebInterfaceManager::setupWebServer()
         },
         nullptr,
         [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+            if (!ensureAuthenticated(request) || !ensureCsrfToken(request))
+            {
+                return;
+            }
             if (index == 0)
             {
                 request->_tempObject = new String();
@@ -528,7 +855,7 @@ void WebInterfaceManager::setupWebServer()
 
             if (index + len == total)
             {
-                DynamicJsonDocument doc(512);
+                JsonDocument doc;
                 DeserializationError error = deserializeJson(doc, *body);
                 delete body;
                 request->_tempObject = nullptr;
@@ -539,7 +866,7 @@ void WebInterfaceManager::setupWebServer()
                     return;
                 }
 
-                if (!doc.containsKey("command") || !doc["command"].is<const char *>())
+                if (!doc["command"].is<const char *>())
                 {
                     request->send(400, "application/json", "{\"error\":\"Missing command field\"}");
                     return;
@@ -555,7 +882,7 @@ void WebInterfaceManager::setupWebServer()
                 String commandText(command);
                 bool success = tncManager->processConfigurationCommand(command);
 
-                DynamicJsonDocument response(1024);
+                JsonDocument response;
                 response["success"] = success;
                 response["status_text"] = tncManager->getConfigurationStatus();
                 response["message"] = success ? "Configuration command accepted." : "Configuration command rejected.";
@@ -569,8 +896,171 @@ void WebInterfaceManager::setupWebServer()
         });
 
     server.on(
+        "/api/pair", HTTP_POST,
+        [this](AsyncWebServerRequest *request) {
+            if (!ensureAuthenticated(request))
+            {
+                return;
+            }
+            if (!pairingRequired)
+            {
+                request->send(409, "application/json", "{\"error\":\"Device already paired\"}");
+                return;
+            }
+            if (!request->_tempObject)
+            {
+                request->_tempObject = new String();
+            }
+        },
+        nullptr,
+        [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+            if (!ensureAuthenticated(request))
+            {
+                return;
+            }
+            if (!pairingRequired)
+            {
+                request->send(409, "application/json", "{\"error\":\"Device already paired\"}");
+                return;
+            }
+
+            if (index == 0)
+            {
+                if (!request->_tempObject)
+                {
+                    request->_tempObject = new String();
+                }
+                size_t reserveSize = total;
+                if (reserveSize > MAX_JSON_BODY_SIZE)
+                {
+                    reserveSize = MAX_JSON_BODY_SIZE;
+                }
+                static_cast<String *>(request->_tempObject)->reserve(reserveSize);
+            }
+
+            String *body = static_cast<String *>(request->_tempObject);
+            if (body->length() + len > MAX_JSON_BODY_SIZE)
+            {
+                delete body;
+                request->_tempObject = nullptr;
+                request->send(413, "application/json", "{\"error\":\"JSON payload too large\"}");
+                return;
+            }
+
+            body->concat(reinterpret_cast<const char *>(data), len);
+
+            if (index + len != total)
+            {
+                return;
+            }
+
+            JsonDocument doc;
+            DeserializationError error = deserializeJson(doc, *body);
+            delete body;
+            request->_tempObject = nullptr;
+
+            if (error)
+            {
+                request->send(400, "application/json", "{\"error\":\"Invalid JSON payload\"}");
+                return;
+            }
+
+            if (!doc["wifi_ssid"].is<const char *>() || !doc["wifi_password"].is<const char *>() ||
+                !doc["ui_username"].is<const char *>() || !doc["ui_password"].is<const char *>())
+            {
+                request->send(400, "application/json", "{\"error\":\"Missing required fields\"}");
+                return;
+            }
+
+            String wifiSSID = doc["wifi_ssid"].as<String>();
+            String wifiPassword = doc["wifi_password"].as<String>();
+            String uiUsername = doc["ui_username"].as<String>();
+            String uiPassword = doc["ui_password"].as<String>();
+
+            wifiSSID.trim();
+            uiUsername.trim();
+
+            if (wifiSSID.isEmpty())
+            {
+                request->send(400, "application/json", "{\"error\":\"Wi-Fi SSID cannot be empty\"}");
+                return;
+            }
+
+            if (wifiPassword.length() < 8)
+            {
+                request->send(400, "application/json", "{\"error\":\"Wi-Fi password must be at least 8 characters\"}");
+                return;
+            }
+
+            if (uiUsername.isEmpty())
+            {
+                request->send(400, "application/json", "{\"error\":\"UI username cannot be empty\"}");
+                return;
+            }
+
+            if (uiPassword.length() < 8)
+            {
+                request->send(400, "application/json", "{\"error\":\"UI password must be at least 8 characters\"}");
+                return;
+            }
+
+            String incomingTheme;
+            bool incomingThemeProvided = false;
+            if (doc["theme"].is<const char *>())
+            {
+                incomingTheme = doc["theme"].as<String>();
+                incomingThemeProvided = true;
+            }
+
+            String normalisedTheme = uiThemePreference;
+            bool overrideTheme = uiThemeOverride;
+            if (incomingThemeProvided)
+            {
+                String normalised = normaliseThemePreference(incomingTheme);
+                if (normalised.isEmpty())
+                {
+                    request->send(400, "application/json", "{\"error\":\"Unsupported theme value\"}");
+                    return;
+                }
+                normalisedTheme = normalised;
+                overrideTheme = normalisedTheme != "system";
+            }
+
+            if (tncManager)
+            {
+                tncManager->setWiFiCredentials(wifiSSID, wifiPassword);
+                tncManager->setUICredentials(uiUsername, uiPassword);
+                tncManager->setUIThemePreference(normalisedTheme, overrideTheme);
+                tncManager->saveConfigurationToFlash();
+            }
+
+            uiThemePreference = normalisedTheme;
+            uiThemeOverride = overrideTheme;
+            pairingRequired = false;
+            temporaryApPassword = String();
+
+            refreshCredentialsFromConfig();
+            regenerateCsrfToken();
+            restartStationInterface();
+
+            JsonDocument response;
+            response["success"] = true;
+            response["sta_enabled"] = stationModeRequested();
+            response["theme"] = uiThemeOverride ? uiThemePreference : "system";
+            response["csrf_token"] = csrfToken;
+
+            String payload;
+            serializeJson(response, payload);
+            request->send(200, "application/json", payload);
+        });
+
+    server.on(
         "/api/command", HTTP_POST,
         [this](AsyncWebServerRequest *request) {
+            if (!ensureAuthenticated(request) || !ensureCsrfToken(request))
+            {
+                return;
+            }
             if (!request->_tempObject)
             {
                 request->send(400, "application/json", "{\"error\":\"Missing JSON body\"}");
@@ -578,6 +1068,10 @@ void WebInterfaceManager::setupWebServer()
         },
         nullptr,
         [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+            if (!ensureAuthenticated(request) || !ensureCsrfToken(request))
+            {
+                return;
+            }
             if (index == 0)
             {
                 request->_tempObject = new String();
@@ -602,7 +1096,7 @@ void WebInterfaceManager::setupWebServer()
 
             if (index + len == total)
             {
-                DynamicJsonDocument doc(512);
+                JsonDocument doc;
                 DeserializationError error = deserializeJson(doc, *body);
                 delete body;
                 request->_tempObject = nullptr;
@@ -613,7 +1107,7 @@ void WebInterfaceManager::setupWebServer()
                     return;
                 }
 
-                if (!doc.containsKey("command") || !doc["command"].is<const char *>())
+                if (!doc["command"].is<const char *>())
                 {
                     request->send(400, "application/json", "{\"error\":\"Missing command field\"}");
                     return;
@@ -630,7 +1124,7 @@ void WebInterfaceManager::setupWebServer()
                 TNCCommandResult result = tncManager->executeCommand(command);
                 CommandHttpMapping mapping = mapCommandResultToHttp(result);
 
-                DynamicJsonDocument response(512);
+                JsonDocument response;
                 response["success"] = mapping.success;
                 response["result"] = commandResultToString(result);
                 response["message"] = mapping.message;
@@ -643,11 +1137,140 @@ void WebInterfaceManager::setupWebServer()
             }
         });
 
+    auto peripheralToggleHandler = [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total,
+                                          std::function<bool(bool)> toggleFn, std::function<bool()> stateFn) {
+        if (!ensureAuthenticated(request) || !ensureCsrfToken(request))
+        {
+            return;
+        }
+
+        if (index == 0)
+        {
+            if (!request->_tempObject)
+            {
+                request->_tempObject = new String();
+            }
+            size_t reserveSize = total;
+            if (reserveSize > MAX_JSON_BODY_SIZE)
+            {
+                reserveSize = MAX_JSON_BODY_SIZE;
+            }
+            static_cast<String *>(request->_tempObject)->reserve(reserveSize);
+        }
+
+        String *body = static_cast<String *>(request->_tempObject);
+        if (body->length() + len > MAX_JSON_BODY_SIZE)
+        {
+            delete body;
+            request->_tempObject = nullptr;
+            request->send(413, "application/json", "{\"error\":\"JSON payload too large\"}");
+            return;
+        }
+
+        body->concat(reinterpret_cast<const char *>(data), len);
+
+        if (index + len != total)
+        {
+            return;
+        }
+
+        JsonDocument doc;
+        DeserializationError error = deserializeJson(doc, *body);
+        delete body;
+        request->_tempObject = nullptr;
+
+        if (error)
+        {
+            request->send(400, "application/json", "{\"error\":\"Invalid JSON payload\"}");
+            return;
+        }
+
+        if (!doc["enabled"].is<bool>())
+        {
+            request->send(400, "application/json", "{\"error\":\"Missing enabled field\"}");
+            return;
+        }
+
+        bool desiredState = doc["enabled"].as<bool>();
+        bool success = toggleFn ? toggleFn(desiredState) : false;
+
+        if (success && tncManager)
+        {
+            tncManager->saveConfigurationToFlash();
+        }
+
+        bool currentState = stateFn ? stateFn() : desiredState;
+
+        JsonDocument response;
+        response["success"] = success;
+        response["enabled"] = currentState;
+        response["csrf_token"] = csrfToken;
+
+        String payload;
+        serializeJson(response, payload);
+        request->send(success ? 200 : 503, "application/json", payload);
+    };
+
+    server.on(
+        "/api/peripherals/gnss", HTTP_POST,
+        [this](AsyncWebServerRequest *request) {
+            if (!ensureAuthenticated(request) || !ensureCsrfToken(request))
+            {
+                return;
+            }
+            if (!request->_tempObject)
+            {
+                request->_tempObject = new String();
+            }
+        },
+        nullptr,
+        [this, peripheralToggleHandler](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+            if (!tncManager)
+            {
+                request->send(503, "application/json", "{\"error\":\"TNC manager unavailable\"}");
+                return;
+            }
+
+            peripheralToggleHandler(request, data, len, index, total,
+                                    [this](bool enable) { return tncManager->setGNSSEnabled(enable); },
+                                    [this]() { return tncManager->isGNSSEnabled(); });
+        });
+
+    server.on(
+        "/api/peripherals/oled", HTTP_POST,
+        [this](AsyncWebServerRequest *request) {
+            if (!ensureAuthenticated(request) || !ensureCsrfToken(request))
+            {
+                return;
+            }
+            if (!request->_tempObject)
+            {
+                request->_tempObject = new String();
+            }
+        },
+        nullptr,
+        [this, peripheralToggleHandler](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+            if (!tncManager)
+            {
+                request->send(503, "application/json", "{\"error\":\"TNC manager unavailable\"}");
+                return;
+            }
+
+            peripheralToggleHandler(request, data, len, index, total,
+                                    [this](bool enable) { return tncManager->setOLEDEnabled(enable); },
+                                    [this]() { return tncManager->isOLEDEnabled(); });
+        });
+
     server.on(
         "/api/ui/theme", HTTP_GET, [this](AsyncWebServerRequest *request) {
-            DynamicJsonDocument doc(128);
+            if (!ensureAuthenticated(request))
+            {
+                return;
+            }
+            JsonDocument doc;
             doc["theme"] = uiThemeOverride ? uiThemePreference : "system";
             doc["override"] = uiThemeOverride;
+            doc["csrf_token"] = csrfToken;
 
             String payload;
             serializeJson(doc, payload);
@@ -656,7 +1279,11 @@ void WebInterfaceManager::setupWebServer()
 
     server.on(
         "/api/ui/theme", HTTP_POST,
-        [](AsyncWebServerRequest *request) {
+        [this](AsyncWebServerRequest *request) {
+            if (!ensureAuthenticated(request) || !ensureCsrfToken(request))
+            {
+                return;
+            }
             if (!request->_tempObject)
             {
                 request->_tempObject = new String();
@@ -664,6 +1291,10 @@ void WebInterfaceManager::setupWebServer()
         },
         nullptr,
         [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+            if (!ensureAuthenticated(request) || !ensureCsrfToken(request))
+            {
+                return;
+            }
             handleThemePost(request, data, len, index, total);
         });
 
@@ -672,6 +1303,10 @@ void WebInterfaceManager::setupWebServer()
         {
             String redirectUrl = String("http://") + WiFi.softAPIP().toString();
             request->redirect(redirectUrl);
+        }
+        else if (!ensureAuthenticated(request))
+        {
+            return;
         }
         else if (spiffsMounted)
         {
@@ -707,6 +1342,11 @@ void WebInterfaceManager::setupWebServer()
 
 void WebInterfaceManager::handleThemePost(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
 {
+    if (!ensureAuthenticated(request) || !ensureCsrfToken(request))
+    {
+        return;
+    }
+
     String *body = static_cast<String *>(request->_tempObject);
     if (index == 0 && !body)
     {
@@ -729,7 +1369,7 @@ void WebInterfaceManager::handleThemePost(AsyncWebServerRequest *request, uint8_
         return;
     }
 
-    DynamicJsonDocument doc(256);
+    JsonDocument doc;
     DeserializationError error = deserializeJson(doc, *body);
     delete body;
     request->_tempObject = nullptr;
@@ -740,7 +1380,7 @@ void WebInterfaceManager::handleThemePost(AsyncWebServerRequest *request, uint8_
         return;
     }
 
-    if (!doc.containsKey("theme"))
+    if (!doc["theme"].is<const char *>())
     {
         request->send(400, "application/json", "{\"error\":\"Missing theme field\"}");
         return;
@@ -757,23 +1397,30 @@ void WebInterfaceManager::handleThemePost(AsyncWebServerRequest *request, uint8_
     uiThemeOverride = normalised != "system";
     uiThemePreference = uiThemeOverride ? normalised : "system";
 
-    DynamicJsonDocument response(192);
+    if (tncManager)
+    {
+        tncManager->setUIThemePreference(uiThemePreference, uiThemeOverride);
+        tncManager->saveConfigurationToFlash();
+    }
+
+    JsonDocument response;
     response["theme"] = uiThemeOverride ? uiThemePreference : "system";
     response["override"] = uiThemeOverride;
-    if (doc.containsKey("source") && doc["source"].is<const char *>())
+    response["csrf_token"] = csrfToken;
+    if (doc["source"].is<const char *>())
     {
         response["source"] = doc["source"].as<const char *>();
     }
     else
     {
-    response["source"] = "user";
+        response["source"] = "user";
     }
 
     String payload;
     serializeJson(response, payload);
     request->send(200, "application/json", payload);
 
-    DynamicJsonDocument message(224);
+    JsonDocument message;
     message["type"] = "ui_theme";
     message["timestamp"] = millis();
     message["theme"] = uiThemeOverride ? uiThemePreference : "system";
@@ -789,7 +1436,7 @@ void WebInterfaceManager::sendStatusSnapshot(AsyncWebSocketClient *client, const
         return;
     }
 
-    DynamicJsonDocument doc(4096);
+    JsonDocument doc;
     doc["type"] = "status_snapshot";
     doc["timestamp"] = millis();
     doc["client_id"] = client->id();
@@ -798,11 +1445,12 @@ void WebInterfaceManager::sendStatusSnapshot(AsyncWebSocketClient *client, const
         doc["id"] = requestId;
     }
 
-    JsonObject wifi = doc.createNestedObject("wifi");
+    JsonObject wifi = doc["wifi"].to<JsonObject>();
     wifi["sta_connected"] = staConnected;
     wifi["ap_ssid"] = apSSID;
+    wifi["pairing_required"] = pairingRequired;
 
-    JsonObject tnc = doc.createNestedObject("tnc");
+    JsonObject tnc = doc["tnc"].to<JsonObject>();
     if (tncManager)
     {
         tnc["available"] = true;
@@ -810,7 +1458,7 @@ void WebInterfaceManager::sendStatusSnapshot(AsyncWebSocketClient *client, const
         tnc["status_text"] = snapshot.statusText;
 
         const DisplayManager::StatusData &displayStatus = snapshot.displayStatus;
-        JsonObject display = tnc.createNestedObject("display");
+        JsonObject display = tnc["display"].to<JsonObject>();
         display["mode"] = modeToString(displayStatus.mode);
         display["tx_count"] = displayStatus.txCount;
         display["rx_count"] = displayStatus.rxCount;
@@ -825,16 +1473,16 @@ void WebInterfaceManager::sendStatusSnapshot(AsyncWebSocketClient *client, const
         display["tx_power_dbm"] = displayStatus.txPower;
         display["uptime_ms"] = displayStatus.uptimeMillis;
 
-        JsonObject battery = display.createNestedObject("battery");
+        JsonObject battery = display["battery"].to<JsonObject>();
         battery["voltage"] = displayStatus.batteryVoltage;
         battery["percent"] = displayStatus.batteryPercent;
 
-        JsonObject powerOff = display.createNestedObject("power_off");
+        JsonObject powerOff = display["power_off"].to<JsonObject>();
         powerOff["active"] = displayStatus.powerOffActive;
         powerOff["progress"] = displayStatus.powerOffProgress;
         powerOff["complete"] = displayStatus.powerOffComplete;
 
-        JsonObject gnss = display.createNestedObject("gnss");
+        JsonObject gnss = display["gnss"].to<JsonObject>();
         gnss["enabled"] = displayStatus.gnssEnabled;
         gnss["has_fix"] = displayStatus.gnssHasFix;
         gnss["is_3d_fix"] = displayStatus.gnssIs3DFix;
@@ -884,9 +1532,10 @@ void WebInterfaceManager::sendStatusSnapshot(AsyncWebSocketClient *client, const
         tnc["status_text"] = "TNC manager unavailable";
     }
 
-    JsonObject ui = doc.createNestedObject("ui");
+    JsonObject ui = doc["ui"].to<JsonObject>();
     ui["theme"] = uiThemeOverride ? uiThemePreference : "system";
     ui["override"] = uiThemeOverride;
+    ui["csrf_token"] = csrfToken;
 
     sendJsonToClient(client, doc);
 }
@@ -898,7 +1547,7 @@ void WebInterfaceManager::sendErrorMessage(AsyncWebSocketClient *client, const S
         return;
     }
 
-    DynamicJsonDocument doc(192);
+    JsonDocument doc;
     doc["type"] = "error";
     doc["timestamp"] = millis();
     doc["message"] = message;
@@ -917,7 +1566,7 @@ void WebInterfaceManager::sendErrorMessage(AsyncWebSocketClient *client, const _
     sendErrorMessage(client, String(message), requestId);
 }
 
-void WebInterfaceManager::sendJsonToClient(AsyncWebSocketClient *client, DynamicJsonDocument &doc)
+void WebInterfaceManager::sendJsonToClient(AsyncWebSocketClient *client, JsonDocument &doc)
 {
     String payload;
     serializeJson(doc, payload);
@@ -950,53 +1599,45 @@ void WebInterfaceManager::broadcastStatus(const DisplayManager::StatusData &stat
         return;
     }
 
-    DynamicJsonDocument doc(1536);
+    JsonDocument doc;
     doc["type"] = "status";
     doc["timestamp"] = now;
     doc["client_count"] = webSocket.count();
 
     bool anyChange = firstBroadcast;
     JsonObject display;
-    bool displayCreated = false;
     JsonObject battery;
-    bool batteryCreated = false;
     JsonObject powerOff;
-    bool powerOffCreated = false;
     JsonObject gnss;
-    bool gnssCreated = false;
 
     auto ensureDisplay = [&]() -> JsonObject {
-        if (!displayCreated)
+        if (display.isNull())
         {
-            display = doc.createNestedObject("display");
-            displayCreated = true;
+            display = doc["display"].to<JsonObject>();
         }
         return display;
     };
 
     auto ensureBattery = [&]() -> JsonObject {
-        if (!batteryCreated)
+        if (battery.isNull())
         {
-            battery = ensureDisplay().createNestedObject("battery");
-            batteryCreated = true;
+            battery = ensureDisplay()["battery"].to<JsonObject>();
         }
         return battery;
     };
 
     auto ensurePowerOff = [&]() -> JsonObject {
-        if (!powerOffCreated)
+        if (powerOff.isNull())
         {
-            powerOff = ensureDisplay().createNestedObject("power_off");
-            powerOffCreated = true;
+            powerOff = ensureDisplay()["power_off"].to<JsonObject>();
         }
         return powerOff;
     };
 
     auto ensureGnss = [&]() -> JsonObject {
-        if (!gnssCreated)
+        if (gnss.isNull())
         {
-            gnss = ensureDisplay().createNestedObject("gnss");
-            gnssCreated = true;
+            gnss = ensureDisplay()["gnss"].to<JsonObject>();
         }
         return gnss;
     };
@@ -1280,7 +1921,7 @@ void WebInterfaceManager::notifyCommandResult(const String &command, TNCCommandR
 
     CommandHttpMapping mapping = mapCommandResultToHttp(result);
 
-    DynamicJsonDocument doc(320);
+    JsonDocument doc;
     doc["type"] = "command_result";
     doc["timestamp"] = millis();
     doc["command"] = command;
@@ -1308,7 +1949,7 @@ void WebInterfaceManager::notifyConfigurationResult(const String &command, bool 
         return;
     }
 
-    DynamicJsonDocument doc(512);
+    JsonDocument doc;
     doc["type"] = "config_result";
     doc["timestamp"] = millis();
     doc["command"] = command;
@@ -1338,7 +1979,7 @@ void WebInterfaceManager::broadcastAlert(const String &category, const String &m
         return;
     }
 
-    DynamicJsonDocument doc(256);
+    JsonDocument doc;
     doc["type"] = "alert";
     doc["timestamp"] = millis();
     doc["category"] = category;
@@ -1355,7 +1996,7 @@ void WebInterfaceManager::broadcastPacketNotification(size_t length, float rssi,
         return;
     }
 
-    DynamicJsonDocument doc(320);
+    JsonDocument doc;
     doc["type"] = "packet";
     doc["timestamp"] = millis();
     doc["length"] = static_cast<uint32_t>(length);
@@ -1406,6 +2047,7 @@ void WebInterfaceManager::setupWebSocket()
         }
     });
 
+    configureWebSocketAuthentication();
     server.addHandler(&webSocket);
 }
 
@@ -1416,7 +2058,7 @@ void WebInterfaceManager::handleWebSocketConnect(AsyncWebSocketClient *client)
         return;
     }
 
-    DynamicJsonDocument doc(512);
+    JsonDocument doc;
     doc["type"] = "hello";
     doc["timestamp"] = millis();
     doc["client_id"] = client->id();
@@ -1424,6 +2066,8 @@ void WebInterfaceManager::handleWebSocketConnect(AsyncWebSocketClient *client)
     doc["sta_connected"] = staConnected;
     doc["ui_theme"] = uiThemeOverride ? uiThemePreference : "system";
     doc["ui_theme_override"] = uiThemeOverride;
+    doc["csrf_token"] = csrfToken;
+    doc["pairing_required"] = pairingRequired;
     if (tncManager)
     {
         doc["tnc_available"] = true;
@@ -1447,7 +2091,7 @@ void WebInterfaceManager::handleWebSocketDisconnect(AsyncWebSocketClient *client
         return;
     }
 
-    DynamicJsonDocument doc(160);
+    JsonDocument doc;
     doc["type"] = "client_disconnected";
     doc["timestamp"] = millis();
     doc["client_id"] = client->id();
@@ -1461,7 +2105,7 @@ void WebInterfaceManager::handleWebSocketMessage(AsyncWebSocketClient *client, c
         return;
     }
 
-    DynamicJsonDocument doc(768);
+    JsonDocument doc;
     DeserializationError error = deserializeJson(doc, data, len);
     if (error)
     {
@@ -1469,7 +2113,7 @@ void WebInterfaceManager::handleWebSocketMessage(AsyncWebSocketClient *client, c
         return;
     }
 
-    if (!doc.containsKey("type") || !doc["type"].is<const char *>())
+    if (!doc["type"].is<const char *>())
     {
         sendErrorMessage(client, F("Missing type field."));
         return;
@@ -1479,14 +2123,34 @@ void WebInterfaceManager::handleWebSocketMessage(AsyncWebSocketClient *client, c
     type.toLowerCase();
 
     String requestId;
-    if (doc.containsKey("id"))
+    if (doc["id"].is<const char *>())
     {
         requestId = doc["id"].as<String>();
     }
 
+    auto requiresCsrf = [&](const String &messageType) {
+        return messageType == "command" || messageType == "config" || messageType == "ui_theme" || messageType == "theme";
+    };
+
+    if (requiresCsrf(type))
+    {
+        if (!doc["csrf_token"].is<const char *>())
+        {
+            sendErrorMessage(client, F("Missing CSRF token."), requestId);
+            return;
+        }
+
+        String token = doc["csrf_token"].as<String>();
+        if (token != csrfToken)
+        {
+            sendErrorMessage(client, F("Invalid CSRF token."), requestId);
+            return;
+        }
+    }
+
     if (type == "command")
     {
-        if (!doc.containsKey("command") || !doc["command"].is<const char *>())
+        if (!doc["command"].is<const char *>())
         {
             sendErrorMessage(client, F("Missing command field."), requestId);
             return;
@@ -1506,7 +2170,7 @@ void WebInterfaceManager::handleWebSocketMessage(AsyncWebSocketClient *client, c
 
     if (type == "config")
     {
-        if (!doc.containsKey("command") || !doc["command"].is<const char *>())
+        if (!doc["command"].is<const char *>())
         {
             sendErrorMessage(client, F("Missing command field."), requestId);
             return;
@@ -1532,7 +2196,7 @@ void WebInterfaceManager::handleWebSocketMessage(AsyncWebSocketClient *client, c
 
     if (type == "ping")
     {
-        DynamicJsonDocument response(160);
+        JsonDocument response;
         response["type"] = "pong";
         if (!requestId.isEmpty())
         {
@@ -1546,7 +2210,7 @@ void WebInterfaceManager::handleWebSocketMessage(AsyncWebSocketClient *client, c
 
     if (type == "ui_theme" || type == "theme")
     {
-        if (!doc.containsKey("theme"))
+        if (!doc["theme"].is<const char *>())
         {
             sendErrorMessage(client, F("Missing theme field."), requestId);
             return;
@@ -1563,7 +2227,13 @@ void WebInterfaceManager::handleWebSocketMessage(AsyncWebSocketClient *client, c
         uiThemeOverride = normalised != "system";
         uiThemePreference = uiThemeOverride ? normalised : "system";
 
-        DynamicJsonDocument response(224);
+        if (tncManager)
+        {
+            tncManager->setUIThemePreference(uiThemePreference, uiThemeOverride);
+            tncManager->saveConfigurationToFlash();
+        }
+
+        JsonDocument response;
         response["type"] = "ui_theme";
         if (!requestId.isEmpty())
         {
@@ -1574,6 +2244,7 @@ void WebInterfaceManager::handleWebSocketMessage(AsyncWebSocketClient *client, c
         response["override"] = uiThemeOverride;
         response["source"] = "websocket";
         response["client_id"] = client->id();
+        response["csrf_token"] = csrfToken;
         sendJsonToClient(nullptr, response);
         return;
     }

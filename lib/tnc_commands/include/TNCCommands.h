@@ -79,6 +79,27 @@ public:
 
     // Synchronize configuration with current peripheral state
     void setPeripheralStateDefaults(bool gnssEnabled, bool oledEnabled);
+    bool getStoredGNSSEnabled() const { return config.gnssEnabled; }
+    bool getStoredOLEDEnabled() const { return config.oledEnabled; }
+
+    // Wi-Fi credential helpers
+    bool hasWiFiCredentials() const { return config.wifiSSID.length() > 0 && config.wifiPassword.length() > 0; }
+    String getWiFiSSID() const { return config.wifiSSID; }
+    String getWiFiPassword() const { return config.wifiPassword; }
+    void setWiFiCredentials(const String& ssid, const String& password);
+    void clearWiFiCredentials();
+
+    // UI credential helpers
+    bool hasUICredentials() const { return config.uiUsername.length() > 0 && config.uiPassword.length() > 0; }
+    String getUIUsername() const { return config.uiUsername; }
+    String getUIPassword() const { return config.uiPassword; }
+    void setUICredentials(const String& username, const String& password);
+    void clearUICredentials();
+
+    // UI theme helpers
+    String getUIThemePreference() const { return config.uiThemePreference; }
+    bool isUIThemeOverrideEnabled() const { return config.uiThemeOverride; }
+    void setUIThemePreference(const String& theme, bool overrideEnabled);
     
     // Configuration management
     bool loadConfigurationFromFlash();
@@ -162,12 +183,20 @@ private:
         bool mconEnabled;
         uint8_t maxUsers;
         bool flowControl;
-        
+
         // System
         uint8_t debugLevel;
         bool autoSave;
         bool gnssEnabled;
         bool oledEnabled;
+
+        // Web and connectivity
+        String wifiSSID;
+        String wifiPassword;
+        String uiUsername;
+        String uiPassword;
+        String uiThemePreference;
+        bool uiThemeOverride;
     } config;
     
     // Statistics storage

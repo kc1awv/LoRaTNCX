@@ -75,6 +75,38 @@ public:
     bool processConfigurationCommand(const char *command);
 
     /**
+     * @brief Load configuration from persistent storage.
+     */
+    bool loadConfigurationFromFlash();
+
+    /**
+     * @brief Persist the current configuration to flash.
+     */
+    bool saveConfigurationToFlash();
+
+    /**
+     * @brief Wi-Fi credential helpers for the web interface.
+     */
+    bool hasWiFiCredentials() const;
+    String getWiFiSSID() const;
+    String getWiFiPassword() const;
+    void setWiFiCredentials(const String &ssid, const String &password);
+
+    /**
+     * @brief UI credential helpers for the web interface.
+     */
+    bool hasUICredentials() const;
+    String getUIUsername() const;
+    String getUIPassword() const;
+    void setUICredentials(const String &username, const String &password);
+
+    /**
+     * @brief UI theme helpers.
+     */
+    void setUIThemePreference(const String &theme, bool overrideEnabled);
+    void getUIThemePreference(String &theme, bool &overrideEnabled) const;
+
+    /**
      * @brief Execute a textual TNC command.
      */
     TNCCommandResult executeCommand(const String &command);

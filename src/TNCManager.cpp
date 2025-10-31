@@ -67,6 +67,16 @@ bool TNCManager::begin()
 {
     Serial.println("=== LoRaTNCX Initialization ===");
 
+    bool configLoaded = loadConfigurationFromFlash();
+    if (configLoaded)
+    {
+        Serial.println("Loaded configuration from flash.");
+    }
+    else
+    {
+        Serial.println("No saved configuration found; using defaults.");
+    }
+
     if (display.begin())
     {
         oledEnabled = true;
@@ -83,7 +93,15 @@ bool TNCManager::begin()
     lastBatteryPercent = batteryMonitor.computePercentage(lastBatteryVoltage);
     lastBatterySample = millis();
 
-    gnssEnabled = GNSS_ENABLED;
+    if (configLoaded)
+    {
+        gnssEnabled = commandSystem.getStoredGNSSEnabled();
+        oledEnabled = commandSystem.getStoredOLEDEnabled();
+    }
+    else
+    {
+        gnssEnabled = GNSS_ENABLED;
+    }
     gnssInitialised = false;
 
     if (gnssEnabled)
@@ -146,6 +164,18 @@ bool TNCManager::begin()
     commandSystem.setOLEDCallbacks(oledSetEnabledCallback, oledGetEnabledCallback);
     commandSystem.setPeripheralStateDefaults(isGNSSEnabled(), isOLEDEnabled());
     Serial.println("✓ Command system hardware integration enabled");
+
+    if (configLoaded)
+    {
+        if (commandSystem.getStoredGNSSEnabled() != isGNSSEnabled())
+        {
+            setGNSSEnabled(commandSystem.getStoredGNSSEnabled());
+        }
+        if (commandSystem.getStoredOLEDEnabled() != isOLEDEnabled())
+        {
+            setOLEDEnabled(commandSystem.getStoredOLEDEnabled());
+        }
+    }
 
     Serial.println("\n=== TNC Ready ===");
     Serial.println("Starting in Command mode...");
@@ -270,6 +300,72 @@ bool TNCManager::processConfigurationCommand(const char *command)
     }
 
     return processConfigurationCommand(safeCommand);
+}
+
+bool TNCManager::loadConfigurationFromFlash()
+{
+    bool loaded = commandSystem.loadConfigurationFromFlash();
+    if (loaded)
+    {
+        commandSystem.setPeripheralStateDefaults(commandSystem.getStoredGNSSEnabled(), commandSystem.getStoredOLEDEnabled());
+    }
+    return loaded;
+}
+
+bool TNCManager::saveConfigurationToFlash()
+{
+    return commandSystem.saveConfigurationToFlash();
+}
+
+bool TNCManager::hasWiFiCredentials() const
+{
+    return commandSystem.hasWiFiCredentials();
+}
+
+String TNCManager::getWiFiSSID() const
+{
+    return commandSystem.getWiFiSSID();
+}
+
+String TNCManager::getWiFiPassword() const
+{
+    return commandSystem.getWiFiPassword();
+}
+
+void TNCManager::setWiFiCredentials(const String &ssid, const String &password)
+{
+    commandSystem.setWiFiCredentials(ssid, password);
+}
+
+bool TNCManager::hasUICredentials() const
+{
+    return commandSystem.hasUICredentials();
+}
+
+String TNCManager::getUIUsername() const
+{
+    return commandSystem.getUIUsername();
+}
+
+String TNCManager::getUIPassword() const
+{
+    return commandSystem.getUIPassword();
+}
+
+void TNCManager::setUICredentials(const String &username, const String &password)
+{
+    commandSystem.setUICredentials(username, password);
+}
+
+void TNCManager::setUIThemePreference(const String &theme, bool overrideEnabled)
+{
+    commandSystem.setUIThemePreference(theme, overrideEnabled);
+}
+
+void TNCManager::getUIThemePreference(String &theme, bool &overrideEnabled) const
+{
+    theme = commandSystem.getUIThemePreference();
+    overrideEnabled = commandSystem.isUIThemeOverrideEnabled();
 }
 
 TNCCommandResult TNCManager::executeCommand(const String &command)

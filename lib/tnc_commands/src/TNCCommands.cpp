@@ -83,6 +83,12 @@ TNCCommands::TNCCommands()
     config.autoSave = true;
     config.gnssEnabled = false;
     config.oledEnabled = true;
+    config.wifiSSID = "";
+    config.wifiPassword = "";
+    config.uiUsername = "";
+    config.uiPassword = "";
+    config.uiThemePreference = "system";
+    config.uiThemeOverride = false;
     
     // Initialize statistics
     stats.packetsTransmitted = 0;
@@ -550,6 +556,31 @@ void TNCCommands::setPeripheralStateDefaults(bool gnssState, bool oledState) {
     config.oledEnabled = oledState;
 }
 
+void TNCCommands::setWiFiCredentials(const String& ssid, const String& password) {
+    config.wifiSSID = ssid;
+    config.wifiPassword = password;
+}
+
+void TNCCommands::clearWiFiCredentials() {
+    config.wifiSSID = "";
+    config.wifiPassword = "";
+}
+
+void TNCCommands::setUICredentials(const String& username, const String& password) {
+    config.uiUsername = username;
+    config.uiPassword = password;
+}
+
+void TNCCommands::clearUICredentials() {
+    config.uiUsername = "";
+    config.uiPassword = "";
+}
+
+void TNCCommands::setUIThemePreference(const String& theme, bool overrideEnabled) {
+    config.uiThemePreference = theme;
+    config.uiThemeOverride = overrideEnabled;
+}
+
 bool TNCCommands::loadConfigurationFromFlash() {
     Preferences preferences;
     if (!preferences.begin("tnc_config", true)) {
@@ -611,6 +642,12 @@ bool TNCCommands::loadConfigurationFromFlash() {
     config.debugLevel = preferences.getUChar("debugLevel", config.debugLevel);
     config.gnssEnabled = preferences.getBool("gnssEnabled", config.gnssEnabled);
     config.oledEnabled = preferences.getBool("oledEnabled", config.oledEnabled);
+    config.wifiSSID = preferences.getString("wifiSSID", config.wifiSSID);
+    config.wifiPassword = preferences.getString("wifiPassword", config.wifiPassword);
+    config.uiUsername = preferences.getString("uiUsername", config.uiUsername);
+    config.uiPassword = preferences.getString("uiPassword", config.uiPassword);
+    config.uiThemePreference = preferences.getString("uiTheme", config.uiThemePreference);
+    config.uiThemeOverride = preferences.getBool("uiThemeOverride", config.uiThemeOverride);
 
     preferences.end();
 
@@ -675,6 +712,12 @@ bool TNCCommands::saveConfigurationToFlash() {
     preferences.putUChar("debugLevel", config.debugLevel);
     preferences.putBool("gnssEnabled", config.gnssEnabled);
     preferences.putBool("oledEnabled", config.oledEnabled);
+    preferences.putString("wifiSSID", config.wifiSSID);
+    preferences.putString("wifiPassword", config.wifiPassword);
+    preferences.putString("uiUsername", config.uiUsername);
+    preferences.putString("uiPassword", config.uiPassword);
+    preferences.putString("uiTheme", config.uiThemePreference);
+    preferences.putBool("uiThemeOverride", config.uiThemeOverride);
 
     preferences.end();
     return true;
