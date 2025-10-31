@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="color-scheme" content="dark light" />
+        <title>LoRaTNCX • Console</title>
+        <link rel="stylesheet" href="./css/bootstrap.css" />
+        <style>
+            body {
+                min-height: 100vh;
+            }
+            .console-log {
+                display: flex;
+                flex-direction: column;
+                min-height: 320px;
+                max-height: 65vh;
+                overflow-y: auto;
+            }
+            .console-entry {
+                display: flex;
+                gap: 1rem;
+                padding: 0.75rem 1rem;
+                border-bottom: 1px solid var(--bs-border-color-translucent);
+            }
+            .console-entry:last-child {
+                border-bottom: none;
+            }
+            .console-entry__time {
+                width: 4.75rem;
+                flex-shrink: 0;
+            }
+            .console-entry__message {
+                white-space: pre-wrap;
+                word-break: break-word;
+                font-family: var(--bs-font-monospace);
+            }
+            .console-entry__details {
+                white-space: pre-wrap;
+                word-break: break-word;
+                font-family: var(--bs-font-monospace);
+            }
+        </style>
+    </head>
+    <body class="d-flex flex-column min-vh-100">
+        <nav class="navbar navbar-expand-lg bg-body-tertiary border-bottom shadow-sm">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="/index.html">LoRaTNCX</a>
+                <button
+                    class="navbar-toggler"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#mainNav"
+                    aria-controls="mainNav"
+                    aria-expanded="false"
+                    aria-label="Toggle navigation"
+                >
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="mainNav">
+                    <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                        <li class="nav-item"><a class="nav-link" data-nav="index" href="/index.html">Dashboard</a></li>
+                        <li class="nav-item"><a class="nav-link" data-nav="status" href="/status.html">Status</a></li>
+                        <li class="nav-item"><a class="nav-link" data-nav="config" href="/config.html">Configuration</a></li>
+                        <li class="nav-item"><a class="nav-link" data-nav="console" href="/console.html">Console</a></li>
+                    </ul>
+                    <div class="d-flex align-items-center gap-2">
+                        <label class="form-label mb-0 small" for="themeSelect">Theme</label>
+                        <select class="form-select form-select-sm" id="themeSelect" data-theme-toggle>
+                            <option value="system">System</option>
+                            <option value="light">Light</option>
+                            <option value="dark">Dark</option>
+                        </select>
+                        <span class="badge text-bg-secondary" data-theme-indicator>system</span>
+                    </div>
+                </div>
+            </div>
+        </nav>
+        <main class="container my-4 flex-grow-1 d-flex flex-column">
+            <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
+                <h1 class="h3 mb-0">Command console</h1>
+                <span class="badge text-bg-secondary" data-console-transport>Status unknown</span>
+                <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" data-console-clear>Clear log</button>
+            </div>
+            <section class="mb-4">
+                <form class="card card-body gap-3" data-console-form>
+                    <div>
+                        <label class="form-label" for="consoleCommand">Command</label>
+                        <input
+                            type="text"
+                            class="form-control"
+                            id="consoleCommand"
+                            name="command"
+                            autocomplete="off"
+                            placeholder="e.g. IDENT"
+                        />
+                        <div class="form-text">Commands are sent directly to the device firmware.</div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2 align-items-center">
+                        <button type="submit" class="btn btn-primary" data-console-send>Send command</button>
+                        <div class="small text-muted">Use ↑/↓ to navigate command history.</div>
+                    </div>
+                </form>
+            </section>
+            <section class="flex-grow-1 d-flex flex-column">
+                <h2 class="h5">Output</h2>
+                <div class="card flex-grow-1">
+                    <div class="card-body p-0">
+                        <div class="console-log bg-body-tertiary" data-console-log role="log" aria-live="polite">
+                            <div class="text-muted small text-center py-4" data-console-empty>No output yet.</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+        <footer class="border-top py-3 mt-auto">
+            <div class="container text-center text-muted small">LoRaTNCX Web Interface</div>
+        </footer>
+        <script src="./js/bootstrap.js" defer></script>
+        <script type="module" src="./js/console.js" defer></script>
+    </body>
+</html>
