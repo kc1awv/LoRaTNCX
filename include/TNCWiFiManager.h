@@ -8,6 +8,7 @@
 #include <Arduino.h>
 #include <Preferences.h>
 #include <WiFi.h>
+#include <functional>
 
 /**
  * @brief WiFi manager that prefers station mode with automatic AP fallback.
@@ -78,6 +79,14 @@ public:
      */
     String getAPPassword() const;
 
+    /**
+     * @brief Set callback for WiFi state changes
+     * @param callback Function called when WiFi state changes (ready/not ready)
+     */
+    void setStateChangeCallback(std::function<void(bool)> callback);
+
+private:
+
 private:
     static constexpr const char *PREF_NAMESPACE = "wifi";
     static constexpr uint8_t MAX_NETWORKS = 8;
@@ -103,6 +112,10 @@ private:
 
     String apSSID;
     String apPassword;
+    
+    // State change callback
+    std::function<void(bool)> stateChangeCallback;
+    bool lastWiFiReady;
 
     void loadNetworksFromPreferences();
     void saveNetworksToPreferences();

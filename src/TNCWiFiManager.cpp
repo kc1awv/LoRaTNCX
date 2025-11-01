@@ -5,7 +5,8 @@
 
 TNCWiFiManager::TNCWiFiManager()
     : networkCount(0), connectedNetworkIndex(-1), apModeActive(false), stationAttemptActive(false),
-      stationAttemptIndex(0), stationAttemptsTried(0), stationAttemptStart(0), lastReconnectCheck(0)
+      stationAttemptIndex(0), stationAttemptsTried(0), stationAttemptStart(0), lastReconnectCheck(0),
+      lastWiFiReady(false)
 {
 }
 
@@ -18,12 +19,14 @@ bool TNCWiFiManager::begin()
     configureDefaultAPCredentials();
     loadNetworksFromPreferences();
 
+    // Start by attempting to connect to saved networks
     if (networkCount > 0)
     {
         startStationAttempt(0);
     }
     else
     {
+        // No saved networks, start AP mode immediately
         startAccessPoint();
     }
 
@@ -38,37 +41,60 @@ void TNCWiFiManager::update()
     {
         if (WiFi.status() == WL_CONNECTED)
         {
+            // Successfully connected to station mode
             stationAttemptActive = false;
-            apModeActive = false;
             connectedNetworkIndex = static_cast<int8_t>(stationAttemptIndex);
             stationAttemptsTried = 0;
             lastReconnectCheck = now;
-            WiFi.softAPdisconnect(true);
+            Serial.print("✓ Connected to WiFi network: ");
+            Serial.println(networks[stationAttemptIndex].ssid);
         }
         else if (now - stationAttemptStart >= STA_CONNECT_TIMEOUT_MS)
         {
+            // Connection attempt timed out, try next network or fall back to AP
             advanceStationAttempt();
         }
     }
-    else
+    else if (!apModeActive)
     {
-        if ((WiFi.getMode() & WIFI_MODE_STA) && WiFi.status() == WL_CONNECTED)
+        // Neither STA nor AP active - this shouldn't happen, fall back to AP
+        Serial.println("⚠ WiFi inactive, starting AP mode");
+        startAccessPoint();
+    }
+    else if (connectedNetworkIndex >= 0 && WiFi.status() != WL_CONNECTED)
+    {
+        // We were connected but lost connection
+        connectedNetworkIndex = -1;
+        Serial.println("⚠ Lost WiFi connection, will retry");
+        
+        // Schedule reconnection attempt
+        if ((now - lastReconnectCheck) >= RECONNECT_INTERVAL_MS)
         {
-            connectedNetworkIndex = connectedNetworkIndex >= 0 ? connectedNetworkIndex : static_cast<int8_t>(stationAttemptIndex);
-        }
-        else if (networkCount > 0 && (now - lastReconnectCheck) >= RECONNECT_INTERVAL_MS)
-        {
-            startStationAttempt(connectedNetworkIndex >= 0 ? static_cast<uint8_t>(connectedNetworkIndex) : 0);
-        }
-        else if (networkCount == 0)
-        {
-            ensureFallbackIfIdle();
+            lastReconnectCheck = now;
+            if (networkCount > 0)
+            {
+                startStationAttempt(0);
+            }
         }
     }
-
-    if (!stationAttemptActive && networkCount == 0)
+    else if (networkCount > 0 && apModeActive && connectedNetworkIndex < 0 && 
+             (now - lastReconnectCheck) >= RECONNECT_INTERVAL_MS)
     {
-        ensureFallbackIfIdle();
+        // We're in AP mode but have networks to try connecting to
+        lastReconnectCheck = now;
+        startStationAttempt(0);
+    }
+
+    // Determine current WiFi ready state
+    bool currentWiFiReady = apModeActive || (WiFi.status() == WL_CONNECTED);
+    
+    if (currentWiFiReady != lastWiFiReady)
+    {
+        lastWiFiReady = currentWiFiReady;
+        if (stateChangeCallback)
+        {
+            stateChangeCallback(currentWiFiReady);
+        }
     }
 }
 
@@ -187,26 +213,30 @@ String TNCWiFiManager::getStatusSummary() const
     wl_status_t wifiStatus = WiFi.status();
     wifi_mode_t mode = WiFi.getMode();
 
+    // In dual mode, show both AP and STA status
+    if (apModeActive)
+    {
+        status = "AP: " + apSSID + " (" + WiFi.softAPIP().toString() + ")";
+    }
+
     if ((mode & WIFI_MODE_STA) && wifiStatus == WL_CONNECTED)
     {
-        status = "STA connected to " + WiFi.SSID();
-        IPAddress ip = WiFi.localIP();
-        status += " (" + ip.toString() + ")";
-    }
-    else if (apModeActive)
-    {
-        status = "AP " + apSSID + " (" + WiFi.softAPIP().toString() + ")";
+        if (!status.isEmpty()) status += " | ";
+        status += "STA: " + WiFi.SSID() + " (" + WiFi.localIP().toString() + ")";
     }
     else if (stationAttemptActive && stationAttemptIndex < networkCount)
     {
-        status = "Connecting to " + networks[stationAttemptIndex].ssid + "...";
+        if (!status.isEmpty()) status += " | ";
+        status += "STA: Connecting to " + networks[stationAttemptIndex].ssid + "...";
     }
-    else
+    else if (networkCount > 0)
     {
-        status = "WiFi idle";
+        if (!status.isEmpty()) status += " | ";
+        status += "STA: Disconnected";
     }
 
-    status += " | Configured STA networks: " + String(networkCount);
+    if (!status.isEmpty()) status += " | ";
+    status += "Networks: " + String(networkCount);
     return status;
 }
 
@@ -215,19 +245,23 @@ TNCWiFiManager::StatusInfo TNCWiFiManager::getStatusInfo() const
     StatusInfo info;
 
     wifi_mode_t mode = WiFi.getMode();
-    info.apActive = (mode & WIFI_MODE_AP) != 0 || apModeActive;
+    
+    // In dual mode, AP should always be active
+    info.apActive = apModeActive && (mode & WIFI_MODE_AP);
     info.stationActive = (mode & WIFI_MODE_STA) != 0;
     info.stationAttemptActive = stationAttemptActive;
 
     wl_status_t status = WiFi.status();
     info.stationConnected = info.stationActive && status == WL_CONNECTED;
 
+    // AP info (should always be available in dual mode)
     if (info.apActive)
     {
         info.apSSID = apSSID;
         info.apIP = WiFi.softAPIP();
     }
 
+    // STA info
     if (info.stationConnected)
     {
         info.stationSSID = WiFi.SSID();
@@ -240,7 +274,6 @@ TNCWiFiManager::StatusInfo TNCWiFiManager::getStatusInfo() const
     else if (connectedNetworkIndex >= 0 && connectedNetworkIndex < networkCount)
     {
         info.stationSSID = networks[connectedNetworkIndex].ssid;
-        info.stationIP = WiFi.localIP();
     }
 
     return info;
@@ -333,25 +366,38 @@ void TNCWiFiManager::generateRandomAPPassword()
     }
 }
 
+
+
 void TNCWiFiManager::startAccessPoint()
 {
     generateRandomAPPassword();
+
     WiFi.mode(WIFI_MODE_AP);
     WiFi.softAP(apSSID.c_str(), apPassword.c_str());
     apModeActive = true;
     stationAttemptActive = false;
     connectedNetworkIndex = -1;
+
+    Serial.println("✓ Access Point started");
+    Serial.print("✓ SSID: ");
+    Serial.print(apSSID);
+    Serial.print(" (Password: ");
+    Serial.print(apPassword);
+    Serial.println(")");
 }
 
 void TNCWiFiManager::startStationAttempt(uint8_t index)
 {
     if (networkCount == 0 || index >= networkCount)
     {
-        startAccessPoint();
+        // No networks to try, fall back to AP mode
+        if (!apModeActive)
+        {
+            startAccessPoint();
+        }
         return;
     }
 
-    WiFi.softAPdisconnect(true);
     WiFi.mode(WIFI_MODE_STA);
     WiFi.disconnect(true, true);
     WiFi.begin(networks[index].ssid.c_str(), networks[index].password.c_str());
@@ -362,36 +408,55 @@ void TNCWiFiManager::startStationAttempt(uint8_t index)
     stationAttemptsTried = 1;
     stationAttemptStart = millis();
     lastReconnectCheck = stationAttemptStart;
-    apModeActive = false;
+    
+    Serial.print("Attempting to connect to: ");
+    Serial.println(networks[index].ssid);
 }
 
 void TNCWiFiManager::advanceStationAttempt()
 {
     if (networkCount == 0)
     {
-        startAccessPoint();
+        // No networks to try, fall back to AP mode
+        stationAttemptActive = false;
+        if (!apModeActive)
+        {
+            startAccessPoint();
+        }
         return;
     }
 
     if (stationAttemptsTried >= networkCount)
     {
+        // Tried all networks, fall back to AP mode
+        stationAttemptActive = false;
+        Serial.println("Failed to connect to any saved network, starting AP mode");
         startAccessPoint();
         return;
     }
 
+    // Try next network
     stationAttemptIndex = (stationAttemptIndex + 1) % networkCount;
     stationAttemptsTried++;
     WiFi.disconnect(true, true);
     WiFi.begin(networks[stationAttemptIndex].ssid.c_str(), networks[stationAttemptIndex].password.c_str());
     stationAttemptStart = millis();
-    apModeActive = false;
+    
+    Serial.print("Trying next network: ");
+    Serial.println(networks[stationAttemptIndex].ssid);
 }
 
 void TNCWiFiManager::ensureFallbackIfIdle()
 {
-    if (!apModeActive)
+    // If neither STA nor AP mode is active, start AP mode
+    if (!apModeActive && !stationAttemptActive && WiFi.status() != WL_CONNECTED)
     {
         startAccessPoint();
     }
+}
+
+void TNCWiFiManager::setStateChangeCallback(std::function<void(bool)> callback)
+{
+    stateChangeCallback = callback;
 }
 

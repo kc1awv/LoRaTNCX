@@ -41,6 +41,7 @@ TNCManager::TNCManager()
       batteryMonitor(),
       gnss(),
       wifiManager(),
+      webServer(),
       kissTcpServer(KISS_TCP_PORT),
       nmeaTcpServer(NMEA_TCP_PORT)
 {
@@ -163,13 +164,75 @@ bool TNCManager::begin()
                                    wifiListNetworksCallback, wifiStatusCallback);
     Serial.println("✓ Command system hardware integration enabled");
 
+    // Initialize web server subsystem
+    if (webServer.begin())
+    {
+        Serial.println("✓ Web server subsystem initialized");
+        
+        // Setup web server callbacks
+        webServer.setCallbacks(
+            [this]() { return getSystemStatusForWeb(); },
+            [this]() { return getLoRaStatusForWeb(); },
+            [this]() { return getWiFiNetworksForWeb(); },
+            [this](const String& ssid, const String& password, String& message) {
+                bool result = wifiManager.addNetwork(ssid, password);
+                message = result ? "Network added successfully" : "Failed to add network";
+                return result;
+            },
+            [this](const String& ssid, String& message) {
+                bool result = wifiManager.removeNetwork(ssid);
+                message = result ? "Network removed successfully" : "Network not found";
+                return result;
+            }
+        );
+        Serial.println("✓ Web server callbacks configured");
+    }
+    else
+    {
+        Serial.println("✗ Web server initialization failed");
+    }
+
     if (wifiManager.begin())
     {
         Serial.println("✓ WiFi subsystem initialized");
+        
+        // Setup WiFi state change callback for web server management
+        wifiManager.onStateChange([this](bool ready) {
+            onWiFiStateChange(ready);
+        });
+        Serial.println("✓ WiFi state change callbacks configured");
     }
     else
     {
         Serial.println("✗ WiFi initialization failed");
+    }
+
+    // Initialize web server subsystem
+    if (webServer.begin())
+    {
+        Serial.println("✓ Web server subsystem initialized");
+        
+        // Set up callbacks for web server API endpoints
+        webServer.setCallbacks(
+            [this]() { return this->getSystemStatusForWeb(); },
+            [this]() { return this->getLoRaStatusForWeb(); },
+            [this]() { return this->getWiFiNetworksForWeb(); },
+            [this](const String& ssid, const String& password, String& message) {
+                bool result = this->wifiManager.addNetwork(ssid, password);
+                message = result ? "Network added successfully" : "Failed to add network";
+                return result;
+            },
+            [this](const String& ssid, String& message) {
+                bool result = this->wifiManager.removeNetwork(ssid);
+                message = result ? "Network removed successfully" : "Network not found";
+                return result;
+            }
+        );
+        Serial.println("✓ Web server callbacks configured");
+    }
+    else
+    {
+        Serial.println("✗ Web server initialization failed");
     }
 
     Serial.println("\n=== TNC Ready ===");
@@ -226,6 +289,7 @@ void TNCManager::update()
     }
 
     wifiManager.update();
+    webServer.update();
     updateTcpServers();
     processKISSTcpClients();
 
@@ -706,18 +770,14 @@ DisplayManager::StatusData TNCManager::buildDisplayStatus()
     status.powerOffProgress = powerOffProgress;
     status.powerOffComplete = powerOffComplete;
 
-    auto wifiInfo = wifiManager.getStatusInfo();
+    auto wifiInfo = wifiManager.getStatus();
     using WiFiMode = DisplayManager::StatusData::WiFiMode;
 
-    if (wifiInfo.apActive && wifiInfo.stationConnected)
-    {
-        status.wifiMode = WiFiMode::AP_STATION;
-    }
-    else if (wifiInfo.stationActive || wifiInfo.stationAttemptActive)
+    if (wifiInfo.state == SimpleWiFiManager::State::STA_CONNECTED)
     {
         status.wifiMode = WiFiMode::STATION;
     }
-    else if (wifiInfo.apActive)
+    else if (wifiInfo.state == SimpleWiFiManager::State::AP_READY)
     {
         status.wifiMode = WiFiMode::ACCESS_POINT;
     }
@@ -726,8 +786,9 @@ DisplayManager::StatusData TNCManager::buildDisplayStatus()
         status.wifiMode = WiFiMode::OFF;
     }
 
-    status.wifiConnected = wifiInfo.stationConnected || (status.wifiMode == WiFiMode::ACCESS_POINT);
-    status.wifiConnecting = wifiInfo.stationAttemptActive && !wifiInfo.stationConnected;
+    status.wifiConnected = (wifiInfo.state == SimpleWiFiManager::State::STA_CONNECTED) || 
+                          (status.wifiMode == WiFiMode::ACCESS_POINT);
+    status.wifiConnecting = (wifiInfo.state == SimpleWiFiManager::State::STA_CONNECTING);
     status.wifiHasIPAddress = false;
     status.wifiSSID[0] = '\0';
     status.wifiIPAddress[0] = '\0';
@@ -749,18 +810,18 @@ DisplayManager::StatusData TNCManager::buildDisplayStatus()
         }
     };
 
-    if (wifiInfo.stationConnected)
+    if (wifiInfo.state == SimpleWiFiManager::State::STA_CONNECTED)
     {
-        copyString(status.wifiSSID, sizeof(status.wifiSSID), wifiInfo.stationSSID);
+        copyString(status.wifiSSID, sizeof(status.wifiSSID), wifiInfo.currentSSID);
 
-        String ipString = wifiInfo.stationIP.toString();
+        String ipString = wifiInfo.currentIP.toString();
         if (ipString != "0.0.0.0")
         {
             copyString(status.wifiIPAddress, sizeof(status.wifiIPAddress), ipString);
             status.wifiHasIPAddress = true;
         }
     }
-    else if (wifiInfo.apActive)
+    else if (wifiInfo.state == SimpleWiFiManager::State::AP_READY)
     {
         copyString(status.wifiSSID, sizeof(status.wifiSSID), wifiInfo.apSSID);
 
@@ -772,15 +833,14 @@ DisplayManager::StatusData TNCManager::buildDisplayStatus()
         }
         
         // Get the AP password for display
-        String apPassword = wifiManager.getAPPassword();
-        if (!apPassword.isEmpty())
+        if (!wifiInfo.apPassword.isEmpty())
         {
-            copyString(status.wifiAPPassword, sizeof(status.wifiAPPassword), apPassword);
+            copyString(status.wifiAPPassword, sizeof(status.wifiAPPassword), wifiInfo.apPassword);
         }
     }
-    else if (!wifiInfo.stationSSID.isEmpty())
+    else if (!wifiInfo.currentSSID.isEmpty())
     {
-        copyString(status.wifiSSID, sizeof(status.wifiSSID), wifiInfo.stationSSID);
+        copyString(status.wifiSSID, sizeof(status.wifiSSID), wifiInfo.currentSSID);
     }
 
     status.gnssEnabled = gnssEnabled && gnssInitialised;
@@ -840,6 +900,7 @@ void TNCManager::performPowerOff()
     stopClients(nmeaTcpClients);
     kissTcpServer.stop();
     nmeaTcpServer.stop();
+    webServer.stop();
     
     // Turn off external power (OLED, sensors, etc.)
     digitalWrite(POWER_CTRL_PIN, POWER_OFF);
@@ -880,8 +941,8 @@ void TNCManager::performPowerOff()
 
 void TNCManager::updateTcpServers()
 {
-    auto wifiInfo = wifiManager.getStatusInfo();
-    bool wifiReady = wifiInfo.apActive || wifiInfo.stationConnected;
+    auto wifiInfo = wifiManager.getStatus();
+    bool wifiReady = wifiInfo.isReady;
 
     if (wifiReady)
     {
@@ -1237,7 +1298,9 @@ bool TNCManager::wifiAddNetworkCallback(const String &ssid, const String &passwo
 {
     if (instance)
     {
-        return instance->wifiManager.addNetwork(ssid, password, message);
+        bool result = instance->wifiManager.addNetwork(ssid, password);
+        message = result ? "Network added successfully" : "Failed to add network";
+        return result;
     }
     message = "WiFi manager unavailable";
     return false;
@@ -1247,7 +1310,9 @@ bool TNCManager::wifiRemoveNetworkCallback(const String &ssid, String &message)
 {
     if (instance)
     {
-        return instance->wifiManager.removeNetwork(ssid, message);
+        bool result = instance->wifiManager.removeNetwork(ssid);
+        message = result ? "Network removed successfully" : "Network not found";
+        return result;
     }
     message = "WiFi manager unavailable";
     return false;
@@ -1257,7 +1322,14 @@ void TNCManager::wifiListNetworksCallback(String &output)
 {
     if (instance)
     {
-        output = instance->wifiManager.getNetworksSummary();
+        auto networks = instance->wifiManager.getStoredNetworks();
+        output = "Stored networks:\n";
+        for (size_t i = 0; i < networks.size(); i++) {
+            output += String(i + 1) + ". " + networks[i].ssid + "\n";
+        }
+        if (networks.empty()) {
+            output = "No networks stored";
+        }
     }
     else
     {
@@ -1269,11 +1341,102 @@ void TNCManager::wifiStatusCallback(String &output)
 {
     if (instance)
     {
-        output = instance->wifiManager.getStatusSummary();
+        auto status = instance->wifiManager.getStatus();
+        output = "WiFi Status:\n";
+        output += "State: ";
+        switch (status.state) {
+            case SimpleWiFiManager::State::INIT: output += "Initializing"; break;
+            case SimpleWiFiManager::State::STA_CONNECTING: output += "Connecting to station"; break;
+            case SimpleWiFiManager::State::STA_CONNECTED: output += "Connected to station"; break;
+            case SimpleWiFiManager::State::AP_STARTING: output += "Starting access point"; break;
+            case SimpleWiFiManager::State::AP_READY: output += "Access point ready"; break;
+            case SimpleWiFiManager::State::ERROR: output += "Error"; break;
+        }
+        output += "\n";
+        
+        if (!status.currentSSID.isEmpty()) {
+            output += "Connected to: " + status.currentSSID + "\n";
+            output += "IP Address: " + status.currentIP.toString() + "\n";
+        }
+        
+        if (!status.apSSID.isEmpty()) {
+            output += "AP SSID: " + status.apSSID + "\n";
+            output += "AP IP: " + status.apIP.toString() + "\n";
+        }
     }
     else
     {
         output = "WiFi manager unavailable";
     }
+}
+
+void TNCManager::onWiFiStateChange(bool ready)
+{
+    if (ready)
+    {
+        // Only start web server if it's not already running
+        if (!webServer.isRunning())
+        {
+            Serial.println("WiFi is ready - starting web server...");
+            if (webServer.start())
+            {
+                auto wifiInfo = wifiManager.getStatus();
+                if (wifiInfo.state == SimpleWiFiManager::State::STA_CONNECTED)
+                {
+                    Serial.print("Web interface available at: http://");
+                    Serial.println(wifiInfo.currentIP.toString());
+                }
+                else if (wifiInfo.state == SimpleWiFiManager::State::AP_READY)
+                {
+                    Serial.print("Web interface available at: http://");
+                    Serial.println(wifiInfo.apIP.toString());
+                    Serial.print("AP Password: ");
+                    Serial.println(wifiInfo.apPassword);
+                }
+            }
+        }
+    }
+    else
+    {
+        // Only stop web server if WiFi is truly disconnected (not just a temporary state change)
+        auto wifiInfo = wifiManager.getStatus();
+        bool actuallyDisconnected = !wifiInfo.isReady;
+        
+        if (actuallyDisconnected && webServer.isRunning())
+        {
+            Serial.println("WiFi disconnected - stopping web server...");
+            webServer.stop();
+        }
+        else if (!actuallyDisconnected)
+        {
+            Serial.println("WiFi state change detected, but connection still available - keeping web server running");
+        }
+    }
+}
+
+String TNCManager::getSystemStatusForWeb()
+{
+    return getStatus();
+}
+
+String TNCManager::getLoRaStatusForWeb()
+{
+    return radio.getStatus();
+}
+
+String TNCManager::getWiFiNetworksForWeb()
+{
+    String result = "[";
+    auto networks = wifiManager.getStoredNetworks();
+    
+    for (size_t i = 0; i < networks.size(); i++) {
+        if (i > 0) {
+            result += ",";
+        }
+        result += "{\"ssid\":\"" + networks[i].ssid + "\"}";
+    }
+    
+    result += "]";
+    return result;
 }
 
