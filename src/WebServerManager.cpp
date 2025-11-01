@@ -4,6 +4,7 @@
  */
 
 #include "WebServerManager.h"
+#include "SystemLogger.h"
 #include <AsyncJson.h>
 #include <ArduinoJson.h>
 
@@ -16,24 +17,24 @@ WebServerManager::WebServerManager(uint16_t port)
 
 bool WebServerManager::begin()
 {
-    Serial.println("Initializing web server subsystem...");
+    LOG_WEB_INFO("Initializing web server subsystem...");
 
     if (!initializeFilesystem())
     {
-        Serial.println("✗ Web server filesystem initialization failed");
+        LOG_WEB_ERROR("✗ Web server filesystem initialization failed");
         return false;
     }
 
     // Initialize API manager
     if (!apiManager->begin())
     {
-        Serial.println("✗ API manager initialization failed");
+        LOG_WEB_ERROR("✗ API manager initialization failed");
         return false;
     }
 
     setupRoutes();
-    Serial.println("✓ Web server routes configured");
-    Serial.println("✓ Web server subsystem initialized (server will start when WiFi is ready)");
+    LOG_WEB_INFO("✓ Web server routes configured");
+    LOG_WEB_INFO("✓ Web server subsystem initialized (server will start when WiFi is ready)");
     return true;
 }
 
@@ -51,24 +52,19 @@ bool WebServerManager::start()
         return true;
     }
 
-    if (!filesystemMounted)
+    if (!filesystemMounted) 
     {
-        Serial.println("✗ Cannot start web server - filesystem not mounted");
+        LOG_WEB_ERROR("✗ Cannot start web server - filesystem not mounted");
         return false;
     }
 
-    Serial.print("Starting web server on port ");
-    Serial.print(serverPort);
-    Serial.println("...");
-
+    LOG_WEB_INFO("Starting web server on port " + String(serverPort) + "...");
+    
     server.begin();
     serverRunning = true;
-
-    Serial.println("✓ Web server started successfully");
-    Serial.print("✓ Web interface available at http://[device-ip]:");
-    Serial.println(serverPort);
     
-    return true;
+    LOG_WEB_INFO("✓ Web server started successfully");
+    LOG_WEB_INFO("✓ Web interface available at http://[device-ip]:" + String(serverPort));    return true;
 }
 
 void WebServerManager::stop()
@@ -78,10 +74,10 @@ void WebServerManager::stop()
         return;
     }
 
-    Serial.println("Stopping web server...");
+    LOG_WEB_INFO("Stopping web server...");
     server.end();
     serverRunning = false;
-    Serial.println("✓ Web server stopped");
+    LOG_WEB_INFO("✓ Web server stopped");
 }
 
 void WebServerManager::setCallbacks(
@@ -103,28 +99,24 @@ void WebServerManager::setCallbacks(
 
 bool WebServerManager::initializeFilesystem()
 {
-    Serial.println("Mounting SPIFFS filesystem...");
+    LOG_WEB_INFO("Mounting SPIFFS filesystem...");
     
     if (!SPIFFS.begin(true))  // Format if mount fails
     {
-        Serial.println("✗ SPIFFS mount failed");
+        LOG_WEB_ERROR("✗ SPIFFS mount failed");
         return false;
     }
 
     filesystemMounted = true;
-    Serial.println("✓ SPIFFS mounted successfully");
+    LOG_WEB_INFO("✓ SPIFFS mounted successfully");
 
     // List available files for debugging
-    Serial.println("Available web files:");
+    LOG_WEB_INFO("Available web files:");
     File root = SPIFFS.open("/");
     File file = root.openNextFile();
     while (file)
     {
-        Serial.print("  ");
-        Serial.print(file.name());
-        Serial.print(" (");
-        Serial.print(file.size());
-        Serial.println(" bytes)");
+        LOG_WEB_INFO("  " + String(file.name()) + " (" + String(file.size()) + " bytes)");
         file = root.openNextFile();
     }
 

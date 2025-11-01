@@ -4,6 +4,7 @@
  */
 
 #include "SimpleWiFiManager.h"
+#include "SystemLogger.h"
 #include <esp_system.h>
 
 SimpleWiFiManager::SimpleWiFiManager() 
@@ -18,7 +19,7 @@ SimpleWiFiManager::SimpleWiFiManager()
 
 bool SimpleWiFiManager::begin()
 {
-    Serial.println("SimpleWiFiManager: Starting...");
+    LOG_WIFI_INFO("SimpleWiFiManager: Starting...");
     
     // Clean WiFi initialization
     WiFi.persistent(false);
@@ -161,7 +162,7 @@ void SimpleWiFiManager::loadNetworks()
     }
     
     uint8_t count = prefs.getUChar("count", 0);
-    Serial.printf("SimpleWiFiManager: Loading %d networks\n", count);
+    LOG_WIFI_INFO("SimpleWiFiManager: Loading " + String(count) + " networks");
     
     for (uint8_t i = 0; i < count && i < MAX_NETWORKS; i++) {
         String ssidKey = "ssid" + String(i);
@@ -175,7 +176,7 @@ void SimpleWiFiManager::loadNetworks()
             network.ssid = ssid;
             network.password = password;
             networks.push_back(network);
-            Serial.printf("SimpleWiFiManager: Loaded network '%s'\n", ssid.c_str());
+            LOG_WIFI_INFO("SimpleWiFiManager: Loaded network '" + ssid + "'");
         }
     }
     

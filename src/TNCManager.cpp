@@ -6,6 +6,7 @@
  */
 
 #include "TNCManager.h"
+#include "SystemLogger.h"
 
 #include "HardwareConfig.h"
 
@@ -80,17 +81,18 @@ TNCManager::TNCManager()
 
 bool TNCManager::begin()
 {
-    Serial.println("=== LoRaTNCX Initialization ===");
+    LOG_BOOT_INFO("=== LoRaTNCX Initialization ===");
 
     if (display.begin())
     {
         oledEnabled = true;
         display.showBootScreen();
+        LOG_BOOT_SUCCESS("OLED display initialized");
     }
     else
     {
         oledEnabled = false;
-        Serial.println("OLED display not available");
+        LOG_BOOT_INFO("OLED display not available");
     }
 
     batteryMonitor.begin();
@@ -103,21 +105,21 @@ bool TNCManager::begin()
 
     if (gnssEnabled)
     {
-        Serial.println("Initializing GNSS module...");
+        LOG_GNSS_INFO("Initializing GNSS module...");
         if (gnss.begin())
         {
-            Serial.println("✓ GNSS module initialized");
+            LOG_GNSS_INFO("✓ GNSS module initialized");
             gnssInitialised = true;
         }
         else
         {
-            Serial.println("✗ GNSS initialization failed");
+            LOG_GNSS_ERROR("✗ GNSS initialization failed");
             gnssEnabled = false;
         }
     }
     else
     {
-        Serial.println("GNSS module disabled");
+        LOG_GNSS_INFO("GNSS module disabled");
     }
 
     pinMode(USER_BUTTON_PIN, INPUT_PULLUP);
@@ -139,21 +141,21 @@ bool TNCManager::begin()
     // Initialize KISS protocol
     if (!kiss.begin())
     {
-        Serial.println("✗ KISS protocol initialization failed");
+        LOG_KISS_ERROR("✗ KISS protocol initialization failed");
         return false;
     }
 
     // Initialize with default amateur radio configuration (balanced)
-    Serial.println("✓ KISS protocol initialized");
-    Serial.println("Configuring LoRa radio with amateur radio settings...");
+    LOG_KISS_INFO("✓ KISS protocol initialized");
+    LOG_LORA_INFO("Configuring LoRa radio with amateur radio settings...");
 
     if (!configManager.setConfiguration(LoRaConfigPreset::BALANCED))
     {
-        Serial.println("✗ LoRa radio configuration failed");
+        LOG_LORA_ERROR("✗ LoRa radio configuration failed");
         return false;
     }
 
-    Serial.println("✓ LoRa radio configured");
+    LOG_LORA_INFO("✓ LoRa radio configured");
 
     // Connect radio to command system for hardware integration
     commandSystem.setRadio(&radio);
@@ -162,12 +164,12 @@ bool TNCManager::begin()
     commandSystem.setPeripheralStateDefaults(isGNSSEnabled(), isOLEDEnabled());
     commandSystem.setWiFiCallbacks(wifiAddNetworkCallback, wifiRemoveNetworkCallback,
                                    wifiListNetworksCallback, wifiStatusCallback);
-    Serial.println("✓ Command system hardware integration enabled");
+    LOG_BOOT_SUCCESS("Command system hardware integration enabled");
 
     // Initialize web server subsystem
     if (webServer.begin())
     {
-        Serial.println("✓ Web server subsystem initialized");
+        LOG_WEB_INFO("✓ Web server subsystem initialized");
         
         // Setup web server callbacks
         webServer.setCallbacks(
@@ -185,62 +187,43 @@ bool TNCManager::begin()
                 return result;
             }
         );
-        Serial.println("✓ Web server callbacks configured");
+        LOG_WEB_INFO("✓ Web server callbacks configured");
     }
     else
     {
-        Serial.println("✗ Web server initialization failed");
+        LOG_WEB_ERROR("✗ Web server initialization failed");
     }
 
     if (wifiManager.begin())
     {
-        Serial.println("✓ WiFi subsystem initialized");
+        LOG_WIFI_INFO("✓ WiFi subsystem initialized");
         
         // Setup WiFi state change callback for web server management
         wifiManager.onStateChange([this](bool ready) {
             onWiFiStateChange(ready);
         });
-        Serial.println("✓ WiFi state change callbacks configured");
+        LOG_WIFI_INFO("✓ WiFi state change callbacks configured");
     }
     else
     {
-        Serial.println("✗ WiFi initialization failed");
+        LOG_WIFI_ERROR("✗ WiFi initialization failed");
     }
 
-    // Initialize web server subsystem
-    if (webServer.begin())
-    {
-        Serial.println("✓ Web server subsystem initialized");
-        
-        // Set up callbacks for web server API endpoints
-        webServer.setCallbacks(
-            [this]() { return this->getSystemStatusForWeb(); },
-            [this]() { return this->getLoRaStatusForWeb(); },
-            [this]() { return this->getWiFiNetworksForWeb(); },
-            [this](const String& ssid, const String& password, String& message) {
-                bool result = this->wifiManager.addNetwork(ssid, password);
-                message = result ? "Network added successfully" : "Failed to add network";
-                return result;
-            },
-            [this](const String& ssid, String& message) {
-                bool result = this->wifiManager.removeNetwork(ssid);
-                message = result ? "Network removed successfully" : "Network not found";
-                return result;
-            }
-        );
-        Serial.println("✓ Web server callbacks configured");
-    }
-    else
-    {
-        Serial.println("✗ Web server initialization failed");
-    }
+    // Initialize web server subsystem (duplicate initialization - removing)
+    // This is a duplicate of the initialization above
 
+    LOG_BOOT_INFO("\n=== TNC Ready ===");
+    LOG_BOOT_INFO("Starting in Command mode...");
+    LOG_BOOT_INFO("Type HELP for available commands");
+    LOG_BOOT_INFO("Type KISS to enter KISS mode");
+    LOG_BOOT_INFO(configManager.getConfigStatus());
+    LOG_BOOT_INFO("===============================");
+    
+    // Only show final ready message on console for user
     Serial.println("\n=== TNC Ready ===");
     Serial.println("Starting in Command mode...");
     Serial.println("Type HELP for available commands");
     Serial.println("Type KISS to enter KISS mode");
-    Serial.println(configManager.getConfigStatus());
-    Serial.println("===============================");
 
     initialized = true;
 
@@ -263,7 +246,7 @@ void TNCManager::update()
         {
             if (gnss.syncSystemTime())
             {
-                Serial.println("System clock synchronized via GNSS.");
+                LOG_GNSS_INFO("System clock synchronized via GNSS.");
             }
         }
     }
@@ -529,7 +512,7 @@ void TNCManager::handleIncomingKISS()
         {
             if (commandSystem.getDebugLevel() >= 2)
             {
-                Serial.println("TNC: Processing configuration command: " + frameData);
+                LOG_DEBUG("TNC: Processing configuration command: " + frameData);
             }
             processConfigurationCommand(frameData);
             return; // Don't transmit configuration commands over radio
@@ -539,21 +522,19 @@ void TNCManager::handleIncomingKISS()
         // Only show debug output in command mode (not KISS mode)
         if (commandSystem.getCurrentMode() != TNCMode::KISS_MODE && commandSystem.getDebugLevel() >= 2)
         {
-            Serial.print("TNC: Transmitting ");
-            Serial.print(length);
-            Serial.print(" bytes: ");
+            String debugData = "TNC: Transmitting " + String(length) + " bytes: ";
             for (size_t i = 0; i < length && i < 20; i++)
             {
                 if (buffer[i] >= 32 && buffer[i] < 127)
                 {
-                    Serial.print((char)buffer[i]);
+                    debugData += (char)buffer[i];
                 }
                 else
                 {
-                    Serial.print('.');
+                    debugData += '.';
                 }
             }
-            Serial.println();
+            LOG_DEBUG(debugData);
         }
 
         // Transmit packet
@@ -562,7 +543,7 @@ void TNCManager::handleIncomingKISS()
             // Only show debug output in command mode (not KISS mode)
             if (commandSystem.getCurrentMode() != TNCMode::KISS_MODE && commandSystem.getDebugLevel() >= 2)
             {
-                Serial.println("TNC: Transmission successful");
+                LOG_DEBUG("TNC: Transmission successful");
             }
         }
         else
@@ -570,7 +551,7 @@ void TNCManager::handleIncomingKISS()
             // Only show debug output in command mode (not KISS mode)
             if (commandSystem.getCurrentMode() != TNCMode::KISS_MODE && commandSystem.getDebugLevel() >= 2)
             {
-                Serial.println("TNC: Transmission failed");
+                LOG_DEBUG("TNC: Transmission failed");
             }
         }
     }
@@ -604,25 +585,20 @@ void TNCManager::handleIncomingRadio()
 
             if (commandSystem.getDebugLevel() >= 2)
             {
-                Serial.print("TNC: Received ");
-                Serial.print(length);
-                Serial.print(" bytes via LoRa: ");
+                String debugData = "TNC: Received " + String(length) + " bytes via LoRa: ";
                 for (size_t i = 0; i < length && i < 20; i++)
                 {
                     if (buffer[i] >= 32 && buffer[i] < 127)
                     {
-                        Serial.print((char)buffer[i]);
+                        debugData += (char)buffer[i];
                     }
                     else
                     {
-                        Serial.print('.');
+                        debugData += '.';
                     }
                 }
-                Serial.print(" (RSSI: ");
-                Serial.print(rssi, 1);
-                Serial.print(" dBm, SNR: ");
-                Serial.print(snr, 1);
-                Serial.println(" dB)");
+                debugData += " (RSSI: " + String(rssi, 1) + " dBm, SNR: " + String(snr, 1) + " dB)";
+                LOG_DEBUG(debugData);
             }
 
             // Process packet for connection management and protocol handling
@@ -887,12 +863,14 @@ void TNCManager::performPowerOff()
     powerOffWarningActive = true;
     powerOffProgress = 1.0f;
 
+    LOG_INFO("POWER", "Power-off button hold detected. Shutting down.");
     Serial.println("Power-off button hold detected. Shutting down.");
 
     display.updateStatus(buildDisplayStatus());
     delay(500);
 
     // Shutdown all peripherals first
+    LOG_INFO("POWER", "Shutting down peripherals...");
     Serial.println("Shutting down peripherals...");
     
     // Stop all TCP clients and servers
@@ -923,6 +901,7 @@ void TNCManager::performPowerOff()
     // Final delay before deep sleep
     delay(1000);
     
+    LOG_INFO("POWER", "Entering deep sleep mode...");
     Serial.println("Entering deep sleep mode...");
     Serial.flush(); // Ensure message is sent before sleep
     
@@ -1163,16 +1142,16 @@ bool TNCManager::setGNSSEnabled(bool enable)
     {
         if (!gnssEnabled || !gnssInitialised)
         {
-            Serial.println("Enabling GNSS module...");
+            LOG_GNSS_INFO("Enabling GNSS module...");
             gnssEnabled = true;
             if (gnss.begin())
             {
-                Serial.println("✓ GNSS module enabled");
+                LOG_GNSS_INFO("✓ GNSS module enabled");
                 gnssInitialised = true;
             }
             else
             {
-                Serial.println("✗ GNSS initialization failed");
+                LOG_GNSS_ERROR("✗ GNSS initialization failed");
                 gnssEnabled = false;
                 gnssInitialised = false;
                 result = false;
@@ -1183,14 +1162,14 @@ bool TNCManager::setGNSSEnabled(bool enable)
     {
         if (gnssEnabled || gnssInitialised)
         {
-            Serial.println("Disabling GNSS module...");
+            LOG_GNSS_INFO("Disabling GNSS module...");
             if (gnssInitialised)
             {
                 gnss.end();
             }
             gnssEnabled = false;
             gnssInitialised = false;
-            Serial.println("✓ GNSS module disabled");
+            LOG_GNSS_INFO("✓ GNSS module disabled");
         }
     }
 
@@ -1202,7 +1181,7 @@ bool TNCManager::setOLEDEnabled(bool enable)
 {
     if (!display.isAvailable())
     {
-        Serial.println("OLED display hardware not available");
+        LOG_ERROR("OLED", "OLED display hardware not available");
         oledEnabled = false;
         commandSystem.setPeripheralStateDefaults(isGNSSEnabled(), isOLEDEnabled());
         return false;
@@ -1214,16 +1193,16 @@ bool TNCManager::setOLEDEnabled(bool enable)
     {
         if (!oledEnabled || !display.isEnabled())
         {
-            Serial.println("Enabling OLED display...");
+            LOG_INFO("OLED", "Enabling OLED display...");
             if (display.setEnabled(true))
             {
                 oledEnabled = true;
-                Serial.println("✓ OLED display enabled");
+                LOG_INFO("OLED", "✓ OLED display enabled");
                 display.updateStatus(buildDisplayStatus());
             }
             else
             {
-                Serial.println("✗ OLED display enable failed");
+                LOG_ERROR("OLED", "✗ OLED display enable failed");
                 oledEnabled = display.isEnabled();
                 result = false;
             }
@@ -1237,15 +1216,15 @@ bool TNCManager::setOLEDEnabled(bool enable)
     {
         if (oledEnabled && display.isEnabled())
         {
-            Serial.println("Disabling OLED display...");
+            LOG_INFO("OLED", "Disabling OLED display...");
             if (display.setEnabled(false))
             {
                 oledEnabled = false;
-                Serial.println("✓ OLED display disabled");
+                LOG_INFO("OLED", "✓ OLED display disabled");
             }
             else
             {
-                Serial.println("✗ OLED display disable failed");
+                LOG_ERROR("OLED", "✗ OLED display disable failed");
                 oledEnabled = display.isEnabled();
                 result = false;
             }
@@ -1377,17 +1356,21 @@ void TNCManager::onWiFiStateChange(bool ready)
         // Only start web server if it's not already running
         if (!webServer.isRunning())
         {
+            LOG_WIFI_INFO("WiFi is ready - starting web server...");
             Serial.println("WiFi is ready - starting web server...");
             if (webServer.start())
             {
                 auto wifiInfo = wifiManager.getStatus();
                 if (wifiInfo.state == SimpleWiFiManager::State::STA_CONNECTED)
                 {
+                    LOG_WEB_INFO("Web interface available at: http://" + wifiInfo.currentIP.toString());
                     Serial.print("Web interface available at: http://");
                     Serial.println(wifiInfo.currentIP.toString());
                 }
                 else if (wifiInfo.state == SimpleWiFiManager::State::AP_READY)
                 {
+                    LOG_WEB_INFO("Web interface available at: http://" + wifiInfo.apIP.toString());
+                    LOG_WEB_INFO("AP Password: " + wifiInfo.apPassword);
                     Serial.print("Web interface available at: http://");
                     Serial.println(wifiInfo.apIP.toString());
                     Serial.print("AP Password: ");
@@ -1404,12 +1387,12 @@ void TNCManager::onWiFiStateChange(bool ready)
         
         if (actuallyDisconnected && webServer.isRunning())
         {
-            Serial.println("WiFi disconnected - stopping web server...");
+            LOG_WIFI_INFO("WiFi disconnected - stopping web server...");
             webServer.stop();
         }
         else if (!actuallyDisconnected)
         {
-            Serial.println("WiFi state change detected, but connection still available - keeping web server running");
+            LOG_WIFI_INFO("WiFi state change detected, but connection still available - keeping web server running");
         }
     }
 }

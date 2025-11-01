@@ -4,6 +4,7 @@
  */
 
 #include "SystemAPIHandler.h"
+#include "SystemLogger.h"
 #include <WiFi.h>
 #include <esp_system.h>
 
@@ -29,6 +30,12 @@ void SystemAPIHandler::registerRoutes(AsyncWebServer& server)
     server.on((basePath + "/performance").c_str(), HTTP_GET, 
         [this](AsyncWebServerRequest* request) {
             this->handlePerformanceInfo(request);
+        });
+
+    // System logs endpoint
+    server.on((basePath + "/logs").c_str(), HTTP_GET, 
+        [this](AsyncWebServerRequest* request) {
+            this->handleSystemLogs(request);
         });
 
     // OPTIONS handler for CORS
@@ -119,4 +126,83 @@ void SystemAPIHandler::handlePerformanceInfo(AsyncWebServerRequest* request)
     reset["wakeup_cause"] = esp_sleep_get_wakeup_cause();
     
     sendSuccess(request, dataDoc, "Performance metrics retrieved successfully");
+}
+
+void SystemAPIHandler::handleSystemLogs(AsyncWebServerRequest* request)
+{
+    SystemLogger* logger = SystemLogger::getInstance();
+    if (!logger) {
+        sendError(request, "Logging system not available", 503);
+        return;
+    }
+    
+    // Parse query parameters
+    size_t count = 100;  // Default count
+    LogLevel minLevel = LogLevel::DEBUG;  // Default level
+    
+    if (request->hasParam("count")) {
+        String countStr = request->getParam("count")->value();
+        int parsedCount = countStr.toInt();
+        if (parsedCount > 0 && parsedCount <= 1000) {
+            count = parsedCount;
+        }
+    }
+    
+    if (request->hasParam("level")) {
+        String levelStr = request->getParam("level")->value();
+        minLevel = SystemLogger::stringToLevel(levelStr);
+    }
+    
+    // Handle special flags
+    if (request->hasParam("all") && request->getParam("all")->value() == "true") {
+        count = 0;  // Get all entries
+    }
+    
+    // Get log entries
+    auto entries = logger->getRecentEntries(count, minLevel);
+    
+    JsonDocument dataDoc;
+    JsonArray logsArray = dataDoc["logs"].to<JsonArray>();
+    
+    for (const auto& entry : entries) {
+        JsonObject logEntry = logsArray.add<JsonObject>();
+        logEntry["timestamp"] = entry.timestamp;
+        logEntry["level"] = SystemLogger::levelToString(entry.level);
+        logEntry["component"] = entry.component;
+        logEntry["message"] = entry.message;
+        
+        // Add human-readable timestamp
+        uint32_t seconds = entry.timestamp / 1000;
+        uint32_t millis_part = entry.timestamp % 1000;
+        uint32_t hours = seconds / 3600;
+        seconds %= 3600;
+        uint32_t minutes = seconds / 60;
+        seconds %= 60;
+        
+        char timeStr[32];
+        if (hours > 0) {
+            snprintf(timeStr, sizeof(timeStr), "%02lu:%02lu:%02lu.%03lu", 
+                    hours, minutes, seconds, millis_part);
+        } else {
+            snprintf(timeStr, sizeof(timeStr), "%02lu:%02lu.%03lu", 
+                    minutes, seconds, millis_part);
+        }
+        logEntry["time_formatted"] = String(timeStr);
+    }
+    
+    // Add statistics
+    auto stats = logger->getStats();
+    JsonObject statsObj = dataDoc["stats"].to<JsonObject>();
+    statsObj["total_messages"] = stats.totalMessages;
+    statsObj["dropped_messages"] = stats.droppedMessages;
+    statsObj["current_entries"] = stats.currentEntries;
+    statsObj["max_capacity"] = stats.maxEntries;
+    statsObj["uptime_ms"] = stats.uptimeMs;
+    
+    // Add metadata
+    dataDoc["requested_count"] = count;
+    dataDoc["requested_level"] = SystemLogger::levelToString(minLevel);
+    dataDoc["returned_count"] = entries.size();
+    
+    sendSuccess(request, dataDoc, "Log entries retrieved successfully");
 }

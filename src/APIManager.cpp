@@ -4,6 +4,7 @@
  */
 
 #include "APIManager.h"
+#include "SystemLogger.h"
 #include <SPIFFS.h>
 #include <WiFi.h>
 
@@ -17,7 +18,7 @@ bool APIManager::begin()
         return true;
     }
 
-    Serial.println("Initializing API management system...");
+    LOG_BOOT_INFO("Initializing API management system...");
 
     // Create API handlers
     systemHandler = std::make_unique<SystemAPIHandler>();
@@ -30,7 +31,7 @@ bool APIManager::begin()
     // in specific member variables. The handlers vector would be for additional handlers.
 
     initialized = true;
-    Serial.println("✓ API management system initialized");
+    LOG_BOOT_SUCCESS("API management system initialized");
     
     return true;
 }
@@ -38,11 +39,11 @@ bool APIManager::begin()
 void APIManager::registerRoutes(AsyncWebServer& server)
 {
     if (!initialized) {
-        Serial.println("✗ Cannot register routes - API manager not initialized");
+        LOG_ERROR("Cannot register routes - API manager not initialized");
         return;
     }
 
-    Serial.println("Registering API routes...");
+    LOG_BOOT_INFO("Registering API routes...");
 
     // Register all handler routes
     systemHandler->registerRoutes(server);
@@ -57,7 +58,7 @@ void APIManager::registerRoutes(AsyncWebServer& server)
     // Setup debug and utility routes
     setupDebugRoutes(server);
 
-    Serial.println("✓ API routes registered successfully");
+    LOG_BOOT_SUCCESS("API routes registered successfully");
 }
 
 void APIManager::setSystemStatusCallback(std::function<String()> callback)
@@ -150,6 +151,7 @@ void APIManager::handleAPIRoot(AsyncWebServerRequest* request)
     systemEndpoints["status"] = "GET /api/system/status";
     systemEndpoints["info"] = "GET /api/system/info";
     systemEndpoints["performance"] = "GET /api/system/performance";
+    systemEndpoints["logs"] = "GET /api/system/logs?count=N&level=LEVEL&all=true";
     
     JsonObject loraEndpoints = endpoints["lora"].to<JsonObject>();
     loraEndpoints["status"] = "GET /api/lora/status";

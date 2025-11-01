@@ -6,10 +6,11 @@
  */
 
 #include "KISSProtocol.h"
+#include "SystemLogger.h"
 
 bool KISSProtocol::begin()
 {
-    Serial.println("Initializing KISS protocol...");
+    LOG_BOOT_INFO("Initializing KISS protocol...");
 
     // Initialize state
     rxIndex = 0;
@@ -31,13 +32,12 @@ bool KISSProtocol::begin()
     fullDuplex = false;    // Half duplex by default
     exitRequested = false; // No exit request initially
 
-    Serial.println("✓ KISS protocol initialized");
-    Serial.println("Default parameters:");
-    Serial.printf("  TX Delay: %d (%.1f ms)\r\n", txDelay, txDelay * 10.0);
-    Serial.printf("  Persistence: %d (%.1f%%)\r\n", persistence, (persistence / 255.0) * 100.0);
-    Serial.printf("  Slot Time: %d (%.1f ms)\r\n", slotTime, slotTime * 10.0);
-    Serial.printf("  TX Tail: %d (%.1f ms)\r\n", txTail, txTail * 10.0);
-    Serial.printf("  Full Duplex: %s\r\n", fullDuplex ? "Yes" : "No");
+    LOG_BOOT_SUCCESS("KISS protocol initialized");
+    LOG_DEBUG("KISS default parameters - TX Delay: " + String(txDelay) + " (" + String(txDelay * 10.0) + " ms)");
+    LOG_DEBUG("KISS default parameters - Persistence: " + String(persistence) + " (" + String((persistence / 255.0) * 100.0) + "%)");
+    LOG_DEBUG("KISS default parameters - Slot Time: " + String(slotTime) + " (" + String(slotTime * 10.0) + " ms)");
+    LOG_DEBUG("KISS default parameters - TX Tail: " + String(txTail) + " (" + String(txTail * 10.0) + " ms)");
+    LOG_DEBUG("KISS default parameters - Full Duplex: " + String(fullDuplex ? "Yes" : "No"));
 
     return true;
 }

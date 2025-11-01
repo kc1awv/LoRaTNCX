@@ -21,6 +21,7 @@
 #include "TNCManager.h"
 #include "KISSProtocol.h"
 #include "LoRaRadio.h"
+#include "SystemLogger.h"
 
 // Global instances
 TNCManager tnc;
@@ -29,18 +30,24 @@ void setup()
     Serial.begin(115200);
     delay(2000);
 
-    Serial.println("LoRaTNCX - LoRa Terminal Node Controller");
-    Serial.println("Based on proven ping/pong communication foundation");
-    Serial.println("Initializing...");
+    // Initialize logging system first
+    SystemLogger* logger = SystemLogger::getInstance();
+    logger->begin();
+    
+    LOG_BOOT_INFO("LoRaTNCX - LoRa Terminal Node Controller");
+    LOG_BOOT_INFO("Based on proven ping/pong communication foundation");
+    LOG_BOOT_INFO("System initialization starting...");
 
     // Initialize TNC - this will handle all subsystem initialization
     if (tnc.begin())
     {
-        Serial.println("TNC initialization successful!");
-        Serial.println("Ready for KISS protocol communication");
+        LOG_BOOT_SUCCESS("TNC initialization successful!");
+        LOG_BOOT_INFO("Ready for KISS protocol communication");
     }
     else
     {
+        LOG_BOOT_FAILURE("TNC initialization failed!");
+        // Critical failure - show on console
         Serial.println("TNC initialization failed!");
         while (true)
         {

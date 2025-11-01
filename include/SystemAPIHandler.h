@@ -53,4 +53,9 @@ private:
      * @brief Handle GET /api/system/performance
      */
     void handlePerformanceInfo(AsyncWebServerRequest* request);
+
+    /**
+     * @brief Handle GET /api/system/logs
+     */
+    void handleSystemLogs(AsyncWebServerRequest* request);
 };

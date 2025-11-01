@@ -1,4 +1,5 @@
 #include "ConfigurationManager.h"
+#include "SystemLogger.h"
 #include "Arduino.h"
 
 // Static configuration definitions
@@ -130,21 +131,12 @@ bool ConfigurationManager::setConfiguration(LoRaConfigPreset preset)
     }
 
     // Apply configuration to radio
-    Serial.print("Configuring radio: ");
-    Serial.println(currentConfig.name);
-    Serial.print("  Frequency: ");
-    Serial.print(currentConfig.frequency, 1);
-    Serial.println(" MHz");
-    Serial.print("  Bandwidth: ");
-    Serial.print(currentConfig.bandwidth, 1);
-    Serial.println(" kHz");
-    Serial.print("  Spreading Factor: SF");
-    Serial.println(currentConfig.spreadingFactor);
-    Serial.print("  Coding Rate: 4/");
-    Serial.println(currentConfig.codingRate);
-    Serial.print("  Max Payload: ");
-    Serial.print(currentConfig.maxPayload);
-    Serial.println(" bytes");
+    LOG_BOOT_INFO("Configuring radio: " + String(currentConfig.name));
+    LOG_DEBUG("  Frequency: " + String(currentConfig.frequency, 1) + " MHz");
+    LOG_DEBUG("  Bandwidth: " + String(currentConfig.bandwidth, 1) + " kHz");
+    LOG_DEBUG("  Spreading Factor: SF" + String(currentConfig.spreadingFactor));
+    LOG_DEBUG("  Coding Rate: 4/" + String(currentConfig.codingRate));
+    LOG_DEBUG("  Max Payload: " + String(currentConfig.maxPayload) + " bytes");
 
     bool result = radio->begin(
         currentConfig.frequency,
@@ -155,17 +147,14 @@ bool ConfigurationManager::setConfiguration(LoRaConfigPreset preset)
     if (result)
     {
         currentPreset = preset;
-        Serial.println("Configuration applied successfully");
-        Serial.print("Expected range: ");
-        Serial.println(currentConfig.expectedRange);
-        Serial.print("Expected throughput: ");
-        Serial.println(currentConfig.expectedThroughput);
-        Serial.print("Use case: ");
-        Serial.println(currentConfig.useCase);
+        LOG_BOOT_SUCCESS("Configuration applied successfully");
+        LOG_DEBUG("Expected range: " + String(currentConfig.expectedRange));
+        LOG_DEBUG("Expected throughput: " + String(currentConfig.expectedThroughput));
+        LOG_DEBUG("Use case: " + String(currentConfig.useCase));
     }
     else
     {
-        Serial.println("ERROR: Failed to apply configuration");
+        LOG_ERROR("Failed to apply configuration");
     }
 
     return result;
@@ -175,7 +164,7 @@ bool ConfigurationManager::setCustomConfiguration(float frequency, float bandwid
 {
     if (!validateConfiguration(frequency, bandwidth, sf, cr))
     {
-        Serial.println("ERROR: Invalid custom configuration parameters");
+        LOG_ERROR("Invalid custom configuration parameters");
         return false;
     }
 

@@ -6,6 +6,7 @@
  */
 
 #include "LoRaRadio.h"
+#include "SystemLogger.h"
 #include <math.h>
 
 LoRaRadio::LoRaRadio()
@@ -31,7 +32,7 @@ LoRaRadio::LoRaRadio()
 bool LoRaRadio::begin()
 {
     const bool reconfiguring = initialized;
-    Serial.println(reconfiguring ? "Reconfiguring LoRa radio with default configuration..."
+    LOG_LORA_INFO(reconfiguring ? "Reconfiguring LoRa radio with default configuration..."
                                  : "Initializing LoRa radio...");
 
     // Initialize SPI and PA control only once
@@ -364,23 +365,23 @@ String LoRaRadio::getStatus()
 
 void LoRaRadio::initializePAControl()
 {
-    Serial.println("Configuring PA control pins (using proven method)...");
+    LOG_BOOT_INFO("Configuring PA control pins (using proven method)...");
 
     // PA Power Control (LORA_PA_POWER = 7) - ANALOG mode (factory firmware insight)
     pinMode(LORA_PA_POWER_PIN, ANALOG);
-    Serial.printf("  PA_POWER (pin %d): ANALOG mode (factory style)\r\n", LORA_PA_POWER_PIN);
+    LOG_DEBUG("  PA_POWER (pin " + String(LORA_PA_POWER_PIN) + "): ANALOG mode (factory style)");
 
     // PA Enable (LORA_PA_EN = 2) - Keep enabled
     pinMode(LORA_PA_EN_PIN, OUTPUT);
     digitalWrite(LORA_PA_EN_PIN, HIGH);
-    Serial.printf("  PA_EN (pin %d): HIGH\r\n", LORA_PA_EN_PIN);
+    LOG_DEBUG("  PA_EN (pin " + String(LORA_PA_EN_PIN) + "): HIGH");
 
     // PA TX Enable (LORA_PA_TX_EN = 46) - Start in receive mode
     pinMode(LORA_PA_TX_EN_PIN, OUTPUT);
     digitalWrite(LORA_PA_TX_EN_PIN, LOW); // LOW for receive mode
-    Serial.printf("  PA_TX_EN (pin %d): LOW (RX mode)\r\n", LORA_PA_TX_EN_PIN);
+    LOG_DEBUG("  PA_TX_EN (pin " + String(LORA_PA_TX_EN_PIN) + "): LOW (RX mode)");
 
-    Serial.println("PA configured: Power/Enable HIGH, TX_EN LOW for receive mode");
+    LOG_BOOT_SUCCESS("PA configured: Power/Enable HIGH, TX_EN LOW for receive mode");
 
     // Power stabilization delay
     delay(200);
@@ -409,9 +410,9 @@ void LoRaRadio::setPA(bool transmit)
 
 void LoRaRadio::initializeSPI()
 {
-    Serial.println("Initializing SPI...");
+    LOG_BOOT_INFO("Initializing SPI...");
     SPI.begin(LORA_SCK_PIN, LORA_MISO_PIN, LORA_MOSI_PIN, LORA_SS_PIN);
-    Serial.println("✓ SPI initialized");
+    LOG_BOOT_SUCCESS("SPI initialized");
     spiInitialized = true;
 }
 
