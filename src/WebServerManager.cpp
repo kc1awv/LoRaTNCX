@@ -10,6 +10,8 @@
 WebServerManager::WebServerManager(uint16_t port)
     : server(port), serverPort(port), serverRunning(false), filesystemMounted(false)
 {
+    // Initialize API manager
+    apiManager = std::make_unique<APIManager>();
 }
 
 bool WebServerManager::begin()
@@ -19,6 +21,13 @@ bool WebServerManager::begin()
     if (!initializeFilesystem())
     {
         Serial.println("✗ Web server filesystem initialization failed");
+        return false;
+    }
+
+    // Initialize API manager
+    if (!apiManager->begin())
+    {
+        Serial.println("✗ API manager initialization failed");
         return false;
     }
 
@@ -82,11 +91,14 @@ void WebServerManager::setCallbacks(
     std::function<bool(const String&, const String&, String&)> addWiFiNetwork,
     std::function<bool(const String&, String&)> removeWiFiNetwork)
 {
-    getSystemStatusCallback = getSystemStatus;
-    getLoRaStatusCallback = getLoRaStatus;
-    getWiFiNetworksCallback = getWiFiNetworks;
-    addWiFiNetworkCallback = addWiFiNetwork;
-    removeWiFiNetworkCallback = removeWiFiNetwork;
+    // Set callbacks through API manager
+    if (apiManager) {
+        apiManager->setSystemStatusCallback(getSystemStatus);
+        apiManager->setLoRaStatusCallback(getLoRaStatus);
+        apiManager->setWiFiNetworksCallback(getWiFiNetworks);
+        apiManager->setAddWiFiNetworkCallback(addWiFiNetwork);
+        apiManager->setRemoveWiFiNetworkCallback(removeWiFiNetwork);
+    }
 }
 
 bool WebServerManager::initializeFilesystem()
@@ -122,7 +134,11 @@ bool WebServerManager::initializeFilesystem()
 void WebServerManager::setupRoutes()
 {
     setupStaticFiles();
-    setupAPIRoutes();
+    
+    // Register API routes through API manager
+    if (apiManager) {
+        apiManager->registerRoutes(server);
+    }
     
     // Handle 404
     server.onNotFound([this](AsyncWebServerRequest *request) {
@@ -134,9 +150,9 @@ void WebServerManager::setupStaticFiles()
 {
     // Serve root index.html
     server.on("/", HTTP_GET, [this](AsyncWebServerRequest *request) {
-        if (fileExists("/www/index.html"))
+        if (fileExists("/index.html"))
         {
-            request->send(SPIFFS, "/www/index.html", "text/html");
+            request->send(SPIFFS, "/index.html", "text/html");
         }
         else
         {
@@ -146,246 +162,24 @@ void WebServerManager::setupStaticFiles()
     });
 
     // Serve static files with proper MIME types
-    server.serveStatic("/css/", SPIFFS, "/www/css/")
+    server.serveStatic("/css/", SPIFFS, "/css/")
         .setDefaultFile("index.html")
         .setCacheControl("max-age=86400"); // Cache CSS for 24 hours
     
-    server.serveStatic("/js/", SPIFFS, "/www/js/")
+    server.serveStatic("/js/", SPIFFS, "/js/")
         .setDefaultFile("index.html")
         .setCacheControl("max-age=86400"); // Cache JS for 24 hours
+    
+    server.serveStatic("/fonts/", SPIFFS, "/fonts/")
+        .setDefaultFile("index.html")
+        .setCacheControl("max-age=86400"); // Cache fonts for 24 hours
 
-    // Serve any other static files from www directory
-    server.serveStatic("/", SPIFFS, "/www/")
+    // Serve any other static files from root directory
+    server.serveStatic("/", SPIFFS, "/")
         .setDefaultFile("index.html");
 }
 
-void WebServerManager::setupAPIRoutes()
-{
-    // System status API
-    server.on("/api/system/status", HTTP_GET, [this](AsyncWebServerRequest *request) {
-        this->handleSystemStatus(request);
-    });
 
-    // LoRa status API
-    server.on("/api/lora/status", HTTP_GET, [this](AsyncWebServerRequest *request) {
-        this->handleLoRaStatus(request);
-    });
-
-    // WiFi networks API
-    server.on("/api/wifi/networks", HTTP_GET, [this](AsyncWebServerRequest *request) {
-        this->handleWiFiNetworks(request);
-    });
-
-    // Add WiFi network API
-    server.on("/api/wifi/add", HTTP_POST, [this](AsyncWebServerRequest *request) {
-        this->handleAddWiFiNetwork(request);
-    });
-
-    // Remove WiFi network API
-    server.on("/api/wifi/remove", HTTP_POST, [this](AsyncWebServerRequest *request) {
-        this->handleRemoveWiFiNetwork(request);
-    });
-
-    // Debug API - List SPIFFS files
-    server.on("/api/debug/files", HTTP_GET, [this](AsyncWebServerRequest *request) {
-        this->handleListFiles(request);
-    });
-
-    // Enable CORS for all API endpoints
-    server.on("/api/*", HTTP_OPTIONS, [this](AsyncWebServerRequest *request) {
-        AsyncWebServerResponse *response = request->beginResponse(200);
-        setCORSHeaders(response);
-        request->send(response);
-    });
-}
-
-void WebServerManager::handleSystemStatus(AsyncWebServerRequest *request)
-{
-    JsonDocument doc;
-    
-    if (getSystemStatusCallback)
-    {
-        String status = getSystemStatusCallback();
-        doc["status"] = "ok";
-        doc["data"] = status;
-        doc["uptime"] = millis();
-        doc["free_heap"] = ESP.getFreeHeap();
-        doc["chip_model"] = ESP.getChipModel();
-        doc["cpu_freq"] = ESP.getCpuFreqMHz();
-    }
-    else
-    {
-        doc["status"] = "error";
-        doc["message"] = "System status callback not available";
-    }
-
-    String jsonString;
-    serializeJson(doc, jsonString);
-    
-    AsyncWebServerResponse *response = request->beginResponse(200, "application/json", jsonString);
-    setCORSHeaders(response);
-    request->send(response);
-}
-
-void WebServerManager::handleLoRaStatus(AsyncWebServerRequest *request)
-{
-    JsonDocument doc;
-    
-    if (getLoRaStatusCallback)
-    {
-        String status = getLoRaStatusCallback();
-        doc["status"] = "ok";
-        doc["data"] = status;
-    }
-    else
-    {
-        doc["status"] = "error";
-        doc["message"] = "LoRa status callback not available";
-    }
-
-    String jsonString;
-    serializeJson(doc, jsonString);
-    
-    AsyncWebServerResponse *response = request->beginResponse(200, "application/json", jsonString);
-    setCORSHeaders(response);
-    request->send(response);
-}
-
-void WebServerManager::handleWiFiNetworks(AsyncWebServerRequest *request)
-{
-    JsonDocument doc;
-    
-    if (getWiFiNetworksCallback)
-    {
-        String networks = getWiFiNetworksCallback();
-        doc["status"] = "ok";
-        doc["data"] = networks;
-    }
-    else
-    {
-        doc["status"] = "error";
-        doc["message"] = "WiFi networks callback not available";
-    }
-
-    String jsonString;
-    serializeJson(doc, jsonString);
-    
-    AsyncWebServerResponse *response = request->beginResponse(200, "application/json", jsonString);
-    setCORSHeaders(response);
-    request->send(response);
-}
-
-void WebServerManager::handleAddWiFiNetwork(AsyncWebServerRequest *request)
-{
-    JsonDocument doc;
-    
-    if (!request->hasParam("ssid", true) || !request->hasParam("password", true))
-    {
-        doc["status"] = "error";
-        doc["message"] = "Missing SSID or password parameter";
-    }
-    else if (!addWiFiNetworkCallback)
-    {
-        doc["status"] = "error";
-        doc["message"] = "Add WiFi network callback not available";
-    }
-    else
-    {
-        String ssid = request->getParam("ssid", true)->value();
-        String password = request->getParam("password", true)->value();
-        String message;
-        
-        if (addWiFiNetworkCallback(ssid, password, message))
-        {
-            doc["status"] = "ok";
-            doc["message"] = message;
-        }
-        else
-        {
-            doc["status"] = "error";
-            doc["message"] = message;
-        }
-    }
-
-    String jsonString;
-    serializeJson(doc, jsonString);
-    
-    AsyncWebServerResponse *response = request->beginResponse(200, "application/json", jsonString);
-    setCORSHeaders(response);
-    request->send(response);
-}
-
-void WebServerManager::handleRemoveWiFiNetwork(AsyncWebServerRequest *request)
-{
-    JsonDocument doc;
-    
-    if (!request->hasParam("ssid", true))
-    {
-        doc["status"] = "error";
-        doc["message"] = "Missing SSID parameter";
-    }
-    else if (!removeWiFiNetworkCallback)
-    {
-        doc["status"] = "error";
-        doc["message"] = "Remove WiFi network callback not available";
-    }
-    else
-    {
-        String ssid = request->getParam("ssid", true)->value();
-        String message;
-        
-        if (removeWiFiNetworkCallback(ssid, message))
-        {
-            doc["status"] = "ok";
-            doc["message"] = message;
-        }
-        else
-        {
-            doc["status"] = "error";
-            doc["message"] = message;
-        }
-    }
-
-    String jsonString;
-    serializeJson(doc, jsonString);
-    
-    AsyncWebServerResponse *response = request->beginResponse(200, "application/json", jsonString);
-    setCORSHeaders(response);
-    request->send(response);
-}
-
-void WebServerManager::handleListFiles(AsyncWebServerRequest *request)
-{
-    JsonDocument doc;
-    doc["status"] = "ok";
-    
-    JsonArray files = doc["files"].to<JsonArray>();
-    
-    if (filesystemMounted)
-    {
-        File root = SPIFFS.open("/");
-        File file = root.openNextFile();
-        while (file)
-        {
-            JsonObject fileObj = files.add<JsonObject>();
-            fileObj["name"] = file.name();
-            fileObj["size"] = file.size();
-            file = root.openNextFile();
-        }
-    }
-    else
-    {
-        doc["status"] = "error";
-        doc["message"] = "Filesystem not mounted";
-    }
-
-    String jsonString;
-    serializeJson(doc, jsonString);
-    
-    AsyncWebServerResponse *response = request->beginResponse(200, "application/json", jsonString);
-    setCORSHeaders(response);
-    request->send(response);
-}
 
 void WebServerManager::handleNotFound(AsyncWebServerRequest *request)
 {
@@ -400,7 +194,9 @@ void WebServerManager::handleNotFound(AsyncWebServerRequest *request)
         serializeJson(doc, jsonString);
         
         AsyncWebServerResponse *response = request->beginResponse(404, "application/json", jsonString);
-        setCORSHeaders(response);
+        response->addHeader("Access-Control-Allow-Origin", "*");
+        response->addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        response->addHeader("Access-Control-Allow-Headers", "Content-Type");
         request->send(response);
         return;
     }
@@ -412,12 +208,11 @@ void WebServerManager::handleNotFound(AsyncWebServerRequest *request)
         path += "index.html";
     }
 
-    // Try to serve file from /www/ directory
-    String wwwPath = "/www" + path;
-    if (fileExists(wwwPath))
+    // Try to serve file from root directory
+    if (fileExists(path))
     {
         String mimeType = getMimeType(path);
-        request->send(SPIFFS, wwwPath, mimeType);
+        request->send(SPIFFS, path, mimeType);
     }
     else
     {
@@ -426,12 +221,7 @@ void WebServerManager::handleNotFound(AsyncWebServerRequest *request)
     }
 }
 
-void WebServerManager::setCORSHeaders(AsyncWebServerResponse *response)
-{
-    response->addHeader("Access-Control-Allow-Origin", "*");
-    response->addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    response->addHeader("Access-Control-Allow-Headers", "Content-Type");
-}
+
 
 String WebServerManager::getMimeType(const String& path)
 {

@@ -1,0 +1,43 @@
+/**
+ * Lightweight Font Alternative
+ * 
+ * If the 1.5MB Iosevka Term font is too large, you can:
+ * 
+ * 1. Use a font subsetting tool to create a smaller version
+ * 2. Use system monospace fonts that are already available
+ * 3. Use a web font service that provides subsets
+ */
+
+/* Option 1: System font stack (fastest loading, 0 bytes) */
+.system-fonts body,
+.system-fonts html {
+    font-family: 
+        /* macOS */ 'SF Mono', 'Monaco',
+        /* Windows */ 'Consolas', 'Courier New',
+        /* Linux */ 'Liberation Mono', 'DejaVu Sans Mono',
+        /* iOS */ 'Menlo',
+        /* Android */ 'Droid Sans Mono',
+        /* Generic fallback */ monospace;
+}
+
+/* Option 2: JetBrains Mono from Google Fonts (smaller, hosted) */
+.jetbrains-fonts body,
+.jetbrains-fonts html {
+    font-family: 'JetBrains Mono', 'Monaco', 'Consolas', 'Courier New', monospace;
+}
+
+/* Option 3: Fira Code from Google Fonts (popular, smaller) */
+.fira-fonts body,
+.fira-fonts html {
+    font-family: 'Fira Code', 'Monaco', 'Consolas', 'Courier New', monospace;
+}
+
+/* 
+ * To use these alternatives:
+ * 
+ * 1. For system fonts: Add class="system-fonts" to <html> tag
+ * 2. For JetBrains: Add <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet"> to <head>
+ *    and class="jetbrains-fonts" to <html> tag
+ * 3. For Fira Code: Add <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400&display=swap" rel="stylesheet"> to <head>
+ *    and class="fira-fonts" to <html> tag
+ */

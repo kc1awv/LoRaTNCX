@@ -9,6 +9,8 @@
 #include <ESPAsyncWebServer.h>
 #include <SPIFFS.h>
 #include <functional>
+#include <memory>
+#include "APIManager.h"
 
 // Forward declarations
 class TNCWiFiManager;
@@ -67,18 +69,20 @@ public:
         std::function<bool(const String&, String&)> removeWiFiNetwork
     );
 
+    /**
+     * @brief Get the API manager for advanced configuration
+     * @return Pointer to APIManager instance
+     */
+    APIManager* getAPIManager() { return apiManager.get(); }
+
 private:
     AsyncWebServer server;
     uint16_t serverPort;
     bool serverRunning;
     bool filesystemMounted;
     
-    // Callback functions for data access
-    std::function<String()> getSystemStatusCallback;
-    std::function<String()> getLoRaStatusCallback;
-    std::function<String()> getWiFiNetworksCallback;
-    std::function<bool(const String&, const String&, String&)> addWiFiNetworkCallback;
-    std::function<bool(const String&, String&)> removeWiFiNetworkCallback;
+    // API management system
+    std::unique_ptr<APIManager> apiManager;
 
     /**
      * @brief Initialize SPIFFS for serving web files
@@ -97,49 +101,9 @@ private:
     void setupStaticFiles();
 
     /**
-     * @brief Setup REST API endpoints
-     */
-    void setupAPIRoutes();
-
-    /**
-     * @brief Handle system status API endpoint
-     */
-    void handleSystemStatus(AsyncWebServerRequest *request);
-
-    /**
-     * @brief Handle LoRa status API endpoint
-     */
-    void handleLoRaStatus(AsyncWebServerRequest *request);
-
-    /**
-     * @brief Handle WiFi networks list API endpoint
-     */
-    void handleWiFiNetworks(AsyncWebServerRequest *request);
-
-    /**
-     * @brief Handle add WiFi network API endpoint
-     */
-    void handleAddWiFiNetwork(AsyncWebServerRequest *request);
-
-    /**
-     * @brief Handle remove WiFi network API endpoint
-     */
-    void handleRemoveWiFiNetwork(AsyncWebServerRequest *request);
-
-    /**
-     * @brief Handle debug files list API endpoint
-     */
-    void handleListFiles(AsyncWebServerRequest *request);
-
-    /**
      * @brief Handle 404 not found responses
      */
     void handleNotFound(AsyncWebServerRequest *request);
-
-    /**
-     * @brief Set CORS headers for API responses
-     */
-    void setCORSHeaders(AsyncWebServerResponse *response);
 
     /**
      * @brief Get MIME type for file extension
