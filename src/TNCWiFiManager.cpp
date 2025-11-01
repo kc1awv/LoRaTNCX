@@ -1,6 +1,7 @@
 #include "TNCWiFiManager.h"
 
 #include <esp_system.h>
+#include <esp_wifi.h>
 
 TNCWiFiManager::TNCWiFiManager()
     : networkCount(0), connectedNetworkIndex(-1), apModeActive(false), stationAttemptActive(false),
@@ -302,7 +303,7 @@ void TNCWiFiManager::saveNetworksToPreferences()
 void TNCWiFiManager::configureDefaultAPCredentials()
 {
     uint8_t mac[6] = {0};
-    esp_read_mac(mac, ESP_MAC_WIFI_SOFTAP);
+    WiFi.macAddress(mac);
 
     char suffix[5];
     snprintf(suffix, sizeof(suffix), "%02X%02X", mac[4], mac[5]);

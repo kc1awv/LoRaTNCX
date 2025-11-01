@@ -10,6 +10,7 @@
 #include "HardwareConfig.h"
 
 #include <cstring>
+#include <esp_sleep.h>
 
 namespace
 {
@@ -823,9 +824,46 @@ void TNCManager::performPowerOff()
     display.updateStatus(buildDisplayStatus());
     delay(500);
 
+    // Shutdown all peripherals first
+    Serial.println("Shutting down peripherals...");
+    
+    // Stop all TCP clients and servers
+    stopClients(kissTcpClients);
+    stopClients(nmeaTcpClients);
+    kissTcpServer.stop();
+    nmeaTcpServer.stop();
+    
+    // Turn off external power (OLED, sensors, etc.)
     digitalWrite(POWER_CTRL_PIN, POWER_OFF);
+    
+    // Shutdown GNSS if enabled
+    if (gnssEnabled && gnssInitialised)
+    {
+        gnss.end();
+    }
+    
+    // Shutdown LoRa radio (set to lowest power mode)
+    digitalWrite(LORA_PA_EN_PIN, LOW);
+    digitalWrite(LORA_PA_TX_EN_PIN, LOW);
+    analogWrite(LORA_PA_POWER_PIN, 0);
+    
+    // Shutdown WiFi completely
+    WiFi.disconnect(true, true);
+    WiFi.mode(WIFI_MODE_NULL);
+    
+    // Final delay before deep sleep
     delay(1000);
-
+    
+    Serial.println("Entering deep sleep mode...");
+    Serial.flush(); // Ensure message is sent before sleep
+    
+    // Configure wake-up source (button press)
+    esp_sleep_enable_ext0_wakeup(GPIO_NUM_0, 0); // Wake on button press (active LOW)
+    
+    // Enter deep sleep - this will truly power off the ESP32
+    esp_deep_sleep_start();
+    
+    // This line should never be reached
     while (true)
     {
         delay(1000);
@@ -884,7 +922,7 @@ void TNCManager::acceptClient(WiFiServer &server, std::array<WiFiClient, MAX_TCP
         return;
     }
 
-    WiFiClient incoming = server.available();
+    WiFiClient incoming = server.accept();
     if (!incoming)
     {
         return;
@@ -998,7 +1036,7 @@ void TNCManager::broadcastKISSFrame(const uint8_t *data, size_t length)
             }
         }
         client.write(static_cast<uint8_t>(FEND));
-        client.flush();
+        // Note: flush() is deprecated, data is sent immediately for WiFiClient
     }
 }
 
@@ -1026,7 +1064,7 @@ void TNCManager::broadcastNMEALine(const String &line)
         }
 
         client.write(buffer, length);
-        client.flush();
+        // Note: flush() is deprecated, data is sent immediately for WiFiClient
     }
 }
 

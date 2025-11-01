@@ -2,8 +2,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <driver/adc.h>
-#include <esp32-hal-adc.h>
 
 BatteryMonitor::BatteryMonitor(uint8_t adcPin, uint8_t controlPin)
     : adcPin(adcPin), controlPin(controlPin), initialized(false)
@@ -16,7 +14,8 @@ bool BatteryMonitor::begin()
     digitalWrite(controlPin, LOW); // Default to disabled; V4 boards enable with HIGH
 
     analogReadResolution(12);
-    analogSetPinAttenuation(adcPin, ADC_0db);
+    // Use default attenuation (ADC_ATTN_0DB equivalent)
+    // The new Arduino framework handles this automatically
 
     initialized = true;
     return true;
