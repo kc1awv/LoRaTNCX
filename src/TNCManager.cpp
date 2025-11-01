@@ -731,6 +731,7 @@ DisplayManager::StatusData TNCManager::buildDisplayStatus()
     status.wifiHasIPAddress = false;
     status.wifiSSID[0] = '\0';
     status.wifiIPAddress[0] = '\0';
+    status.wifiAPPassword[0] = '\0';
 
     auto copyString = [](char *destination, size_t destinationSize, const String &value) {
         if (destinationSize == 0)
@@ -768,6 +769,13 @@ DisplayManager::StatusData TNCManager::buildDisplayStatus()
         {
             copyString(status.wifiIPAddress, sizeof(status.wifiIPAddress), ipString);
             status.wifiHasIPAddress = true;
+        }
+        
+        // Get the AP password for display
+        String apPassword = wifiManager.getAPPassword();
+        if (!apPassword.isEmpty())
+        {
+            copyString(status.wifiAPPassword, sizeof(status.wifiAPPassword), apPassword);
         }
     }
     else if (!wifiInfo.stationSSID.isEmpty())

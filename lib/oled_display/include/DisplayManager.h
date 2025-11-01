@@ -79,6 +79,7 @@ public:
         bool wifiHasIPAddress = false;
         char wifiSSID[33] = {0};
         char wifiIPAddress[18] = {0};
+        char wifiAPPassword[9] = {0};  // 8 chars + null terminator
     };
 
     DisplayManager();

@@ -72,12 +72,17 @@ public:
      */
     StatusInfo getStatusInfo() const;
 
+    /**
+     * @brief Get the current AP password for display purposes.
+     * @return The current AP password, or empty string if not in AP mode.
+     */
+    String getAPPassword() const;
+
 private:
     static constexpr const char *PREF_NAMESPACE = "wifi";
     static constexpr uint8_t MAX_NETWORKS = 8;
     static constexpr unsigned long STA_CONNECT_TIMEOUT_MS = 15000UL;
     static constexpr unsigned long RECONNECT_INTERVAL_MS = 30000UL;
-    static constexpr const char *DEFAULT_AP_PASSWORD = "LoRaTNCX";
 
     struct NetworkEntry
     {
@@ -102,6 +107,7 @@ private:
     void loadNetworksFromPreferences();
     void saveNetworksToPreferences();
     void configureDefaultAPCredentials();
+    void generateRandomAPPassword();
     void startAccessPoint();
     void startStationAttempt(uint8_t index);
     void advanceStationAttempt();

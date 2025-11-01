@@ -246,6 +246,15 @@ TNCWiFiManager::StatusInfo TNCWiFiManager::getStatusInfo() const
     return info;
 }
 
+String TNCWiFiManager::getAPPassword() const
+{
+    if (apModeActive)
+    {
+        return apPassword;
+    }
+    return String();
+}
+
 void TNCWiFiManager::loadNetworksFromPreferences()
 {
     Preferences preferences;
@@ -309,11 +318,24 @@ void TNCWiFiManager::configureDefaultAPCredentials()
     snprintf(suffix, sizeof(suffix), "%02X%02X", mac[4], mac[5]);
 
     apSSID = "LoRaTNCX-" + String(suffix);
-    apPassword = DEFAULT_AP_PASSWORD;
+    // Password will be generated when AP mode starts
+}
+
+void TNCWiFiManager::generateRandomAPPassword()
+{
+    const char charset[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    const int charsetSize = sizeof(charset) - 1; // Exclude null terminator
+    
+    apPassword = "";
+    for (int i = 0; i < 8; i++)
+    {
+        apPassword += charset[random(charsetSize)];
+    }
 }
 
 void TNCWiFiManager::startAccessPoint()
 {
+    generateRandomAPPassword();
     WiFi.mode(WIFI_MODE_AP);
     WiFi.softAP(apSSID.c_str(), apPassword.c_str());
     apModeActive = true;

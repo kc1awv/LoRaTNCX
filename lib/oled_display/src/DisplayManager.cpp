@@ -344,75 +344,107 @@ void DisplayManager::drawWiFiScreen()
     drawHeader("WiFi Status");
     u8g2.setFont(u8g2_font_6x10_tf);
 
-    const char *modeLabel = "Off";
-    switch (lastStatus.wifiMode)
+    // Special layout for AP mode - more spacious and focused
+    if (lastStatus.wifiMode == StatusData::WiFiMode::ACCESS_POINT && lastStatus.wifiAPPassword[0] != '\0')
     {
-    case StatusData::WiFiMode::ACCESS_POINT:
-        modeLabel = "AP";
-        break;
-    case StatusData::WiFiMode::STATION:
-        modeLabel = "STA";
-        break;
-    case StatusData::WiFiMode::AP_STATION:
-        modeLabel = "AP+STA";
-        break;
-    case StatusData::WiFiMode::OFF:
-    default:
-        modeLabel = "Off";
-        break;
-    }
+        // Mode line
+        u8g2.drawStr(0, 30, "Mode: Access Point");
 
-    char modeLine[24];
-    snprintf(modeLine, sizeof(modeLine), "Mode: %s", modeLabel);
-    u8g2.drawStr(0, 30, modeLine);
-
-    char statusLine[28];
-    if (lastStatus.wifiMode == StatusData::WiFiMode::OFF)
-    {
-        snprintf(statusLine, sizeof(statusLine), "Status: Disabled");
-    }
-    else if (lastStatus.wifiConnecting)
-    {
-        snprintf(statusLine, sizeof(statusLine), "Status: Connecting");
-    }
-    else if (lastStatus.wifiConnected)
-    {
-        if (lastStatus.wifiMode == StatusData::WiFiMode::ACCESS_POINT)
+        // SSID line (moved up to where status was)
+        char ssidLine[44];
+        if (lastStatus.wifiSSID[0] != '\0')
         {
-            snprintf(statusLine, sizeof(statusLine), "Status: AP Ready");
+            snprintf(ssidLine, sizeof(ssidLine), "SSID: %s", lastStatus.wifiSSID);
         }
         else
         {
+            snprintf(ssidLine, sizeof(ssidLine), "SSID: --");
+        }
+        u8g2.drawStr(0, 42, ssidLine);
+
+        // Password line with emphasis
+        char passwordLine[20];
+        snprintf(passwordLine, sizeof(passwordLine), "Password: %s", lastStatus.wifiAPPassword);
+        u8g2.drawStr(0, 54, passwordLine);
+
+        // IP address
+        char ipLine[32];
+        if (lastStatus.wifiHasIPAddress && lastStatus.wifiIPAddress[0] != '\0')
+        {
+            snprintf(ipLine, sizeof(ipLine), "IP: %s", lastStatus.wifiIPAddress);
+        }
+        else
+        {
+            snprintf(ipLine, sizeof(ipLine), "IP: --");
+        }
+        u8g2.drawStr(0, 64, ipLine);
+    }
+    else
+    {
+        // Standard layout for STA mode and other modes
+        const char *modeLabel = "Off";
+        switch (lastStatus.wifiMode)
+        {
+        case StatusData::WiFiMode::ACCESS_POINT:
+            modeLabel = "AP";
+            break;
+        case StatusData::WiFiMode::STATION:
+            modeLabel = "STA";
+            break;
+        case StatusData::WiFiMode::AP_STATION:
+            modeLabel = "AP+STA";
+            break;
+        case StatusData::WiFiMode::OFF:
+        default:
+            modeLabel = "Off";
+            break;
+        }
+
+        char modeLine[24];
+        snprintf(modeLine, sizeof(modeLine), "Mode: %s", modeLabel);
+        u8g2.drawStr(0, 30, modeLine);
+
+        char statusLine[28];
+        if (lastStatus.wifiMode == StatusData::WiFiMode::OFF)
+        {
+            snprintf(statusLine, sizeof(statusLine), "Status: Disabled");
+        }
+        else if (lastStatus.wifiConnecting)
+        {
+            snprintf(statusLine, sizeof(statusLine), "Status: Connecting");
+        }
+        else if (lastStatus.wifiConnected)
+        {
             snprintf(statusLine, sizeof(statusLine), "Status: Connected");
         }
-    }
-    else
-    {
-        snprintf(statusLine, sizeof(statusLine), "Status: Idle");
-    }
-    u8g2.drawStr(0, 42, statusLine);
+        else
+        {
+            snprintf(statusLine, sizeof(statusLine), "Status: Idle");
+        }
+        u8g2.drawStr(0, 42, statusLine);
 
-    char ssidLine[44];
-    if (lastStatus.wifiSSID[0] != '\0')
-    {
-        snprintf(ssidLine, sizeof(ssidLine), "SSID: %s", lastStatus.wifiSSID);
-    }
-    else
-    {
-        snprintf(ssidLine, sizeof(ssidLine), "SSID: --");
-    }
-    u8g2.drawStr(0, 54, ssidLine);
+        char ssidLine[44];
+        if (lastStatus.wifiSSID[0] != '\0')
+        {
+            snprintf(ssidLine, sizeof(ssidLine), "SSID: %s", lastStatus.wifiSSID);
+        }
+        else
+        {
+            snprintf(ssidLine, sizeof(ssidLine), "SSID: --");
+        }
+        u8g2.drawStr(0, 54, ssidLine);
 
-    char ipLine[32];
-    if (lastStatus.wifiHasIPAddress && lastStatus.wifiIPAddress[0] != '\0')
-    {
-        snprintf(ipLine, sizeof(ipLine), "IP: %s", lastStatus.wifiIPAddress);
+        char ipLine[32];
+        if (lastStatus.wifiHasIPAddress && lastStatus.wifiIPAddress[0] != '\0')
+        {
+            snprintf(ipLine, sizeof(ipLine), "IP: %s", lastStatus.wifiIPAddress);
+        }
+        else
+        {
+            snprintf(ipLine, sizeof(ipLine), "IP: --");
+        }
+        u8g2.drawStr(0, 64, ipLine);
     }
-    else
-    {
-        snprintf(ipLine, sizeof(ipLine), "IP: --");
-    }
-    u8g2.drawStr(0, 64, ipLine);
 }
 
 void DisplayManager::drawLoRaDetails()
