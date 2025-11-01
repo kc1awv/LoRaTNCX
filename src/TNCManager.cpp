@@ -9,6 +9,8 @@
 
 #include "HardwareConfig.h"
 
+#include <cstring>
+
 namespace
 {
 constexpr unsigned long BUTTON_DEBOUNCE_MS = 30UL;
@@ -32,7 +34,14 @@ inline float clamp01(float value)
 // Static member definition
 TNCManager* TNCManager::instance = nullptr;
 
-TNCManager::TNCManager() : configManager(&radio), display(), batteryMonitor(), gnss()
+TNCManager::TNCManager()
+    : configManager(&radio),
+      display(),
+      batteryMonitor(),
+      gnss(),
+      wifiManager(),
+      kissTcpServer(KISS_TCP_PORT),
+      nmeaTcpServer(NMEA_TCP_PORT)
 {
     initialized = false;
     lastStatus = 0;
@@ -56,9 +65,15 @@ TNCManager::TNCManager() : configManager(&radio), display(), batteryMonitor(), g
     gnssEnabled = false;
     gnssInitialised = false;
     oledEnabled = true;
+    kissServerRunning = false;
+    nmeaServerRunning = false;
 
     // Set static instance for callbacks
     instance = this;
+
+    gnss.setNMEACallback([this](const String &line) {
+        handleNMEASentence(line);
+    });
 }
 
 bool TNCManager::begin()
@@ -143,7 +158,18 @@ bool TNCManager::begin()
     commandSystem.setGNSSCallbacks(gnssSetEnabledCallback, gnssGetEnabledCallback);
     commandSystem.setOLEDCallbacks(oledSetEnabledCallback, oledGetEnabledCallback);
     commandSystem.setPeripheralStateDefaults(isGNSSEnabled(), isOLEDEnabled());
+    commandSystem.setWiFiCallbacks(wifiAddNetworkCallback, wifiRemoveNetworkCallback,
+                                   wifiListNetworksCallback, wifiStatusCallback);
     Serial.println("✓ Command system hardware integration enabled");
+
+    if (wifiManager.begin())
+    {
+        Serial.println("✓ WiFi subsystem initialized");
+    }
+    else
+    {
+        Serial.println("✗ WiFi initialization failed");
+    }
 
     Serial.println("\n=== TNC Ready ===");
     Serial.println("Starting in Command mode...");
@@ -197,6 +223,10 @@ void TNCManager::update()
         lastBatteryPercent = batteryMonitor.computePercentage(lastBatteryVoltage);
         lastBatterySample = millis();
     }
+
+    wifiManager.update();
+    updateTcpServers();
+    processKISSTcpClients();
 
     handleUserButton();
 
@@ -533,12 +563,20 @@ void TNCManager::handleIncomingRadio()
             // Process packet for connection management and protocol handling
             commandSystem.processReceivedPacket(packet, rssi, snr);
 
-            // Only forward KISS frames to the host when operating in KISS mode.
+            bool forwarded = false;
             if (commandSystem.getCurrentMode() == TNCMode::KISS_MODE)
             {
                 kiss.sendData(buffer, length);
+                forwarded = true;
             }
-            else if (commandSystem.isMonitorEnabled() || commandSystem.getDebugLevel() >= 2)
+
+            if (hasActiveKISSClients())
+            {
+                broadcastKISSFrame(buffer, length);
+                forwarded = true;
+            }
+
+            if (!forwarded && (commandSystem.isMonitorEnabled() || commandSystem.getDebugLevel() >= 2))
             {
                 const size_t maxPreview = 120;
                 size_t previewLength = length < maxPreview ? length : maxPreview;
@@ -667,6 +705,75 @@ DisplayManager::StatusData TNCManager::buildDisplayStatus()
     status.powerOffProgress = powerOffProgress;
     status.powerOffComplete = powerOffComplete;
 
+    auto wifiInfo = wifiManager.getStatusInfo();
+    using WiFiMode = DisplayManager::StatusData::WiFiMode;
+
+    if (wifiInfo.apActive && wifiInfo.stationConnected)
+    {
+        status.wifiMode = WiFiMode::AP_STATION;
+    }
+    else if (wifiInfo.stationActive || wifiInfo.stationAttemptActive)
+    {
+        status.wifiMode = WiFiMode::STATION;
+    }
+    else if (wifiInfo.apActive)
+    {
+        status.wifiMode = WiFiMode::ACCESS_POINT;
+    }
+    else
+    {
+        status.wifiMode = WiFiMode::OFF;
+    }
+
+    status.wifiConnected = wifiInfo.stationConnected || (status.wifiMode == WiFiMode::ACCESS_POINT);
+    status.wifiConnecting = wifiInfo.stationAttemptActive && !wifiInfo.stationConnected;
+    status.wifiHasIPAddress = false;
+    status.wifiSSID[0] = '\0';
+    status.wifiIPAddress[0] = '\0';
+
+    auto copyString = [](char *destination, size_t destinationSize, const String &value) {
+        if (destinationSize == 0)
+        {
+            return;
+        }
+
+        if (value.length() >= destinationSize)
+        {
+            value.substring(0, destinationSize - 1).toCharArray(destination, destinationSize);
+        }
+        else
+        {
+            value.toCharArray(destination, destinationSize);
+        }
+    };
+
+    if (wifiInfo.stationConnected)
+    {
+        copyString(status.wifiSSID, sizeof(status.wifiSSID), wifiInfo.stationSSID);
+
+        String ipString = wifiInfo.stationIP.toString();
+        if (ipString != "0.0.0.0")
+        {
+            copyString(status.wifiIPAddress, sizeof(status.wifiIPAddress), ipString);
+            status.wifiHasIPAddress = true;
+        }
+    }
+    else if (wifiInfo.apActive)
+    {
+        copyString(status.wifiSSID, sizeof(status.wifiSSID), wifiInfo.apSSID);
+
+        String ipString = wifiInfo.apIP.toString();
+        if (ipString != "0.0.0.0")
+        {
+            copyString(status.wifiIPAddress, sizeof(status.wifiIPAddress), ipString);
+            status.wifiHasIPAddress = true;
+        }
+    }
+    else if (!wifiInfo.stationSSID.isEmpty())
+    {
+        copyString(status.wifiSSID, sizeof(status.wifiSSID), wifiInfo.stationSSID);
+    }
+
     status.gnssEnabled = gnssEnabled && gnssInitialised;
     if (status.gnssEnabled)
     {
@@ -723,6 +830,222 @@ void TNCManager::performPowerOff()
     {
         delay(1000);
     }
+}
+
+void TNCManager::updateTcpServers()
+{
+    auto wifiInfo = wifiManager.getStatusInfo();
+    bool wifiReady = wifiInfo.apActive || wifiInfo.stationConnected;
+
+    if (wifiReady)
+    {
+        if (!kissServerRunning)
+        {
+            kissTcpServer.begin();
+            kissTcpServer.setNoDelay(true);
+            kissServerRunning = true;
+        }
+
+        if (!nmeaServerRunning)
+        {
+            nmeaTcpServer.begin();
+            nmeaTcpServer.setNoDelay(true);
+            nmeaServerRunning = true;
+        }
+
+        acceptClient(kissTcpServer, kissTcpClients);
+        acceptClient(nmeaTcpServer, nmeaTcpClients);
+    }
+    else
+    {
+        if (kissServerRunning)
+        {
+            stopClients(kissTcpClients);
+            kissTcpServer.stop();
+            kissServerRunning = false;
+        }
+
+        if (nmeaServerRunning)
+        {
+            stopClients(nmeaTcpClients);
+            nmeaTcpServer.stop();
+            nmeaServerRunning = false;
+        }
+    }
+
+    pruneClients(kissTcpClients);
+    pruneClients(nmeaTcpClients);
+}
+
+void TNCManager::acceptClient(WiFiServer &server, std::array<WiFiClient, MAX_TCP_CLIENTS> &clients)
+{
+    if (!server.hasClient())
+    {
+        return;
+    }
+
+    WiFiClient incoming = server.available();
+    if (!incoming)
+    {
+        return;
+    }
+
+    for (auto &client : clients)
+    {
+        if (client && client.remoteIP() == incoming.remoteIP() && client.remotePort() == incoming.remotePort())
+        {
+            incoming.stop();
+            return;
+        }
+    }
+
+    for (auto &client : clients)
+    {
+        if (!client || !client.connected())
+        {
+            if (client)
+            {
+                client.stop();
+            }
+            client = incoming;
+            client.setNoDelay(true);
+            return;
+        }
+    }
+
+    incoming.stop();
+}
+
+void TNCManager::pruneClients(std::array<WiFiClient, MAX_TCP_CLIENTS> &clients)
+{
+    for (auto &client : clients)
+    {
+        if (client && !client.connected())
+        {
+            client.stop();
+        }
+    }
+}
+
+void TNCManager::stopClients(std::array<WiFiClient, MAX_TCP_CLIENTS> &clients)
+{
+    for (auto &client : clients)
+    {
+        if (client)
+        {
+            client.stop();
+        }
+    }
+}
+
+void TNCManager::processKISSTcpClients()
+{
+    for (auto &client : kissTcpClients)
+    {
+        if (!client || !client.connected())
+        {
+            continue;
+        }
+
+        while (client.available())
+        {
+            int value = client.read();
+            if (value < 0)
+            {
+                break;
+            }
+
+            if (kiss.processByte(static_cast<uint8_t>(value)))
+            {
+                handleIncomingKISS();
+            }
+        }
+    }
+}
+
+void TNCManager::broadcastKISSFrame(const uint8_t *data, size_t length)
+{
+    if (data == nullptr || length == 0)
+    {
+        return;
+    }
+
+    for (auto &client : kissTcpClients)
+    {
+        if (!client || !client.connected())
+        {
+            continue;
+        }
+
+        client.write(static_cast<uint8_t>(FEND));
+        client.write(static_cast<uint8_t>(CMD_DATA));
+        for (size_t i = 0; i < length; ++i)
+        {
+            uint8_t byte = data[i];
+            if (byte == FEND)
+            {
+                client.write(static_cast<uint8_t>(FESC));
+                client.write(static_cast<uint8_t>(TFEND));
+            }
+            else if (byte == FESC)
+            {
+                client.write(static_cast<uint8_t>(FESC));
+                client.write(static_cast<uint8_t>(TFESC));
+            }
+            else
+            {
+                client.write(byte);
+            }
+        }
+        client.write(static_cast<uint8_t>(FEND));
+        client.flush();
+    }
+}
+
+void TNCManager::broadcastNMEALine(const String &line)
+{
+    if (line.length() == 0)
+    {
+        return;
+    }
+
+    String payload = line;
+    if (!payload.endsWith("\r\n"))
+    {
+        payload += "\r\n";
+    }
+
+    const uint8_t *buffer = reinterpret_cast<const uint8_t *>(payload.c_str());
+    size_t length = payload.length();
+
+    for (auto &client : nmeaTcpClients)
+    {
+        if (!client || !client.connected())
+        {
+            continue;
+        }
+
+        client.write(buffer, length);
+        client.flush();
+    }
+}
+
+bool TNCManager::hasActiveKISSClients()
+{
+    for (auto &client : kissTcpClients)
+    {
+        if (client && client.connected())
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void TNCManager::handleNMEASentence(const String &line)
+{
+    broadcastNMEALine(line);
 }
 
 bool TNCManager::setGNSSEnabled(bool enable)
@@ -863,3 +1186,48 @@ bool TNCManager::gnssGetEnabledCallback() {
     }
     return false;
 }
+
+bool TNCManager::wifiAddNetworkCallback(const String &ssid, const String &password, String &message)
+{
+    if (instance)
+    {
+        return instance->wifiManager.addNetwork(ssid, password, message);
+    }
+    message = "WiFi manager unavailable";
+    return false;
+}
+
+bool TNCManager::wifiRemoveNetworkCallback(const String &ssid, String &message)
+{
+    if (instance)
+    {
+        return instance->wifiManager.removeNetwork(ssid, message);
+    }
+    message = "WiFi manager unavailable";
+    return false;
+}
+
+void TNCManager::wifiListNetworksCallback(String &output)
+{
+    if (instance)
+    {
+        output = instance->wifiManager.getNetworksSummary();
+    }
+    else
+    {
+        output = "WiFi manager unavailable";
+    }
+}
+
+void TNCManager::wifiStatusCallback(String &output)
+{
+    if (instance)
+    {
+        output = instance->wifiManager.getStatusSummary();
+    }
+    else
+    {
+        output = "WiFi manager unavailable";
+    }
+}
+
