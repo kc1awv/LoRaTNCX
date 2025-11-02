@@ -1,26 +1,29 @@
 #include <Arduino.h>
 #include "LoRaRadio.h"
+#include "LoRaTNC.h"
 
-// Global LoRa radio instance
+// Global instances
 LoRaRadio loraRadio;
+LoRaTNC* tnc;
 
 // LoRa event handlers
 void onTxDone() {
-    Serial.println("[LoRa] TX completed successfully");
+    if (tnc) {
+        tnc->handleLoRaTransmitDone();
+    }
 }
 
 void onTxTimeout() {
-    Serial.println("[LoRa] TX timeout occurred");
+    if (tnc) {
+        tnc->handleLoRaTransmitTimeout();
+    }
 }
 
 void onRxDone(uint8_t *payload, uint16_t size, int16_t rssi, float snr) {
-    // Null terminate the payload for safe string operations
-    char message[size + 1];
-    memcpy(message, payload, size);
-    message[size] = '\0';
-    
-    Serial.printf("[LoRa] RX: \"%s\" (RSSI: %d dBm, SNR: %.1f dB, Size: %d)\n", 
-                  message, rssi, snr, size);
+    // Forward to TNC for processing
+    if (tnc) {
+        tnc->handleLoRaReceive(payload, size, rssi, snr);
+    }
 }
 
 void onRxTimeout() {
@@ -89,6 +92,15 @@ void setup() {
     // Initialize LoRa radio
     if (loraRadio.begin()) {
         Serial.println("LoRa radio initialized successfully!");
+        
+        // Initialize TNC
+        tnc = new LoRaTNC(&loraRadio);
+        if (tnc->begin()) {
+            Serial.println("TNC initialized successfully!");
+        } else {
+            Serial.println("Failed to initialize TNC!");
+        }
+        
         // Start in receive mode
         loraRadio.startReceive();
     } else {
@@ -135,6 +147,14 @@ void processCommand(String command) {
         Serial.println("  lora sf <sf>   - Set spreading factor (7-12)");
         Serial.println("  lora bw <khz>  - Set bandwidth in kHz (125/250/500) or 0/1/2");
         Serial.println("  lora cr <cr>   - Set coding rate (5-8 for 4/5-4/8) or 1-4");
+        Serial.println();
+        Serial.println("TNC Commands:");
+        Serial.println("  tnc status     - Show TNC status and statistics");
+        Serial.println("  tnc config     - Show TNC configuration");
+        Serial.println("  tnc kiss       - Enter KISS mode");
+        Serial.println("  tnc beacon <en> <int> <text> - Set beacon (enable, interval_ms, text)");
+        Serial.println("  tnc csma <en> [slot] [retries] - Configure CSMA/CD");
+        Serial.println("  tnc test       - Send test frame");
     }
     else if (cmd == "status") {
         Serial.println("System Status:");
@@ -181,10 +201,11 @@ void processCommand(String command) {
                     Serial.println("Usage: lora send <message>");
                 } else {
                     Serial.printf("Sending: \"%s\"\n", subArgs.c_str());
-                    if (loraRadio.send(subArgs)) {
+                    int result = loraRadio.send(subArgs);
+                    if (result == RADIOLIB_ERR_NONE) {
                         Serial.println("Message queued for transmission");
                     } else {
-                        Serial.println("Failed to queue message");
+                        Serial.printf("Failed to queue message (error: %d)\n", result);
                     }
                 }
             }
@@ -245,6 +266,87 @@ void processCommand(String command) {
             }
         }
     }
+    else if (cmd == "tnc") {
+        if (args.length() == 0) {
+            Serial.println("TNC command requires arguments. Type 'help' for usage.");
+        }
+        else {
+            int argSpaceIndex = args.indexOf(' ');
+            String subCmd = (argSpaceIndex == -1) ? args : args.substring(0, argSpaceIndex);
+            String subArgs = (argSpaceIndex == -1) ? "" : args.substring(argSpaceIndex + 1);
+            subCmd.toLowerCase();
+            
+            if (subCmd == "status") {
+                if (tnc) {
+                    tnc->printStatistics();
+                } else {
+                    Serial.println("TNC not initialized");
+                }
+            }
+            else if (subCmd == "config") {
+                if (tnc) {
+                    tnc->printConfiguration();
+                } else {
+                    Serial.println("TNC not initialized");
+                }
+            }
+            else if (subCmd == "kiss") {
+                if (tnc) {
+                    tnc->enterKissMode();
+                    return; // Don't print prompt in KISS mode
+                } else {
+                    Serial.println("TNC not initialized");
+                }
+            }
+            else if (subCmd == "beacon") {
+                if (tnc) {
+                    // Parse beacon arguments: enable interval text
+                    int space1 = subArgs.indexOf(' ');
+                    int space2 = subArgs.indexOf(' ', space1 + 1);
+                    
+                    if (space1 == -1 || space2 == -1) {
+                        Serial.println("Usage: tnc beacon <enable> <interval_ms> <text>");
+                    } else {
+                        bool enable = subArgs.substring(0, space1).toInt() != 0;
+                        uint32_t interval = subArgs.substring(space1 + 1, space2).toInt();
+                        String text = subArgs.substring(space2 + 1);
+                        tnc->setBeacon(enable, interval, text);
+                    }
+                } else {
+                    Serial.println("TNC not initialized");
+                }
+            }
+            else if (subCmd == "csma") {
+                if (tnc) {
+                    int space1 = subArgs.indexOf(' ');
+                    bool enable = subArgs.substring(0, space1 == -1 ? subArgs.length() : space1).toInt() != 0;
+                    
+                    if (space1 == -1) {
+                        // Just enable/disable with defaults
+                        tnc->enableCSMA(enable);
+                    } else {
+                        int space2 = subArgs.indexOf(' ', space1 + 1);
+                        uint16_t slotTime = subArgs.substring(space1 + 1, space2 == -1 ? subArgs.length() : space2).toInt();
+                        uint8_t retries = (space2 == -1) ? 10 : subArgs.substring(space2 + 1).toInt();
+                        
+                        tnc->enableCSMA(enable, slotTime, retries);
+                    }
+                } else {
+                    Serial.println("TNC not initialized");
+                }
+            }
+            else if (subCmd == "test") {
+                if (tnc) {
+                    tnc->sendTestFrame();
+                } else {
+                    Serial.println("TNC not initialized");
+                }
+            }
+            else {
+                Serial.println("Unknown TNC command. Type 'help' for available commands.");
+            }
+        }
+    }
     else {
         Serial.println("Unknown command. Type 'help' for available commands.");
     }
@@ -257,8 +359,13 @@ void loop() {
     // Handle LoRa radio events
     loraRadio.handle();
     
-    // Check if data is available on serial port
-    if (Serial.available() > 0) {
+    // Handle TNC processing
+    if (tnc) {
+        tnc->handle();
+    }
+    
+    // Check if data is available on serial port (only in command mode)
+    if (tnc && tnc->getMode() == TNC_MODE_COMMAND && Serial.available() > 0) {
         char incomingChar = Serial.read();
         
         // Handle different characters
