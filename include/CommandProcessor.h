@@ -29,7 +29,6 @@ private:
     
     // System command implementations
     void handleHelp();
-    void handleStatus();
     void handleClear();
     void handleReset();
     

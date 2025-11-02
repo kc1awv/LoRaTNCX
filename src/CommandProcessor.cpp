@@ -22,13 +22,16 @@ bool CommandProcessor::processCommand(const String& input) {
     cmd.toLowerCase();
     
     // Route to appropriate handler
-    if (cmd == "help" || cmd == "status" || cmd == "clear" || cmd == "reset") {
+    // 1. System commands (help, clear, reset)
+    if (cmd == "help" || cmd == "clear" || cmd == "reset") {
         return handleSystemCommand(cmd, args);
     }
+    // 2. LoRa commands (lora ...)
     else if (cmd == "lora") {
         return handleLoRaCommand(cmd, args);
     }
-    else if (cmd == "tnc") {
+    // 3. TNC commands (config, kiss, beacon, csma, test)
+    else if (cmd == "config" || cmd == "kiss" || cmd == "beacon" || cmd == "csma" || cmd == "test") {
         return handleTncCommand(cmd, args);
     }
     else {
@@ -78,9 +81,6 @@ String CommandProcessor::getArguments(const String& input) {
 bool CommandProcessor::handleSystemCommand(const String& cmd, const String& args) {
     if (cmd == "help") {
         handleHelp();
-    }
-    else if (cmd == "status") {
-        handleStatus();
     }
     else if (cmd == "clear") {
         handleClear();
@@ -141,33 +141,23 @@ bool CommandProcessor::handleLoRaCommand(const String& cmd, const String& args) 
 }
 
 bool CommandProcessor::handleTncCommand(const String& cmd, const String& args) {
-    if (args.length() == 0) {
-        Serial.println("TNC command requires arguments. Type 'help' for usage.");
-        return false;
-    }
-    
-    int argSpaceIndex = args.indexOf(' ');
-    String subCmd = (argSpaceIndex == -1) ? args : args.substring(0, argSpaceIndex);
-    String subArgs = (argSpaceIndex == -1) ? "" : args.substring(argSpaceIndex + 1);
-    subCmd.toLowerCase();
-    
-    if (subCmd == "status") {
+    if (cmd == "status") {
         handleTncStatus();
     }
-    else if (subCmd == "config") {
+    else if (cmd == "config") {
         handleTncConfig();
     }
-    else if (subCmd == "kiss") {
+    else if (cmd == "kiss") {
         handleTncKiss();
         return false; // Don't print prompt in KISS mode
     }
-    else if (subCmd == "beacon") {
-        handleTncBeacon(subArgs);
+    else if (cmd == "beacon") {
+        handleTncBeacon(args);
     }
-    else if (subCmd == "csma") {
-        handleTncCsma(subArgs);
+    else if (cmd == "csma") {
+        handleTncCsma(args);
     }
-    else if (subCmd == "test") {
+    else if (cmd == "test") {
         handleTncTest();
     }
     else {
@@ -198,22 +188,12 @@ void CommandProcessor::handleHelp() {
     Serial.println("  lora cr <cr>   - Set coding rate (5-8 for 4/5-4/8) or 1-4");
     Serial.println();
     Serial.println("TNC Commands:");
-    Serial.println("  tnc status     - Show TNC status and statistics");
-    Serial.println("  tnc config     - Show TNC configuration");
-    Serial.println("  tnc kiss       - Enter KISS mode");
-    Serial.println("  tnc beacon <en> <int> <text> - Set beacon (enable, interval_ms, text)");
-    Serial.println("  tnc csma <en> [slot] [retries] - Configure CSMA/CD");
-    Serial.println("  tnc test       - Send test frame");
-}
-
-void CommandProcessor::handleStatus() {
-    Serial.println("System Status:");
-    Serial.printf("  Uptime: %u seconds\n", millis() / 1000);
-    Serial.printf("  Free Heap: %u bytes\n", ESP.getFreeHeap());
-    Serial.printf("  CPU Frequency: %u MHz\n", ESP.getCpuFreqMHz());
-    Serial.printf("  Flash Size: %u bytes\n", ESP.getFlashChipSize());
-    Serial.printf("  Chip Model: %s\n", ESP.getChipModel());
-    Serial.printf("  Chip Revision: %u\n", ESP.getChipRevision());
+    Serial.println("  status         - Show TNC status and statistics");
+    Serial.println("  config         - Show TNC configuration");
+    Serial.println("  kiss           - Enter KISS mode");
+    Serial.println("  beacon <en> <int> <text> - Set beacon (enable, interval_ms, text)");
+    Serial.println("  csma <en> [slot] [retries] - Configure CSMA/CD");
+    Serial.println("  test           - Send test frame");
 }
 
 void CommandProcessor::handleClear() {
