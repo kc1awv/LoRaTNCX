@@ -65,8 +65,12 @@ void setup() {
             Serial.println("Failed to initialize TNC!");
         }
         
-        // Initialize command processor
+        // Initialize command processor (this creates TNC2Config and StationHeard)
         cmdProcessor = new CommandProcessor(&loraRadio, tnc);
+        
+        // Wire up TNC-2 integration
+        tnc->setTNC2Config(cmdProcessor->getTNC2Config());
+        tnc->setStationHeard(cmdProcessor->getStationHeard());
         
         // Print header and help
         cmdProcessor->printHeader();

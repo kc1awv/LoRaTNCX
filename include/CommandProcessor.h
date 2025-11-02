@@ -2,6 +2,9 @@
 #define COMMANDPROCESSOR_H
 
 #include <Arduino.h>
+#include <map>
+#include "TNC2Config.h"
+#include "StationHeard.h"
 
 // Forward declarations
 class LoRaRadio;
@@ -14,9 +17,20 @@ public:
     void printHeader();
     bool processCommand(const String& input);
     
+    // Access to TNC-2 objects for other classes
+    TNC2Config* getTNC2Config() { return tnc2Config; }
+    StationHeard* getStationHeard() { return heardList; }
+    
 private:
     LoRaRadio* loraRadio;
     LoRaTNC* tnc;
+    TNC2Config* tnc2Config;
+    StationHeard* heardList;
+    
+    // Command abbreviation system
+    std::map<String, String> commandAliases;
+    void initializeAliases();
+    String resolveCommand(const String& input);
     
     // Command parsing helpers
     String getCommand(const String& input);
@@ -26,6 +40,7 @@ private:
     bool handleSystemCommand(const String& cmd, const String& args);
     bool handleLoRaCommand(const String& cmd, const String& args);
     bool handleTncCommand(const String& cmd, const String& args);
+    bool handleTNC2Command(const String& cmd, const String& args);
     
     // System command implementations
     void handleHelp();
@@ -54,6 +69,39 @@ private:
     void handleTncBeacon(const String& args);
     void handleTncCsma(const String& args);
     void handleTncTest();
+    
+    // TNC-2 compatible command implementations
+    void handleMycall(const String& args);
+    void handleMyAlias(const String& args);
+    void handleBtext(const String& args);
+    void handleCtext(const String& args);
+    void handleBeaconTNC2(const String& args);
+    void handleMonitorTNC2(const String& args);
+    void handleMheard(const String& args);
+    void handleMstamp(const String& args);
+    void handleConnect(const String& args);
+    void handleConok(const String& args);
+    void handleCstatus(const String& args);
+    void handleConvers(const String& args);
+    void handleMaxframe(const String& args);
+    void handleRetry(const String& args);
+    void handlePaclen(const String& args);
+    void handleFrack(const String& args);
+    void handleResptime(const String& args);
+    void handleEcho(const String& args);
+    void handleXflow(const String& args);
+    void handleDigipeat(const String& args);
+    void handleDisplay(const String& args);
+    
+    // LoRa-enhanced TNC-2 commands
+    void handleRssi(const String& args);
+    void handleSnr(const String& args);
+    void handleLinkqual(const String& args);
+    
+    // Utility methods
+    void printTNC2Help();
+    String formatOnOff(bool value);
+    bool parseOnOff(const String& input, bool& result);
 };
 
 #endif

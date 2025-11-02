@@ -4,6 +4,10 @@
 #include "LoRaRadio.h"
 #include "KissProtocol.h"
 
+// Forward declarations for TNC-2 integration
+class TNC2Config;
+class StationHeard;
+
 typedef enum
 {
     TNC_MODE_COMMAND,    // Command line mode (current mode)
@@ -29,6 +33,10 @@ private:
     KissProtocol *kissProtocol;
     tnc_mode_t currentMode;
     tnc_statistics_t stats;
+    
+    // TNC-2 integration
+    TNC2Config *tnc2Config;
+    StationHeard *heardList;
 
     // Configuration
     bool beaconEnabled;
@@ -54,6 +62,12 @@ private:
 public:
     LoRaTNC(LoRaRadio *lora);
     ~LoRaTNC();
+    
+    // TNC-2 integration methods
+    void setTNC2Config(TNC2Config *config) { tnc2Config = config; }
+    void setStationHeard(StationHeard *heard) { heardList = heard; }
+    TNC2Config* getTNC2Config() { return tnc2Config; }
+    StationHeard* getStationHeard() { return heardList; }
 
     // Initialization
     bool begin();
@@ -90,6 +104,10 @@ public:
     void sendTestFrame();
     bool isConnected();
     void printConfiguration();
+    
+    // TNC-2 callsign extraction utilities
+    String extractCallsignFromMessage(const String& message);
+    bool isValidCallsignFormat(const String& call);
 
     // Static callback wrappers for C-style callbacks
     static LoRaTNC *instance;

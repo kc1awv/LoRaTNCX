@@ -1,4 +1,6 @@
 #include "LoRaTNC.h"
+#include "TNC2Config.h"
+#include "StationHeard.h"
 
 // Static instance pointer for callbacks
 LoRaTNC *LoRaTNC::instance = nullptr;
@@ -16,6 +18,10 @@ LoRaTNC::LoRaTNC(LoRaRadio *lora)
 
     // Initialize statistics
     memset(&stats, 0, sizeof(stats));
+
+    // Initialize TNC-2 integration (will be set by CommandProcessor)
+    tnc2Config = nullptr;
+    heardList = nullptr;
 
     // Initialize configuration
     beaconEnabled = false;
@@ -456,6 +462,24 @@ void LoRaTNC::handleLoRaReceive(uint8_t *payload, uint16_t size, int16_t rssi, f
 {
     stats.packetsReceived++;
 
+    // Convert payload to string for processing
+    char message[size + 1];
+    memcpy(message, payload, size);
+    message[size] = '\0';
+    String messageStr = String(message);
+
+    // Extract callsign for station tracking (simple heuristic - look for callsign pattern)
+    String callsign = extractCallsignFromMessage(messageStr);
+    
+    // Add to heard list if TNC-2 integration is available and monitoring is enabled
+    if (heardList && tnc2Config && tnc2Config->getMonitorEnabled() && !callsign.isEmpty()) {
+        // Get current LoRa parameters
+        uint8_t sf = loraRadio->getConfig().spreadingFactor;
+        float bw = loraRadio->getConfig().bandwidth;
+        
+        heardList->addStation(callsign, rssi, snr, sf, bw, messageStr);
+    }
+
     if (currentMode == TNC_MODE_KISS)
     {
         // Forward to host via KISS - TNC-2 behavior: silent operation
@@ -465,13 +489,105 @@ void LoRaTNC::handleLoRaReceive(uint8_t *payload, uint16_t size, int16_t rssi, f
     else
     {
         // Command mode - display the packet
-        char message[size + 1];
-        memcpy(message, payload, size);
-        message[size] = '\0';
-
-        Serial.printf("[TNC] LoRa RX: \"%s\" (RSSI: %d dBm, SNR: %.1f dB, Size: %d)\n",
-                      message, rssi, snr, size);
+        // Use TNC-2 monitoring format if available
+        bool showTNC2Format = (tnc2Config && tnc2Config->getMonitorEnabled());
+        
+        if (showTNC2Format && !callsign.isEmpty()) {
+            // TNC-2 style monitor display
+            String timestamp = "";
+            if (tnc2Config->getTimestampEnabled()) {
+                // For now, just use simple timestamp
+                unsigned long now = millis();
+                timestamp = String(now / 1000) + ": ";
+            }
+            
+            Serial.printf("%s%s: %s (RSSI:%ddBm SNR:%.1fdB SF%d)\n",
+                          timestamp.c_str(), callsign.c_str(), messageStr.c_str(),
+                          rssi, snr, loraRadio->getConfig().spreadingFactor);
+        } else {
+            // Original LoRaTNCX format
+            Serial.printf("[TNC] LoRa RX: \"%s\" (RSSI: %d dBm, SNR: %.1f dB, Size: %d)\n",
+                          messageStr.c_str(), rssi, snr, size);
+        }
     }
+}
+
+String LoRaTNC::extractCallsignFromMessage(const String& message) {
+    // Simple callsign extraction - look for typical amateur radio patterns
+    // This is a basic implementation - can be enhanced for AX.25 parsing
+    
+    // Look for patterns like "DE KC1AWV" or "KC1AWV-1>"
+    int deIndex = message.indexOf("DE ");
+    if (deIndex != -1) {
+        int start = deIndex + 3;
+        int end = message.indexOf(' ', start);
+        if (end == -1) end = message.indexOf('>', start);
+        if (end == -1) end = message.indexOf(':', start);
+        if (end == -1) end = message.length();
+        
+        String call = message.substring(start, end);
+        call.trim();
+        if (isValidCallsignFormat(call)) {
+            return call;
+        }
+    }
+    
+    // Look for "FROM CALLSIGN" pattern
+    int fromIndex = message.indexOf("FROM ");
+    if (fromIndex != -1) {
+        int start = fromIndex + 5;
+        int end = message.indexOf(' ', start);
+        if (end == -1) end = message.length();
+        
+        String call = message.substring(start, end);
+        call.trim();
+        if (isValidCallsignFormat(call)) {
+            return call;
+        }
+    }
+    
+    // Look for callsign at start of message (before ':' or '>')
+    int colonIndex = message.indexOf(':');
+    int gtIndex = message.indexOf('>');
+    int sepIndex = -1;
+    
+    if (colonIndex != -1 && gtIndex != -1) {
+        sepIndex = min(colonIndex, gtIndex);
+    } else if (colonIndex != -1) {
+        sepIndex = colonIndex;
+    } else if (gtIndex != -1) {
+        sepIndex = gtIndex;
+    }
+    
+    if (sepIndex != -1 && sepIndex > 0) {
+        String call = message.substring(0, sepIndex);
+        call.trim();
+        if (isValidCallsignFormat(call)) {
+            return call;
+        }
+    }
+    
+    return ""; // No callsign found
+}
+
+bool LoRaTNC::isValidCallsignFormat(const String& call) {
+    if (call.length() < 3 || call.length() > 9) {
+        return false;
+    }
+    
+    // Basic check - starts with letter or number, contains letters/numbers/dash
+    if (!isAlphaNumeric(call.charAt(0))) {
+        return false;
+    }
+    
+    for (int i = 0; i < call.length(); i++) {
+        char c = call.charAt(i);
+        if (!isAlphaNumeric(c) && c != '-') {
+            return false;
+        }
+    }
+    
+    return true;
 }
 
 void LoRaTNC::handleLoRaTransmitDone()
@@ -571,14 +687,37 @@ void LoRaTNC::handle()
     }
 
     // Handle beacon transmission
-    if (beaconEnabled && (millis() - lastBeaconTime) >= beaconInterval)
+    bool useBeacon = beaconEnabled;
+    uint32_t beaconInt = beaconInterval;
+    String beaconMsg = beaconText;
+    
+    // Use TNC-2 beacon configuration if available
+    if (tnc2Config && tnc2Config->getBeaconEnabled()) {
+        useBeacon = true;
+        beaconInt = tnc2Config->getBeaconInterval() * 1000; // Convert seconds to ms
+        beaconMsg = tnc2Config->getBeaconText();
+        
+        // Add callsign to beacon if configured
+        String myCall = tnc2Config->getMyCall();
+        if (!myCall.isEmpty() && myCall != "NOCALL") {
+            if (!beaconMsg.isEmpty()) {
+                beaconMsg = myCall + ": " + beaconMsg;
+            } else {
+                beaconMsg = myCall + " beacon";
+            }
+        }
+    }
+    
+    if (useBeacon && (millis() - lastBeaconTime) >= beaconInt)
     {
         lastBeaconTime = millis();
 
-        if (beaconText.length() > 0)
+        if (beaconMsg.length() > 0)
         {
-            Serial.println("[TNC] Sending beacon");
-            loraRadio->send(beaconText);
+            if (currentMode == TNC_MODE_COMMAND) {
+                Serial.println("[TNC] Sending beacon");
+            }
+            loraRadio->send(beaconMsg);
         }
     }
 
