@@ -56,6 +56,10 @@ private:
     std::vector<FrequencyBand> availableBands;
     FrequencyBand* currentBand;
     float currentFrequency;
+    bool spiffsInitialized;
+    
+    // SPIFFS initialization
+    bool initializeSPIFFS();
     
     // Load predefined ISM and amateur bands
     void loadPredefinedBands();
@@ -66,6 +70,9 @@ private:
 public:
     FrequencyBandManager();
     ~FrequencyBandManager();
+    
+    // Initialize full system after setup() when SPIFFS is safe to use
+    void initializeFullSystem();
     
     // Band management
     bool addBand(const FrequencyBand& band);

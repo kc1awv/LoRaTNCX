@@ -331,6 +331,8 @@ void CommandProcessor::handleTncConfig() {
 
 void CommandProcessor::handleTncKiss() {
     if (tnc) {
+        // TAPR TNC-2 compatible: silent entry to KISS mode
+        // No confirmation message should be sent
         tnc->enterKissMode();
     }
     else {

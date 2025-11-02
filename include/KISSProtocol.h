@@ -66,6 +66,7 @@ private:
     void (*onCommandCallback)(uint8_t command, uint8_t parameter);
 
     // Internal methods
+    void processReceivedFrame();
     void processCommand(uint8_t command, uint8_t parameter);
     void sendFrame(uint8_t command, uint8_t *data, uint16_t length);
     uint16_t escapeData(uint8_t *input, uint16_t inputLength, uint8_t *output);
@@ -107,6 +108,7 @@ public:
     uint32_t getFramesSent() const { return framesSent; }
     uint32_t getFrameErrors() const { return frameErrors; }
     void printStatistics();
+    void clearStatistics();
     void printConfiguration();
 
     // Utility

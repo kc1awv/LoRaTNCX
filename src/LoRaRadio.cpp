@@ -26,17 +26,11 @@ LoRaRadio::LoRaRadio() : radio(new Module(LORA_NSS, LORA_DIO1, LORA_NRST, LORA_B
     // Set this as the singleton instance
     instance = this;
 
-    // Initialize frequency band manager
-    bandManager = new FrequencyBandManager();
+    // Don't initialize frequency band manager here to avoid SPIFFS issues during global constructor
+    bandManager = nullptr;
 
-    // Initialize default configuration based on band manager
-    if (bandManager->getCurrentBand()) {
-        config.frequency = bandManager->getCurrentFrequency();
-    } else {
-        // Set safe default band (North American ISM)
-        config.frequency = 915.0; // Default to 915 MHz (902-928 MHz range)
-        bandManager->selectBand(BAND_ISM_902_928);
-    }
+    // Initialize default configuration with safe values
+    config.frequency = 915.0; // Default to 915 MHz (North American ISM)
 
     config.txPower = LORA_DEFAULT_TX_POWER;
     config.bandwidth = LORA_BANDWIDTH_DEFAULT;
@@ -122,6 +116,21 @@ bool LoRaRadio::begin(float frequency)
 
 bool LoRaRadio::begin(float frequency, int8_t txPower)
 {
+    // Initialize frequency band manager if not already done
+    if (!bandManager) {
+        Serial.println("[LoRa] Initializing frequency band manager...");
+        bandManager = new FrequencyBandManager();
+        
+        // Initialize full system (SPIFFS, regional bands, saved config)
+        bandManager->initializeFullSystem();
+        
+        // Try to select the appropriate band for the requested frequency
+        if (bandManager->getCurrentBand() == nullptr) {
+            // Select default band if none loaded
+            bandManager->selectBand(BAND_ISM_902_928);
+        }
+    }
+
     // Validate parameters
     if (!isFrequencyValid(frequency))
     {

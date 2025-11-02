@@ -85,21 +85,33 @@ void LoRaTNC::setMode(tnc_mode_t mode)
     tnc_mode_t oldMode = currentMode;
     currentMode = mode;
 
-    Serial.printf("[TNC] Mode changed from %s to %s\n",
-                  (oldMode == TNC_MODE_COMMAND) ? "COMMAND" : (oldMode == TNC_MODE_KISS) ? "KISS"
-                                                                                         : "TRANSPARENT",
-                  (mode == TNC_MODE_COMMAND) ? "COMMAND" : (mode == TNC_MODE_KISS) ? "KISS"
-                                                                                   : "TRANSPARENT");
-
     if (mode == TNC_MODE_KISS)
     {
-        Serial.println("[TNC] Entering KISS mode - binary protocol active");
-        Serial.println("[TNC] Send KISS frames or use KISS command 0xFF to exit");
+        // TAPR TNC-2 compatible KISS mode entry
+        // Silent entry - no messages sent to host
+        // The TNC should simply start accepting KISS frames
+        
+        // Reset KISS protocol state
+        kissProtocol->reset();
+        
+        // In TNC-2, entering KISS mode is silent - no output
+        // Debug messages only if not coming from command line
+        if (oldMode != TNC_MODE_COMMAND)
+        {
+            Serial.println("[TNC] Entering KISS mode - binary protocol active");
+        }
     }
     else if (oldMode == TNC_MODE_KISS)
     {
-        Serial.println("[TNC] Exited KISS mode - returning to command mode");
-        Serial.print("> ");
+        // Exiting KISS mode back to command mode
+        Serial.println("\r\ncmd:");  // TNC-2 style command mode prompt
+    }
+    else
+    {
+        // Other mode transitions (for debugging)
+        Serial.printf("[TNC] Mode changed from %s to %s\n",
+                      (oldMode == TNC_MODE_COMMAND) ? "COMMAND" : (oldMode == TNC_MODE_KISS) ? "KISS" : "TRANSPARENT",
+                      (mode == TNC_MODE_COMMAND) ? "COMMAND" : (mode == TNC_MODE_KISS) ? "KISS" : "TRANSPARENT");
     }
 }
 
@@ -182,12 +194,9 @@ void LoRaTNC::handleKissDataFrame(uint8_t *data, uint16_t length)
 {
     stats.packetsFromHost++;
 
-    Serial.printf("[TNC] KISS data frame received: %d bytes\n", length);
-
     // Check if data length exceeds LoRa maximum
     if (length > LORA_BUFFER_SIZE)
     {
-        Serial.printf("[TNC] Error: Data frame too large for LoRa (%d > %d bytes)\n", length, LORA_BUFFER_SIZE);
         stats.transmitErrors++;
         return;
     }
@@ -200,27 +209,48 @@ void LoRaTNC::handleKissDataFrame(uint8_t *data, uint16_t length)
 
     // Transmit over LoRa
     int result = loraRadio->send(data, length);
-    if (result == RADIOLIB_ERR_NONE)
+    if (result != RADIOLIB_ERR_NONE)
     {
-        Serial.println("[TNC] Packet queued for LoRa transmission");
-    }
-    else
-    {
-        Serial.printf("[TNC] Failed to queue packet for LoRa transmission: %d\n", result);
         stats.transmitErrors++;
     }
+    
+    // TNC-2 behavior: no confirmation messages in KISS mode
+    // Uncomment for debugging:
+    // Serial.printf("[DEBUG] KISS data frame: %d bytes, result: %d\n", length, result);
 }
 
 void LoRaTNC::handleKissCommand(uint8_t command, uint8_t parameter)
 {
-    Serial.printf("[TNC] KISS command received: %s (0x%02X) parameter: %d\n",
-                  KissProtocol::commandToString(command).c_str(), command, parameter);
-
-    if (command == KISS_CMD_RETURN)
+    // Handle KISS commands
+    switch (command)
     {
-        // Exit KISS mode
+    case KISS_CMD_RETURN:
+        // Exit KISS mode - return to command mode
         exitKissMode();
+        break;
+        
+    case KISS_CMD_TXDELAY:
+    case KISS_CMD_P:
+    case KISS_CMD_SLOTTIME:
+    case KISS_CMD_TXTAIL:
+    case KISS_CMD_FULLDUPLEX:
+        // Configuration commands - no response needed in TNC-2 mode
+        // Parameters are already updated by KissProtocol::processCommand()
+        break;
+        
+    case KISS_CMD_SETHARDWARE:
+        // Hardware-specific command - acknowledge but ignore
+        break;
+        
+    default:
+        // Unknown command - silently ignore (TNC-2 behavior)
+        break;
     }
+    
+    // Only log commands in debug mode (not in normal KISS operation)
+    // Uncomment the line below for debugging:
+    // Serial.printf("[DEBUG] KISS command: %s (0x%02X) parameter: %d\n",
+    //               KissProtocol::commandToString(command).c_str(), command, parameter);
 }
 
 void LoRaTNC::handleLoRaReceive(uint8_t *payload, uint16_t size, int16_t rssi, float snr)
@@ -229,16 +259,13 @@ void LoRaTNC::handleLoRaReceive(uint8_t *payload, uint16_t size, int16_t rssi, f
 
     if (currentMode == TNC_MODE_KISS)
     {
-        // Forward to host via KISS
+        // Forward to host via KISS - TNC-2 behavior: silent operation
         kissProtocol->sendDataFrame(payload, size);
         stats.packetsToHost++;
-
-        Serial.printf("[TNC] LoRa packet forwarded to host: %d bytes, RSSI: %d dBm, SNR: %.1f dB\n",
-                      size, rssi, snr);
     }
     else
     {
-        // Command mode - just display the packet
+        // Command mode - display the packet
         char message[size + 1];
         memcpy(message, payload, size);
         message[size] = '\0';
@@ -252,6 +279,7 @@ void LoRaTNC::handleLoRaTransmitDone()
 {
     stats.packetsTransmitted++;
 
+    // TNC-2 KISS behavior: silent operation
     if (currentMode == TNC_MODE_COMMAND)
     {
         Serial.println("[TNC] LoRa TX completed successfully");
@@ -262,6 +290,7 @@ void LoRaTNC::handleLoRaTransmitTimeout()
 {
     stats.transmitErrors++;
 
+    // TNC-2 KISS behavior: silent operation, no error messages to host
     if (currentMode == TNC_MODE_COMMAND)
     {
         Serial.println("[TNC] LoRa TX timeout occurred");

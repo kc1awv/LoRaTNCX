@@ -4,30 +4,69 @@
 #include <SPIFFS.h>
 
 FrequencyBandManager::FrequencyBandManager() 
-    : currentBand(nullptr), currentFrequency(0.0f)
+    : currentBand(nullptr), currentFrequency(0.0f), spiffsInitialized(false)
 {
-    // Initialize SPIFFS for regional band storage
-    if (!SPIFFS.begin(true)) {
-        Serial.println("[FreqBand] Warning: SPIFFS initialization failed");
-    }
-    
-    // Load all available bands
+    // Only load predefined bands in constructor (no SPIFFS operations)
     loadPredefinedBands();
-    loadRegionalBandsFromFile();
     
-    // Load saved configuration
-    loadConfiguration();
-    
-    // If no configuration loaded, select a default band
-    if (currentBand == nullptr) {
-        // Try to select a safe default based on region
-        selectBand(BAND_ISM_902_928); // US ISM band as default
+    // Select a safe default band without SPIFFS/Preferences operations
+    for (auto& band : availableBands) {
+        if (band.identifier == BAND_ISM_902_928 && band.enabled) {
+            currentBand = &band;
+            currentFrequency = band.defaultFrequency;
+            Serial.printf("[FreqBand] Default band selected: %s (%.3f MHz)\n", 
+                         band.name.c_str(), currentFrequency);
+            break;
+        }
     }
+    
+    // Note: SPIFFS and Preferences initialization will be done lazily when first needed
+    Serial.println("[FreqBand] Frequency band manager created (deferred initialization mode)");
 }
 
 FrequencyBandManager::~FrequencyBandManager()
 {
     saveConfiguration();
+}
+
+bool FrequencyBandManager::initializeSPIFFS()
+{
+    if (spiffsInitialized) {
+        return true;
+    }
+    
+    // Try to initialize SPIFFS without auto-formatting first
+    spiffsInitialized = SPIFFS.begin(false);
+    
+    if (!spiffsInitialized) {
+        Serial.println("[FreqBand] SPIFFS not formatted, trying with format...");
+        // Only format if explicitly requested and safe to do so
+        spiffsInitialized = SPIFFS.begin(true);
+    }
+    
+    if (!spiffsInitialized) {
+        Serial.println("[FreqBand] Warning: SPIFFS initialization failed - running without filesystem support");
+        Serial.println("[FreqBand] Regional bands and configuration persistence will not be available");
+    } else {
+        Serial.println("[FreqBand] SPIFFS initialized successfully");
+    }
+    
+    return spiffsInitialized;
+}
+
+void FrequencyBandManager::initializeFullSystem()
+{
+    // This method should be called after setup() when it's safe to use SPIFFS
+    Serial.println("[FreqBand] Initializing full frequency band system...");
+    
+    // Initialize SPIFFS
+    initializeSPIFFS();
+    
+    // Load regional bands and saved configuration
+    loadRegionalBandsFromFile();
+    loadConfiguration();
+    
+    Serial.println("[FreqBand] Full system initialization complete");
 }
 
 void FrequencyBandManager::loadPredefinedBands()
@@ -345,12 +384,18 @@ bool FrequencyBandManager::saveConfiguration()
         if (currentBand) {
             success &= prefs.putString("band_id", currentBand->identifier);
             success &= prefs.putFloat("frequency", currentFrequency);
+            if (success) {
+                Serial.printf("[FreqBand] Configuration saved: %s @ %.3f MHz\n", 
+                             currentBand->identifier.c_str(), currentFrequency);
+            }
         }
         
         prefs.end();
         return success;
+    } else {
+        Serial.println("[FreqBand] Warning: Cannot save configuration - NVS not available");
+        return false;
     }
-    return false;
 }
 
 bool FrequencyBandManager::loadConfiguration()
@@ -364,18 +409,21 @@ bool FrequencyBandManager::loadConfiguration()
         if (!bandId.isEmpty() && freq > 0.0f) {
             if (selectBand(bandId)) {
                 currentFrequency = freq;
-                Serial.printf("[FreqBand] Loaded config: %s @ %.3f MHz\n", 
+                Serial.printf("[FreqBand] Loaded saved config: %s @ %.3f MHz\n", 
                              bandId.c_str(), freq);
                 return true;
             }
         }
+        Serial.println("[FreqBand] No saved configuration found, using defaults");
+    } else {
+        Serial.println("[FreqBand] NVS not available, using default configuration");
     }
     return false;
 }
 
 bool FrequencyBandManager::saveRegionalBands(const String& filename)
 {
-    if (!SPIFFS.begin()) {
+    if (!spiffsInitialized) {
         Serial.println("[FreqBand] SPIFFS not available for saving regional bands");
         return false;
     }
@@ -416,7 +464,7 @@ bool FrequencyBandManager::saveRegionalBands(const String& filename)
 
 bool FrequencyBandManager::loadRegionalBands(const String& filename)
 {
-    if (!SPIFFS.begin()) {
+    if (!spiffsInitialized) {
         Serial.println("[FreqBand] SPIFFS not available, skipping regional bands");
         return false;
     }
