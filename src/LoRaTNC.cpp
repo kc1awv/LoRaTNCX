@@ -161,6 +161,13 @@ void LoRaTNC::handleKissDataFrame(uint8_t* data, uint16_t length) {
     
     Serial.printf("[TNC] KISS data frame received: %d bytes\n", length);
     
+    // Check if data length exceeds LoRa maximum
+    if (length > LORA_BUFFER_SIZE) {
+        Serial.printf("[TNC] Error: Data frame too large for LoRa (%d > %d bytes)\n", length, LORA_BUFFER_SIZE);
+        stats.transmitErrors++;
+        return;
+    }
+    
     // Wait for clear channel if CSMA is enabled
     if (!waitForChannel()) {
         return;  // Channel busy, packet dropped

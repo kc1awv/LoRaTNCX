@@ -19,8 +19,11 @@
 #define KISS_CMD_RETURN     0xFF  // Exit KISS mode
 
 // KISS TNC Parameters
-#define KISS_MAX_FRAME_SIZE  256  // Maximum KISS frame size
-#define KISS_DEFAULT_TXDELAY 50   // Default TX delay in 10ms units (500ms)
+// Note: KISS frames add overhead (FEND+CMD+FEND = 3 bytes) plus potential escaping
+// Safe payload size = 255 - 3 - worst_case_escaping_overhead
+#define KISS_MAX_FRAME_SIZE     255  // Maximum KISS frame size (matches LoRa limit)
+#define KISS_MAX_DATA_PAYLOAD   250  // Maximum data payload (leaves room for framing + escaping)
+#define KISS_DEFAULT_TXDELAY 50      // Default TX delay in 10ms units (500ms)
 #define KISS_DEFAULT_P       63   // Default persistence (63/255 ≈ 25%)
 #define KISS_DEFAULT_SLOTTIME 10  // Default slot time in 10ms units (100ms)
 #define KISS_DEFAULT_TXTAIL  2    // Default TX tail in 10ms units (20ms)
