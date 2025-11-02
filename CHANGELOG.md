@@ -1,5 +1,54 @@
 # LoRaTNCX Changelog
 
+## Version 1.3 - KISS Protocol LoRa Extensions
+
+### Major Features
+- **Extended KISS Protocol Support**
+  - LoRa-specific KISS commands for radio configuration
+  - Compatible with packet radio software (APRS, Winlink, etc.)
+  - Hardware-specific commands via SETHARDWARE (0x06)
+  - Multi-byte parameter support for complex settings
+
+### New KISS Commands
+- `SET_FREQ` (0x10) - Set frequency (4-byte Hz parameter)
+- `SET_TXPOWER` (0x12) - Set TX power in dBm
+- `SET_BANDWIDTH` (0x13) - Set bandwidth (encoded index)
+- `SET_SF` (0x14) - Set spreading factor (6-12)
+- `SET_CR` (0x15) - Set coding rate (5-8 for 4/5 to 4/8)
+- `SET_PREAMBLE` (0x16) - Set preamble length (2-byte parameter)
+- `SET_SYNCWORD` (0x17) - Set sync word
+- `SET_CRC` (0x18) - Enable/disable CRC
+- `SELECT_BAND` (0x19) - Select predefined frequency band
+- `GET_CONFIG` (0x1A) - Get current configuration
+- `SAVE_CONFIG` (0x1B) - Save configuration to flash
+- `RESET_CONFIG` (0x1C) - Reset to defaults
+
+### KISS Protocol Features
+- **Standard TNC Compatibility**
+  - TXDELAY, PERSISTENCE, SLOTTIME, TXTAIL, FULLDUPLEX
+  - RETURN command to exit KISS mode
+  - TNC-2 compatible silent operation
+- **Response System**
+  - ACK/NAK responses for configuration commands
+  - Multi-frame responses for GET_CONFIG
+  - Error handling for invalid parameters
+
+### Integration Support
+- **Packet Radio Applications**
+  - APRS software compatibility
+  - Winlink integration potential
+  - Custom KISS client support
+- **Programming Examples**
+  - Python KISS client example
+  - Raw hex command documentation
+  - Frame format specifications
+
+### Documentation Updates
+- Added KISS command reference to README.md
+- Created docs/KISS_TESTING.md for validation
+- Extended EXAMPLES.md with KISS usage scenarios
+- Complete command encoding tables
+
 ## Version 1.2 - Frequency Band Management System
 
 ### Major Features

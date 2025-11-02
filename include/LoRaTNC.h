@@ -44,6 +44,7 @@ private:
     // Internal methods
     void handleKissDataFrame(uint8_t *data, uint16_t length);
     void handleKissCommand(uint8_t command, uint8_t parameter);
+    void handleKissLoRaCommand(uint8_t command, uint8_t *data, uint16_t length);
 
     // CSMA/CD implementation
     bool channelIsBusy();
@@ -94,4 +95,5 @@ public:
     static LoRaTNC *instance;
     static void kissDataFrameWrapper(uint8_t *data, uint16_t length);
     static void kissCommandWrapper(uint8_t command, uint8_t parameter);
+    static void kissLoRaCommandWrapper(uint8_t command, uint8_t *data, uint16_t length);
 };

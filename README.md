@@ -66,6 +66,62 @@ platformio run -e heltec_wifi_lora_32_V4
 platformio run
 ```
 
+## KISS TNC Mode
+
+LoRaTNCX supports KISS TNC mode for compatibility with packet radio applications. In addition to standard KISS commands, it provides extended commands for LoRa-specific configuration.
+
+### Standard KISS Commands
+- `TXDELAY` (0x01) - TX delay in 10ms units
+- `PERSISTENCE` (0x02) - P parameter (0-255)
+- `SLOTTIME` (0x03) - Slot time in 10ms units
+- `TXTAIL` (0x04) - TX tail in 10ms units
+- `FULLDUPLEX` (0x05) - Full/half duplex mode
+- `RETURN` (0xFF) - Exit KISS mode
+
+### LoRa-Specific KISS Commands
+Extended hardware commands for LoRa radio configuration:
+
+- `SET_FREQ` (0x10) - Set frequency (4-byte parameter in Hz)
+- `SET_TXPOWER` (0x12) - Set TX power in dBm (-17 to +22)
+- `SET_BANDWIDTH` (0x13) - Set bandwidth (see encoding table)
+- `SET_SF` (0x14) - Set spreading factor (6-12)
+- `SET_CR` (0x15) - Set coding rate (5=4/5, 6=4/6, 7=4/7, 8=4/8)
+- `SET_PREAMBLE` (0x16) - Set preamble length (2-byte parameter)
+- `SET_SYNCWORD` (0x17) - Set sync word (0x12=public, 0x34=private)
+- `SET_CRC` (0x18) - Enable/disable CRC (0=disable, 1=enable)
+- `SELECT_BAND` (0x19) - Select predefined band by index
+- `GET_CONFIG` (0x1A) - Get current configuration (returns multiple frames)
+- `SAVE_CONFIG` (0x1B) - Save configuration to flash
+- `RESET_CONFIG` (0x1C) - Reset to defaults
+
+### Bandwidth Encoding
+- 0 = 7.8 kHz, 1 = 10.4 kHz, 2 = 15.6 kHz, 3 = 20.8 kHz
+- 4 = 31.25 kHz, 5 = 41.7 kHz, 6 = 62.5 kHz
+- 7 = 125 kHz, 8 = 250 kHz, 9 = 500 kHz
+
+### KISS Frame Format for LoRa Commands
+```
+FEND + SETHARDWARE (0x06) + LoRa_Command + Parameters + FEND
+```
+
+Example: Set frequency to 915.000 MHz (915000000 Hz)
+```
+C0 06 10 36 89 69 00 C0
+```
+
+### Entering KISS Mode
+1. From serial console: Type `kiss` and press Enter
+2. The TNC enters KISS mode silently (TNC-2 compatible behavior)
+3. All subsequent communication uses KISS framing
+4. To exit KISS mode: Send RETURN command (0xFF) or restart device
+
+### Using with Packet Radio Software
+LoRaTNCX is compatible with any software that supports KISS TNCs:
+- **APRS**: Use with applications like UI-View, Xastir, or APRSIS32
+- **Winlink**: Connect via VARA or other HF/VHF digital modes
+- **Packet BBS**: Terminal programs with KISS support
+- **Custom Applications**: Any software using KISS protocol
+
 ## Serial Console Commands
 
 The device provides a serial console interface with the following commands:
@@ -77,6 +133,8 @@ The device provides a serial console interface with the following commands:
 - `reset` - Restart the device
 
 ### LoRa Commands
+### TNC Commands
+- `kiss` - Enter KISS TNC mode for packet radio applications
 - `lora status` - Show current LoRa radio state
 - `lora config` - Display LoRa configuration
 - `lora stats` - Show transmission/reception statistics

@@ -17,6 +17,13 @@ KissProtocol::KissProtocol()
     frameErrors = 0;
     onDataFrameCallback = nullptr;
     onCommandCallback = nullptr;
+    onLoRaCommandCallback = nullptr;
+    
+    // Initialize multi-byte parameter state
+    expectingMultiByteParam = false;
+    multiByteCommand = 0;
+    multiBytePos = 0;
+    multiByteExpected = 0;
 }
 
 void KissProtocol::begin() 
@@ -40,6 +47,12 @@ void KissProtocol::reset()
 {
     state = KISS_STATE_IDLE;
     rxBufferPos = 0;
+    
+    // Reset multi-byte parameter state
+    expectingMultiByteParam = false;
+    multiByteCommand = 0;
+    multiBytePos = 0;
+    multiByteExpected = 0;
 }
 void KissProtocol::setTxDelay(uint8_t delay) { config.txDelay = delay; }
 void KissProtocol::setPersistence(uint8_t p) { config.persistence = p; }
@@ -191,11 +204,20 @@ void KissProtocol::processReceivedFrame()
     }
     else
     {
-        // Command frame - must have parameter byte
+        // Command frame - must have parameter byte(s)
         if (rxBufferPos >= 2)
         {
-            uint8_t parameter = rxBuffer[1];
-            processCommand(command, parameter);
+            if (command == KISS_CMD_SETHARDWARE)
+            {
+                // Hardware commands can have variable-length parameters
+                processHardwareCommand(&rxBuffer[1], rxBufferPos - 1);
+            }
+            else
+            {
+                // Standard commands have single-byte parameters
+                uint8_t parameter = rxBuffer[1];
+                processCommand(command, parameter);
+            }
         }
         else
         {
@@ -237,9 +259,8 @@ void KissProtocol::processCommand(uint8_t command, uint8_t parameter)
         break;
 
     case KISS_CMD_SETHARDWARE:
-        // Hardware-specific commands
-        // For TNC-2 compatibility, we acknowledge but don't implement
-        // specific hardware commands
+        // Hardware-specific commands - should be handled by processHardwareCommand
+        // This should not be reached in normal operation
         break;
 
     case KISS_CMD_RETURN:
@@ -321,8 +342,34 @@ void KissProtocol::sendDataFrame(uint8_t *data, uint16_t length)
     sendToSerial(txBuffer, framePos);
     framesSent++;
 }
+void KissProtocol::processHardwareCommand(uint8_t *data, uint16_t length)
+{
+    if (length < 1)
+    {
+        frameErrors++;
+        return;
+    }
+    
+    uint8_t subCommand = data[0];
+    
+    // Check if this is a LoRa-specific command
+    if (subCommand >= KISS_LORA_SET_FREQ_LOW && subCommand <= KISS_LORA_RESET_CONFIG)
+    {
+        if (onLoRaCommandCallback)
+        {
+            onLoRaCommandCallback(subCommand, &data[1], length - 1);
+        }
+    }
+    else
+    {
+        // Unknown hardware command - silently ignore (TNC-2 behavior)
+        frameErrors++;
+    }
+}
+
 void KissProtocol::onDataFrame(void (*callback)(uint8_t *data, uint16_t length)) { onDataFrameCallback = callback; }
 void KissProtocol::onCommand(void (*callback)(uint8_t command, uint8_t parameter)) { onCommandCallback = callback; }
+void KissProtocol::onLoRaCommand(void (*callback)(uint8_t command, uint8_t *data, uint16_t length)) { onLoRaCommandCallback = callback; }
 void KissProtocol::handleSerialInput()
 {
     while (Serial.available() > 0)
@@ -538,4 +585,145 @@ void KissProtocol::sendCommand(uint8_t command, uint8_t parameter)
 {
     uint8_t data[1] = {parameter};
     sendFrame(command, data, 1);
+}
+
+String KissProtocol::loraCommandToString(uint8_t command)
+{
+    switch (command)
+    {
+    case KISS_LORA_SET_FREQ_LOW:
+        return "SET_FREQ_LOW";
+    case KISS_LORA_SET_FREQ_HIGH:
+        return "SET_FREQ_HIGH";
+    case KISS_LORA_SET_TXPOWER:
+        return "SET_TXPOWER";
+    case KISS_LORA_SET_BANDWIDTH:
+        return "SET_BANDWIDTH";
+    case KISS_LORA_SET_SF:
+        return "SET_SF";
+    case KISS_LORA_SET_CR:
+        return "SET_CR";
+    case KISS_LORA_SET_PREAMBLE:
+        return "SET_PREAMBLE";
+    case KISS_LORA_SET_SYNCWORD:
+        return "SET_SYNCWORD";
+    case KISS_LORA_SET_CRC:
+        return "SET_CRC";
+    case KISS_LORA_SELECT_BAND:
+        return "SELECT_BAND";
+    case KISS_LORA_GET_CONFIG:
+        return "GET_CONFIG";
+    case KISS_LORA_SAVE_CONFIG:
+        return "SAVE_CONFIG";
+    case KISS_LORA_RESET_CONFIG:
+        return "RESET_CONFIG";
+    default:
+        return "UNKNOWN_LORA";
+    }
+}
+
+float KissProtocol::bandwidthIndexToValue(uint8_t index)
+{
+    switch (index)
+    {
+    case KISS_LORA_BW_7_8: return 7.8;
+    case KISS_LORA_BW_10_4: return 10.4;
+    case KISS_LORA_BW_15_6: return 15.6;
+    case KISS_LORA_BW_20_8: return 20.8;
+    case KISS_LORA_BW_31_25: return 31.25;
+    case KISS_LORA_BW_41_7: return 41.7;
+    case KISS_LORA_BW_62_5: return 62.5;
+    case KISS_LORA_BW_125: return 125.0;
+    case KISS_LORA_BW_250: return 250.0;
+    case KISS_LORA_BW_500: return 500.0;
+    default: return 125.0; // Default to 125 kHz
+    }
+}
+
+uint8_t KissProtocol::bandwidthValueToIndex(float bandwidth)
+{
+    if (bandwidth <= 7.8) return KISS_LORA_BW_7_8;
+    if (bandwidth <= 10.4) return KISS_LORA_BW_10_4;
+    if (bandwidth <= 15.6) return KISS_LORA_BW_15_6;
+    if (bandwidth <= 20.8) return KISS_LORA_BW_20_8;
+    if (bandwidth <= 31.25) return KISS_LORA_BW_31_25;
+    if (bandwidth <= 41.7) return KISS_LORA_BW_41_7;
+    if (bandwidth <= 62.5) return KISS_LORA_BW_62_5;
+    if (bandwidth <= 125.0) return KISS_LORA_BW_125;
+    if (bandwidth <= 250.0) return KISS_LORA_BW_250;
+    return KISS_LORA_BW_500; // Default to 500 kHz for anything higher
+}
+
+void KissProtocol::sendLoRaCommand(uint8_t command, uint8_t *data, uint16_t length)
+{
+    // Build hardware command frame: FEND + SETHARDWARE + COMMAND + DATA + FEND
+    uint16_t framePos = 0;
+    uint16_t totalLength = 3 + length; // FEND + SETHARDWARE + COMMAND + DATA + FEND
+    
+    if (totalLength > KISS_MAX_FRAME_SIZE)
+    {
+        frameErrors++;
+        return;
+    }
+    
+    // Start frame
+    txBuffer[framePos++] = KISS_FEND;
+    
+    // Hardware command
+    txBuffer[framePos++] = KISS_CMD_SETHARDWARE;
+    
+    // LoRa sub-command
+    txBuffer[framePos++] = command;
+    
+    // Add data with escaping
+    for (uint16_t i = 0; i < length; i++)
+    {
+        uint8_t byte = data[i];
+        if (byte == KISS_FEND)
+        {
+            if (framePos >= KISS_MAX_FRAME_SIZE - 3) { frameErrors++; return; }
+            txBuffer[framePos++] = KISS_FESC;
+            txBuffer[framePos++] = KISS_TFEND;
+        }
+        else if (byte == KISS_FESC)
+        {
+            if (framePos >= KISS_MAX_FRAME_SIZE - 3) { frameErrors++; return; }
+            txBuffer[framePos++] = KISS_FESC;
+            txBuffer[framePos++] = KISS_TFESC;
+        }
+        else
+        {
+            if (framePos >= KISS_MAX_FRAME_SIZE - 2) { frameErrors++; return; }
+            txBuffer[framePos++] = byte;
+        }
+    }
+    
+    // End frame
+    txBuffer[framePos++] = KISS_FEND;
+    
+    // Send to serial
+    sendToSerial(txBuffer, framePos);
+    framesSent++;
+}
+
+void KissProtocol::sendLoRaResponse(uint8_t command, uint8_t *data, uint16_t length)
+{
+    sendLoRaCommand(command, data, length);
+}
+
+void KissProtocol::sendFrequencyBytes(uint32_t frequencyHz)
+{
+    uint8_t data[4];
+    data[0] = (frequencyHz >> 24) & 0xFF;
+    data[1] = (frequencyHz >> 16) & 0xFF;
+    data[2] = (frequencyHz >> 8) & 0xFF;
+    data[3] = frequencyHz & 0xFF;
+    sendLoRaCommand(KISS_LORA_SET_FREQ_LOW, data, 4);
+}
+
+void KissProtocol::sendConfigResponse()
+{
+    // This method would need access to the radio configuration
+    // It's better to handle this in the LoRaTNC class
+    // This is just a placeholder
 }

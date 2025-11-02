@@ -247,3 +247,126 @@ System Status:
 ```
 
 This gives you packet counts and signal quality metrics for performance evaluation.
+
+## KISS TNC Mode Examples
+
+### Entering KISS Mode
+From the serial console:
+```
+> kiss
+(Device enters KISS mode silently - no prompt appears)
+```
+
+The device is now in KISS mode and ready for packet radio applications.
+
+### Using with APRS Software
+
+1. **Setup your APRS application** (UI-View, Xastir, etc.)
+2. **Configure port settings**:
+   - Port: COM port of your device
+   - Speed: 115200 baud
+   - Protocol: KISS TNC
+3. **Enter KISS mode**: Type `kiss` in console
+4. **Start APRS application** - it will communicate via KISS frames
+
+### Manual KISS Commands
+
+You can send raw KISS frames to configure the LoRa radio. Here are some examples using hex bytes:
+
+#### Set TX Power to 15 dBm:
+```
+C0 06 12 0F C0
+```
+- `C0` = FEND (frame start)
+- `06` = SETHARDWARE command
+- `12` = SET_TXPOWER sub-command  
+- `0F` = 15 dBm (hex)
+- `C0` = FEND (frame end)
+
+#### Set Frequency to 915.0 MHz (915000000 Hz):
+```
+C0 06 10 36 89 69 00 C0
+```
+- `C0` = FEND
+- `06` = SETHARDWARE command
+- `10` = SET_FREQ_LOW sub-command
+- `36 89 69 00` = 915000000 in big-endian format
+- `C0` = FEND
+
+#### Set Spreading Factor to SF8:
+```
+C0 06 14 08 C0
+```
+- `C0` = FEND
+- `06` = SETHARDWARE command  
+- `14` = SET_SF sub-command
+- `08` = SF8
+- `C0` = FEND
+
+#### Set Bandwidth to 250 kHz:
+```
+C0 06 13 08 C0
+```
+- `C0` = FEND
+- `06` = SETHARDWARE command
+- `13` = SET_BANDWIDTH sub-command
+- `08` = 250 kHz (see bandwidth encoding table)
+- `C0` = FEND
+
+#### Get Current Configuration:
+```
+C0 06 1A C0
+```
+This returns multiple KISS frames with current settings.
+
+#### Select ISM 915 MHz Band (index 3):
+```
+C0 06 19 03 C0
+```
+- `19` = SELECT_BAND sub-command
+- `03` = Band index (varies based on available bands)
+
+### Exiting KISS Mode
+Send RETURN command:
+```
+C0 FF C0
+```
+- `C0` = FEND
+- `FF` = RETURN command
+- `C0` = FEND
+
+The device will return to command mode and display:
+```
+cmd:
+```
+
+### Integration Examples
+
+#### Python KISS Client
+```python
+import serial
+import time
+
+# Open serial connection
+ser = serial.Serial('COM3', 115200, timeout=1)
+
+# Enter KISS mode
+ser.write(b'kiss\r\n')
+time.sleep(1)
+
+# Set frequency to 915.0 MHz
+kiss_freq_cmd = bytes([0xC0, 0x06, 0x10, 0x36, 0x89, 0x69, 0x00, 0xC0])
+ser.write(kiss_freq_cmd)
+
+# Send data frame
+kiss_data = bytes([0xC0, 0x00]) + b"Hello LoRa" + bytes([0xC0])
+ser.write(kiss_data)
+
+# Listen for responses
+while True:
+    if ser.in_waiting:
+        data = ser.read(ser.in_waiting)
+        print(f"Received: {data.hex()}")
+```
+
+This demonstrates basic KISS communication for custom applications.
