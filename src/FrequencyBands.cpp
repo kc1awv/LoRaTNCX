@@ -2,6 +2,8 @@
 #include <Preferences.h>
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
+#include <nvs_flash.h>
+#include <esp_err.h>
 
 FrequencyBandManager::FrequencyBandManager() 
     : currentBand(nullptr), currentFrequency(0.0f), spiffsInitialized(false)
@@ -62,11 +64,56 @@ void FrequencyBandManager::initializeFullSystem()
     // Initialize SPIFFS
     initializeSPIFFS();
     
+    // Initialize NVS by attempting to create the namespace
+    initializeNVS();
+    
     // Load regional bands and saved configuration
     loadRegionalBandsFromFile();
     loadConfiguration();
     
     Serial.println("[FreqBand] Full system initialization complete");
+}
+
+bool FrequencyBandManager::initializeNVS()
+{
+    Serial.println("[FreqBand] Initializing NVS...");
+    
+    // First, try to initialize the NVS system itself
+    esp_err_t err = nvs_flash_init();
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        // NVS partition was truncated and needs to be erased
+        Serial.println("[FreqBand] NVS partition needs erasing, attempting to erase and retry...");
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        err = nvs_flash_init();
+    }
+    
+    if (err != ESP_OK) {
+        Serial.printf("[FreqBand] NVS flash init failed: %s\n", esp_err_to_name(err));
+        return false;
+    }
+    
+    Serial.println("[FreqBand] NVS flash initialized successfully");
+    
+    // Now try to open our namespace
+    Preferences prefs;
+    if (prefs.begin("freq_config", false)) {
+        Serial.println("[FreqBand] NVS namespace 'freq_config' opened successfully");
+        
+        // Test write to verify functionality
+        size_t testResult = prefs.putString("test", "init");
+        if (testResult > 0) {
+            Serial.println("[FreqBand] NVS write test successful");
+            prefs.remove("test"); // Clean up test entry
+        } else {
+            Serial.println("[FreqBand] NVS write test failed");
+        }
+        
+        prefs.end();
+        return testResult > 0;
+    } else {
+        Serial.println("[FreqBand] Warning: Could not open NVS namespace 'freq_config'");
+        return false;
+    }
 }
 
 void FrequencyBandManager::loadPredefinedBands()
@@ -378,22 +425,42 @@ String FrequencyBandManager::getBandInfo(const String& identifier) const
 bool FrequencyBandManager::saveConfiguration()
 {
     Preferences prefs;
+    // Try to open namespace for read-write (false = read-write mode)
+    Serial.println("[FreqBand] Attempting to save configuration to NVS...");
+    
     if (prefs.begin("freq_config", false)) {
-        bool success = true;
+        Serial.println("[FreqBand] NVS namespace opened successfully");
         
         if (currentBand) {
-            success &= prefs.putString("band_id", currentBand->identifier);
-            success &= prefs.putFloat("frequency", currentFrequency);
-            if (success) {
-                Serial.printf("[FreqBand] Configuration saved: %s @ %.3f MHz\n", 
+            Serial.printf("[FreqBand] Saving band_id: %s\n", currentBand->identifier.c_str());
+            size_t bandResult = prefs.putString("band_id", currentBand->identifier);
+            
+            Serial.printf("[FreqBand] Saving frequency: %.3f\n", currentFrequency);
+            size_t freqResult = prefs.putFloat("frequency", currentFrequency);
+            
+            Serial.printf("[FreqBand] Band ID write result: %d bytes\n", bandResult);
+            Serial.printf("[FreqBand] Frequency write result: %d bytes\n", freqResult);
+            
+            if (bandResult > 0 && freqResult > 0) {
+                Serial.printf("[FreqBand] Configuration saved to NVS: %s @ %.3f MHz\n", 
                              currentBand->identifier.c_str(), currentFrequency);
+                prefs.end();
+                return true;
+            } else {
+                Serial.println("[FreqBand] Warning: Failed to write data to NVS");
+                Serial.printf("[FreqBand] Band write: %s, Freq write: %s\n", 
+                             (bandResult > 0) ? "OK" : "FAILED",
+                             (freqResult > 0) ? "OK" : "FAILED");
             }
+        } else {
+            Serial.println("[FreqBand] Warning: No current band to save");
         }
         
         prefs.end();
-        return success;
+        return false;
     } else {
-        Serial.println("[FreqBand] Warning: Cannot save configuration - NVS not available");
+        Serial.println("[FreqBand] Warning: Cannot open NVS namespace 'freq_config' for writing");
+        Serial.println("[FreqBand] This might be due to NVS not being initialized or partition issues");
         return false;
     }
 }

@@ -45,6 +45,7 @@ private:
     void handleLoRaCr(const String& args);
     void handleLoRaBands(const String& args);
     void handleLoRaBand(const String& args);
+    void handleLoRaSave();
     
     // TNC command implementations
     void handleTncStatus();

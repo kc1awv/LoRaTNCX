@@ -61,6 +61,9 @@ private:
     // SPIFFS initialization
     bool initializeSPIFFS();
     
+    // NVS initialization
+    bool initializeNVS();
+    
     // Load predefined ISM and amateur bands
     void loadPredefinedBands();
     

@@ -132,6 +132,9 @@ bool CommandProcessor::handleLoRaCommand(const String& cmd, const String& args) 
     else if (subCmd == "band") {
         handleLoRaBand(subArgs);
     }
+    else if (subCmd == "save") {
+        handleLoRaSave();
+    }
     else {
         Serial.println("Unknown LoRa command. Type 'help' for available commands.");
         return false;
@@ -192,6 +195,7 @@ void CommandProcessor::handleHelp() {
     Serial.println("  lora bands amateur - Show amateur radio bands");
     Serial.println("  lora band      - Show current band configuration");
     Serial.println("  lora band <id> - Select frequency band (e.g., ISM_915)");
+    Serial.println("  lora save      - Save current configuration to NVS memory");
     Serial.println();
     Serial.println("TNC Commands:");
     Serial.println("  status         - Show TNC status and statistics");
@@ -431,5 +435,20 @@ void CommandProcessor::handleLoRaBand(const String& args) {
             Serial.printf("Failed to select band: %s\n", bandId.c_str());
             Serial.println("Use 'lora bands' to see available bands");
         }
+    }
+}
+
+void CommandProcessor::handleLoRaSave() {
+    if (loraRadio && loraRadio->getBandManager()) {
+        Serial.println("Saving current LoRa configuration to NVS...");
+        if (loraRadio->getBandManager()->saveConfiguration()) {
+            Serial.println("Configuration saved successfully!");
+            Serial.println("Settings will be restored on next boot.");
+        } else {
+            Serial.println("Failed to save configuration.");
+            Serial.println("NVS may not be available or is corrupted.");
+        }
+    } else {
+        Serial.println("Error: LoRa radio or band manager not available");
     }
 }
