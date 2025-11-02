@@ -1,0 +1,92 @@
+{
+  "regional_bands": [
+    {
+      "name": "US ISM 902-928 (Restricted)",
+      "identifier": "US_ISM_902_928_RESTRICTED",
+      "min_frequency": 902.0,
+      "max_frequency": 928.0,
+      "default_frequency": 915.0,
+      "license": 0,
+      "region": "US",
+      "description": "US ISM band with full 902-928 MHz range",
+      "enabled": true
+    },
+    {
+      "name": "FCC Part 97 33cm Band",
+      "identifier": "FCC_33CM_FULL",
+      "min_frequency": 902.0,
+      "max_frequency": 928.0,
+      "default_frequency": 906.0,
+      "license": 1,
+      "region": "US",
+      "description": "FCC Part 97 Amateur Radio 33cm allocation (overlaps ISM)",
+      "enabled": true
+    },
+    {
+      "name": "EU ISM 863-870 (Restricted)",
+      "identifier": "EU_ISM_863_870_RESTRICTED",
+      "min_frequency": 863.0,
+      "max_frequency": 870.0,
+      "default_frequency": 868.0,
+      "license": 0,
+      "region": "EU",
+      "description": "European ISM band 863-870 MHz with duty cycle limits",
+      "enabled": true
+    },
+    {
+      "name": "CEPT Recommendation T/R 70-03 ISM",
+      "identifier": "CEPT_ISM_863_870",
+      "min_frequency": 863.0,
+      "max_frequency": 870.0,
+      "default_frequency": 868.1,
+      "license": 0,
+      "region": "CEPT",
+      "description": "CEPT harmonized ISM band for Europe",
+      "enabled": true
+    },
+    {
+      "name": "Australia ISM 915-928",
+      "identifier": "AU_ISM_915_928",
+      "min_frequency": 915.0,
+      "max_frequency": 928.0,
+      "default_frequency": 921.5,
+      "license": 0,
+      "region": "AU",
+      "description": "Australian ISM band 915-928 MHz",
+      "enabled": true
+    },
+    {
+      "name": "Japan ISM 920-928",
+      "identifier": "JP_ISM_920_928",
+      "min_frequency": 920.0,
+      "max_frequency": 928.0,
+      "default_frequency": 924.0,
+      "license": 0,
+      "region": "JP",
+      "description": "Japanese ISM band 920-928 MHz",
+      "enabled": true
+    },
+    {
+      "name": "China ISM 470-510",
+      "identifier": "CN_ISM_470_510",
+      "min_frequency": 470.0,
+      "max_frequency": 510.0,
+      "default_frequency": 490.0,
+      "license": 0,
+      "region": "CN",
+      "description": "Chinese ISM band 470-510 MHz",
+      "enabled": true
+    },
+    {
+      "name": "Hardware Test Band",
+      "identifier": "HARDWARE_TEST",
+      "min_frequency": 430.0,
+      "max_frequency": 440.0,
+      "default_frequency": 435.0,
+      "license": 2,
+      "region": "Global",
+      "description": "Hardware testing band - user responsibility for legal operation",
+      "enabled": false
+    }
+  ]
+}

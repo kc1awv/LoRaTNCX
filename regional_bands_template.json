@@ -1,0 +1,282 @@
+{
+  "regional_bands": [
+    {
+      "_comment": "=== TEMPLATE REGIONAL BANDS FILE ===",
+      "_description": "This file contains custom regional frequency band definitions that extend the built-in ISM and Amateur Radio bands. Copy this file to your device's SPIFFS filesystem as 'regional_bands.json'.",
+      "_instructions": "1. Customize the bands below for your region, 2. Remove bands you don't need, 3. Set 'enabled': false to disable a band, 4. Upload to device SPIFFS using PlatformIO or other tools",
+      "_license_types": "0=ISM (no license), 1=Amateur Radio (license required), 2=Custom (user responsibility)"
+    },
+    {
+      "name": "US ISM 902-928 (FCC Compliant)",
+      "identifier": "US_FCC_ISM_902_928",
+      "min_frequency": 902.0,
+      "max_frequency": 928.0,
+      "default_frequency": 915.0,
+      "license": 0,
+      "region": "US",
+      "description": "FCC Part 15.247 ISM band - 1W EIRP limit, spread spectrum required above certain power levels",
+      "enabled": true
+    },
+    {
+      "name": "US ISM 902-928 (Low Power)",
+      "identifier": "US_ISM_902_928_LP",
+      "min_frequency": 902.0,
+      "max_frequency": 928.0,
+      "default_frequency": 915.0,
+      "license": 0,
+      "region": "US",
+      "description": "US ISM band restricted to low power operation (< 100mW)",
+      "enabled": true
+    },
+    {
+      "name": "EU ETSI SRD 433 MHz",
+      "identifier": "EU_ETSI_SRD_433",
+      "min_frequency": 433.050,
+      "max_frequency": 434.790,
+      "default_frequency": 433.920,
+      "license": 0,
+      "region": "EU",
+      "description": "ETSI EN 300 220 SRD band - 10mW ERP limit, duty cycle restrictions apply",
+      "enabled": true
+    },
+    {
+      "name": "EU ETSI SRD 863-870 MHz",
+      "identifier": "EU_ETSI_SRD_863_870",
+      "min_frequency": 863.0,
+      "max_frequency": 870.0,
+      "default_frequency": 868.0,
+      "license": 0,
+      "region": "EU",
+      "description": "ETSI EN 300 220 SRD band - Power and duty cycle limits vary by sub-band",
+      "enabled": true
+    },
+    {
+      "name": "EU ETSI SRD 863-865 MHz (1% duty cycle)",
+      "identifier": "EU_ETSI_SRD_863_865_1PCT",
+      "min_frequency": 863.0,
+      "max_frequency": 865.0,
+      "default_frequency": 864.0,
+      "license": 0,
+      "region": "EU",
+      "description": "ETSI SRD 863-865 MHz with 1% duty cycle limit, 25mW ERP",
+      "enabled": true
+    },
+    {
+      "name": "EU ETSI SRD 865-868 MHz (0.1% duty cycle)",
+      "identifier": "EU_ETSI_SRD_865_868_01PCT",
+      "min_frequency": 865.0,
+      "max_frequency": 868.0,
+      "default_frequency": 866.5,
+      "license": 0,
+      "region": "EU",
+      "description": "ETSI SRD 865-868 MHz with 0.1% duty cycle limit, 25mW ERP",
+      "enabled": true
+    },
+    {
+      "name": "EU ETSI SRD 868-870 MHz (1% duty cycle)",
+      "identifier": "EU_ETSI_SRD_868_870_1PCT",
+      "min_frequency": 868.0,
+      "max_frequency": 870.0,
+      "default_frequency": 869.0,
+      "license": 0,
+      "region": "EU",
+      "description": "ETSI SRD 868-870 MHz with 1% duty cycle limit, 500mW ERP",
+      "enabled": true
+    },
+    {
+      "name": "Japan ISM 920-928 MHz",
+      "identifier": "JP_ARIB_920_928",
+      "min_frequency": 920.5,
+      "max_frequency": 928.1,
+      "default_frequency": 924.3,
+      "license": 0,
+      "region": "JP",
+      "description": "ARIB STD-T108 specific low power radio band - Channel plan and power limits apply",
+      "enabled": true
+    },
+    {
+      "name": "Australia ISM 915-928 MHz",
+      "identifier": "AU_ACMA_915_928",
+      "min_frequency": 915.0,
+      "max_frequency": 928.0,
+      "default_frequency": 921.5,
+      "license": 0,
+      "region": "AU",
+      "description": "ACMA ISM band - 1W EIRP limit, frequency hopping recommended",
+      "enabled": true
+    },
+    {
+      "name": "Canada ISM 902-928 MHz",
+      "identifier": "CA_ISED_902_928",
+      "min_frequency": 902.0,
+      "max_frequency": 928.0,
+      "default_frequency": 915.0,
+      "license": 0,
+      "region": "CA",
+      "description": "ISED (Industry Canada) ISM band - Similar to FCC Part 15 rules",
+      "enabled": true
+    },
+    {
+      "name": "China ISM 470-510 MHz",
+      "identifier": "CN_MIIT_470_510",
+      "min_frequency": 470.0,
+      "max_frequency": 510.0,
+      "default_frequency": 490.0,
+      "license": 0,
+      "region": "CN", 
+      "description": "China MIIT ISM band - Micropower short range devices",
+      "enabled": true
+    },
+    {
+      "name": "Brazil ISM 902-907.5 MHz",
+      "identifier": "BR_ANATEL_902_907",
+      "min_frequency": 902.0,
+      "max_frequency": 907.5,
+      "default_frequency": 904.75,
+      "license": 0,
+      "region": "BR",
+      "description": "ANATEL ISM band - Restricted bandwidth compared to US/CA",
+      "enabled": true
+    },
+    {
+      "name": "India ISM 865-867 MHz",
+      "identifier": "IN_WPC_865_867",
+      "min_frequency": 865.0,
+      "max_frequency": 867.0,
+      "default_frequency": 866.0,
+      "license": 0,
+      "region": "IN",
+      "description": "India WPC ISM band - Limited to 865-867 MHz sub-band",
+      "enabled": true
+    },
+    {
+      "name": "South Korea ISM 917-923.5 MHz",
+      "identifier": "KR_RRA_917_923",
+      "min_frequency": 917.0,
+      "max_frequency": 923.5,
+      "default_frequency": 920.25,
+      "license": 0,
+      "region": "KR",
+      "description": "Korea RRA ISM band - Shifted frequency range",
+      "enabled": true
+    },
+    {
+      "name": "US Amateur 70cm Weak Signal",
+      "identifier": "US_AMATEUR_70CM_WEAK",
+      "min_frequency": 432.0,
+      "max_frequency": 433.0,
+      "default_frequency": 432.1,
+      "license": 1,
+      "region": "US",
+      "description": "US Amateur Radio 70cm weak signal segment - CW, SSB, digital modes",
+      "enabled": true
+    },
+    {
+      "name": "US Amateur 70cm Digital",
+      "identifier": "US_AMATEUR_70CM_DIGITAL", 
+      "min_frequency": 430.0,
+      "max_frequency": 431.0,
+      "default_frequency": 430.5,
+      "license": 1,
+      "region": "US",
+      "description": "US Amateur Radio 70cm digital modes segment",
+      "enabled": true
+    },
+    {
+      "name": "US Amateur 33cm Weak Signal",
+      "identifier": "US_AMATEUR_33CM_WEAK",
+      "min_frequency": 902.0,
+      "max_frequency": 903.0,
+      "default_frequency": 902.1,
+      "license": 1,
+      "region": "US",
+      "description": "US Amateur Radio 33cm weak signal segment - Shared with ISM",
+      "enabled": true
+    },
+    {
+      "name": "US Amateur 33cm Digital",
+      "identifier": "US_AMATEUR_33CM_DIGITAL",
+      "min_frequency": 903.0,
+      "max_frequency": 906.0,
+      "default_frequency": 904.5,
+      "license": 1,
+      "region": "US",
+      "description": "US Amateur Radio 33cm digital modes segment",
+      "enabled": true
+    },
+    {
+      "name": "EU Amateur 70cm Digital",
+      "identifier": "EU_AMATEUR_70CM_DIGITAL",
+      "min_frequency": 430.0,
+      "max_frequency": 432.0,
+      "default_frequency": 431.0,
+      "license": 1,
+      "region": "EU",
+      "description": "European Amateur Radio 70cm digital segment - May vary by country",
+      "enabled": true
+    },
+    {
+      "name": "EU Amateur 23cm",
+      "identifier": "EU_AMATEUR_23CM",
+      "min_frequency": 1240.0,
+      "max_frequency": 1300.0,
+      "default_frequency": 1296.0,
+      "license": 1,
+      "region": "EU",
+      "description": "European Amateur Radio 23cm band - Microwave allocation",
+      "enabled": true
+    },
+    {
+      "name": "Hardware Test Band (Disabled by default)",
+      "identifier": "HARDWARE_TEST_430_440",
+      "min_frequency": 430.0,
+      "max_frequency": 440.0,
+      "default_frequency": 435.0,
+      "license": 2,
+      "region": "Global",
+      "description": "Hardware testing frequency range - USER ASSUMES ALL LEGAL RESPONSIBILITY",
+      "enabled": false
+    },
+    {
+      "name": "Emergency Services Test (Disabled by default)",
+      "identifier": "EMERGENCY_TEST_450_470",
+      "min_frequency": 450.0,
+      "max_frequency": 470.0,
+      "default_frequency": 460.0,
+      "license": 2,
+      "region": "Global", 
+      "description": "Emergency/public safety test range - AUTHORIZED USERS ONLY",
+      "enabled": false
+    },
+    {
+      "name": "Custom Band Template",
+      "identifier": "CUSTOM_TEMPLATE",
+      "min_frequency": 800.0,
+      "max_frequency": 900.0,
+      "default_frequency": 850.0,
+      "license": 2,
+      "region": "Custom",
+      "description": "Template for custom frequency band - Edit for your specific needs",
+      "enabled": false
+    }
+  ],
+  "_usage_instructions": {
+    "upload_method_1": "PlatformIO: Use 'pio run --target uploadfs' to upload data folder",
+    "upload_method_2": "ESP32 Sketch Data Upload: Use Arduino IDE plugin",
+    "upload_method_3": "Manual: Copy file to SPIFFS partition using esptool or web interface",
+    "file_location": "Must be named 'regional_bands.json' in SPIFFS root directory",
+    "validation": "Use 'lora bands' command to verify bands loaded correctly",
+    "customization": "Edit bands above, remove unneeded entries, adjust for your region"
+  },
+  "_legal_notice": {
+    "responsibility": "USER IS FULLY RESPONSIBLE FOR LEGAL COMPLIANCE",
+    "warnings": [
+      "Verify frequency usage is legal in your jurisdiction",
+      "ISM bands may have power and duty cycle restrictions", 
+      "Amateur radio bands require appropriate license",
+      "Custom bands require user to ensure legal operation",
+      "Regulations vary by country - check local rules"
+    ],
+    "recommendation": "Consult your local spectrum authority before using any frequency"
+  }
+}

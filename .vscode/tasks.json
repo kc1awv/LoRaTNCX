@@ -30,13 +30,11 @@
 			"group": "build"
 		},
 		{
-			"label": "Build LoRaTNCX V4 433MHz",
+			"label": "Build All Environments",
 			"type": "shell",
 			"command": "C:\\Users\\smill\\.platformio\\penv\\Scripts\\platformio.exe",
 			"args": [
-				"run",
-				"--environment",
-				"heltec_wifi_lora_32_V4_433"
+				"run"
 			],
 			"problemMatcher": [
 				"$platformio"
@@ -44,63 +42,7 @@
 			"group": "build"
 		},
 		{
-			"label": "Build LoRaTNCX V3 433MHz",
-			"type": "shell",
-			"command": "C:\\Users\\smill\\.platformio\\penv\\Scripts\\platformio.exe",
-			"args": [
-				"run",
-				"--environment",
-				"heltec_wifi_lora_32_V3_433"
-			],
-			"problemMatcher": [
-				"$platformio"
-			],
-			"group": "build"
-		},
-		{
-			"label": "Build LoRaTNCX V3 with RadioLib",
-			"type": "shell",
-			"command": "C:\\Users\\smill\\.platformio\\penv\\Scripts\\platformio.exe",
-			"args": [
-				"run",
-				"--environment",
-				"heltec_wifi_lora_32_V3"
-			],
-			"problemMatcher": [
-				"$platformio"
-			],
-			"group": "build"
-		},
-		{
-			"label": "Build LoRaTNCX V4 with RadioLib",
-			"type": "shell",
-			"command": "C:\\Users\\smill\\.platformio\\penv\\Scripts\\platformio.exe",
-			"args": [
-				"run",
-				"--environment",
-				"heltec_wifi_lora_32_V4"
-			],
-			"problemMatcher": [
-				"$platformio"
-			],
-			"group": "build"
-		},
-		{
-			"label": "Build LoRaTNCX V4 433MHz with RadioLib",
-			"type": "shell",
-			"command": "C:\\Users\\smill\\.platformio\\penv\\Scripts\\platformio.exe",
-			"args": [
-				"run",
-				"--environment",
-				"heltec_wifi_lora_32_V4_433"
-			],
-			"problemMatcher": [
-				"$platformio"
-			],
-			"group": "build"
-		},
-		{
-			"label": "Clean and Build LoRaTNCX V3",
+			"label": "Clean and Build V3",
 			"type": "shell",
 			"command": "C:\\Users\\smill\\.platformio\\penv\\Scripts\\platformio.exe",
 			"args": [
@@ -116,13 +58,15 @@
 			"group": "build"
 		},
 		{
-			"label": "Build LoRaTNCX V3 Final",
+			"label": "Clean and Build V4",
 			"type": "shell",
 			"command": "C:\\Users\\smill\\.platformio\\penv\\Scripts\\platformio.exe",
 			"args": [
 				"run",
 				"--environment",
-				"heltec_wifi_lora_32_V3"
+				"heltec_wifi_lora_32_V4",
+				"--target",
+				"clean"
 			],
 			"problemMatcher": [
 				"$platformio"
@@ -130,13 +74,15 @@
 			"group": "build"
 		},
 		{
-			"label": "Test Build V4 Fix",
+			"label": "Upload Filesystem (SPIFFS) V3",
 			"type": "shell",
 			"command": "C:\\Users\\smill\\.platformio\\penv\\Scripts\\platformio.exe",
 			"args": [
 				"run",
 				"--environment",
-				"heltec_wifi_lora_32_V4"
+				"heltec_wifi_lora_32_V3",
+				"--target",
+				"uploadfs"
 			],
 			"problemMatcher": [
 				"$platformio"
@@ -144,27 +90,15 @@
 			"group": "build"
 		},
 		{
-			"label": "Test Build V3 Fix",
+			"label": "Upload Filesystem (SPIFFS) V4",
 			"type": "shell",
 			"command": "C:\\Users\\smill\\.platformio\\penv\\Scripts\\platformio.exe",
 			"args": [
 				"run",
 				"--environment",
-				"heltec_wifi_lora_32_V3"
-			],
-			"problemMatcher": [
-				"$platformio"
-			],
-			"group": "build"
-		},
-		{
-			"label": "Test Build V4 433MHz Fix",
-			"type": "shell",
-			"command": "C:\\Users\\smill\\.platformio\\penv\\Scripts\\platformio.exe",
-			"args": [
-				"run",
-				"--environment",
-				"heltec_wifi_lora_32_V4_433"
+				"heltec_wifi_lora_32_V4",
+				"--target",
+				"uploadfs"
 			],
 			"problemMatcher": [
 				"$platformio"

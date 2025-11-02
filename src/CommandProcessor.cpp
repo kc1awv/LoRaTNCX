@@ -52,15 +52,8 @@ void CommandProcessor::printHeader() {
     Serial.printf("CPU Frequency: %u MHz\n", ESP.getCpuFreqMHz());
     Serial.printf("Free Heap: %u bytes\n", ESP.getFreeHeap());
     
-#ifdef FREQUENCY_BAND_868
-    Serial.println("Frequency Band: 868 MHz (863-928 MHz, includes 915 MHz)");
-#elif defined(FREQUENCY_BAND_915)
-    Serial.println("Frequency Band: 915 MHz (902-928 MHz)");
-#elif defined(FREQUENCY_BAND_433)
-    Serial.println("Frequency Band: 433 MHz (430-440 MHz)");
-#else
-    Serial.println("Frequency Band: 868 MHz (default)");
-#endif
+    // Show current frequency band configuration
+    Serial.println("Frequency Band: Runtime configured (use 'lora bands' to see available)");
     
     Serial.println();
     Serial.println("Console ready. Type 'help' for available commands.");
@@ -133,6 +126,12 @@ bool CommandProcessor::handleLoRaCommand(const String& cmd, const String& args) 
     else if (subCmd == "cr") {
         handleLoRaCr(subArgs);
     }
+    else if (subCmd == "bands") {
+        handleLoRaBands(subArgs);
+    }
+    else if (subCmd == "band") {
+        handleLoRaBand(subArgs);
+    }
     else {
         Serial.println("Unknown LoRa command. Type 'help' for available commands.");
         return false;
@@ -186,6 +185,13 @@ void CommandProcessor::handleHelp() {
     Serial.println("  lora sf <sf>   - Set spreading factor (7-12)");
     Serial.println("  lora bw <khz>  - Set bandwidth in kHz (125/250/500) or 0/1/2");
     Serial.println("  lora cr <cr>   - Set coding rate (5-8 for 4/5-4/8) or 1-4");
+    Serial.println();
+    Serial.println("Frequency Band Commands:");
+    Serial.println("  lora bands     - Show all available frequency bands");
+    Serial.println("  lora bands ism - Show ISM bands (no license required)");
+    Serial.println("  lora bands amateur - Show amateur radio bands");
+    Serial.println("  lora band      - Show current band configuration");
+    Serial.println("  lora band <id> - Select frequency band (e.g., ISM_915)");
     Serial.println();
     Serial.println("TNC Commands:");
     Serial.println("  status         - Show TNC status and statistics");
@@ -245,10 +251,15 @@ void CommandProcessor::handleLoRaRx() {
 void CommandProcessor::handleLoRaFreq(const String& args) {
     if (args.length() == 0) {
         Serial.printf("Current frequency: %.1f MHz\n", loraRadio->getFrequency());
+        loraRadio->printCurrentBand();
     }
     else {
         float freq = args.toFloat();
-        loraRadio->setFrequency(freq);
+        if (loraRadio->setFrequencyWithBand(freq)) {
+            Serial.printf("Frequency set to %.3f MHz\n", freq);
+        } else {
+            Serial.printf("Failed to set frequency to %.3f MHz - check band restrictions\n", freq);
+        }
     }
 }
 
@@ -376,5 +387,47 @@ void CommandProcessor::handleTncTest() {
     }
     else {
         Serial.println("TNC not initialized");
+    }
+}
+
+void CommandProcessor::handleLoRaBands(const String& args) {
+    if (args.length() == 0) {
+        // Show all available bands
+        loraRadio->printAvailableBands();
+    } else {
+        // Filter by region or license type
+        String filter = args;
+        filter.toLowerCase();
+        
+        if (filter == "ism") {
+            Serial.println("\n[FreqBand] ISM Bands (No license required):");
+            loraRadio->getBandManager()->printAvailableBands();
+            // TODO: Add filtering by license type
+        } else if (filter == "amateur" || filter == "ham") {
+            Serial.println("\n[FreqBand] Amateur Radio Bands (License required):");
+            loraRadio->getBandManager()->printAvailableBands();
+            // TODO: Add filtering by license type
+        } else {
+            Serial.printf("Unknown band filter: %s. Use 'ism' or 'amateur'\n", args.c_str());
+        }
+    }
+}
+
+void CommandProcessor::handleLoRaBand(const String& args) {
+    if (args.length() == 0) {
+        // Show current band
+        loraRadio->printCurrentBand();
+    } else {
+        // Select a specific band
+        String bandId = args;
+        bandId.toUpperCase();
+        
+        if (loraRadio->selectBand(bandId)) {
+            Serial.printf("Successfully selected band: %s\n", bandId.c_str());
+            loraRadio->printCurrentBand();
+        } else {
+            Serial.printf("Failed to select band: %s\n", bandId.c_str());
+            Serial.println("Use 'lora bands' to see available bands");
+        }
     }
 }

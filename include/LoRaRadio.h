@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <RadioLib.h>
 #include <SPI.h>
+#include "FrequencyBands.h"
 
 // Pin definitions for Heltec WiFi LoRa 32 boards
 // Both V3 and V4 use SX1262 LoRa chip with similar pin configuration
@@ -23,10 +24,7 @@
 #define LORA_PA_POWER 38 // PA Power control
 #endif
 
-// Frequency bands based on device capabilities
-#define LORA_FREQ_BAND_433 433000000 // 433-510 MHz band center
-#define LORA_FREQ_BAND_868 868000000 // 863-928 MHz band center
-#define LORA_FREQ_BAND_915 915000000 // 902-928 MHz band center
+// Hardware capabilities are now handled by FrequencyBandManager
 
 // Default LoRa parameters (RadioLib compatible)
 #define LORA_BANDWIDTH_DEFAULT 125.0    // 125 kHz
@@ -76,6 +74,9 @@ private:
     SX1262 radio;
     lora_config_t config;
     lora_state_t currentState;
+    
+    // Frequency band management
+    FrequencyBandManager* bandManager;
 
     // Callback function pointers
     void (*onTxDoneCallback)(void);
@@ -121,6 +122,11 @@ public:
     int setPreambleLength(uint16_t length);
     int setSyncWord(uint8_t syncWord);
     int setCRC(bool enable);
+    
+    // Frequency band methods
+    bool selectBand(const String& bandId);
+    bool setFrequencyWithBand(float frequency);
+    FrequencyBandManager* getBandManager() { return bandManager; }
 
     // Get current configuration
     lora_config_t getConfig() const { return config; }
@@ -154,6 +160,8 @@ public:
     bool isTxPowerValid(int8_t power);
     void printConfiguration();
     void printStatistics();
+    void printAvailableBands();
+    void printCurrentBand();
 
     // Process radio events (call this in main loop)
     void handle();

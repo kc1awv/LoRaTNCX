@@ -1,5 +1,43 @@
 # LoRaTNCX Changelog
 
+## Version 1.2 - Frequency Band Management System
+
+### Major Features
+- **Runtime Frequency Band Configuration**
+  - Complete replacement of build-time frequency flags
+  - Support for ISM and Amateur Radio bands
+  - Regional band configurations via JSON files
+  - Legal compliance awareness with license tracking
+
+### New Commands
+- `lora bands` - Show available frequency bands
+- `lora bands ism` - Filter ISM bands (no license required)  
+- `lora bands amateur` - Filter amateur radio bands
+- `lora band` - Show current band configuration
+- `lora band <id>` - Select frequency band (e.g., ISM_915, AMATEUR_70CM)
+
+### Supported Bands
+#### ISM Bands (No License Required)
+- **ISM_433**: 433.05-433.92 MHz (Global)
+- **ISM_470_510**: 470-510 MHz (China/Asia)
+- **ISM_863_870**: 863-870 MHz (Europe)
+- **ISM_902_928**: 902-928 MHz (North America)
+
+#### Amateur Radio Bands (License Required)  
+- **AMATEUR_70CM**: 420-450 MHz (Global)
+- **AMATEUR_33CM**: 902-928 MHz (US)
+- **AMATEUR_23CM**: 1240-1300 MHz (Global)
+- **AMATEUR_FREE**: 144-1300 MHz (Free selection)
+
+### Breaking Changes
+- **Removed build environments**: `*_433` environments no longer needed
+- **Removed build flags**: `FREQ_BAND_433`, `FREQ_BAND_868` flags removed
+- **Default behavior**: All builds default to ISM_902_928 (North American ISM)
+
+### Migration Guide
+- Old: Compile with `heltec_wifi_lora_32_V4_433` for 433 MHz
+- New: Use any build, then `lora band ISM_433` at runtime
+
 ## Version 1.1 - RadioLib Integration
 
 ### Major Changes

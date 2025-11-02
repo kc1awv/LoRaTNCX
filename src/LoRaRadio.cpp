@@ -1,4 +1,5 @@
 #include "LoRaRadio.h"
+#include "FrequencyBands.h"
 
 // Static instance pointer for callbacks
 LoRaRadio *LoRaRadio::instance = nullptr;
@@ -22,18 +23,20 @@ void LoRaRadio::setFlag(void)
 
 LoRaRadio::LoRaRadio() : radio(new Module(LORA_NSS, LORA_DIO1, LORA_NRST, LORA_BUSY))
 {
-
     // Set this as the singleton instance
     instance = this;
 
-// Initialize default configuration
-#ifdef FREQ_BAND_433
-    config.frequency = 433.0; // MHz (433-510 MHz range)
-#elif defined(FREQ_BAND_868)
-    config.frequency = 868.0; // MHz (863-928 MHz range, includes 915 MHz)
-#else
-    config.frequency = 868.0; // Default to 868 MHz (863-928 MHz range)
-#endif
+    // Initialize frequency band manager
+    bandManager = new FrequencyBandManager();
+
+    // Initialize default configuration based on band manager
+    if (bandManager->getCurrentBand()) {
+        config.frequency = bandManager->getCurrentFrequency();
+    } else {
+        // Set safe default band (North American ISM)
+        config.frequency = 915.0; // Default to 915 MHz (902-928 MHz range)
+        bandManager->selectBand(BAND_ISM_902_928);
+    }
 
     config.txPower = LORA_DEFAULT_TX_POWER;
     config.bandwidth = LORA_BANDWIDTH_DEFAULT;
@@ -69,6 +72,8 @@ LoRaRadio::~LoRaRadio()
     {
         instance = nullptr;
     }
+    
+    delete bandManager;
 }
 
 void LoRaRadio::initializeHardware()
@@ -424,9 +429,13 @@ void LoRaRadio::onRxError(void (*callback)(void))
 
 bool LoRaRadio::isFrequencyValid(float frequency)
 {
-    // Check if frequency is within valid bands (in MHz)
-    return ((frequency >= 433.0 && frequency <= 510.0) || // 433-510 MHz
-            (frequency >= 863.0 && frequency <= 928.0));  // 863-928 MHz
+    // Use band manager for validation if available
+    if (bandManager) {
+        return bandManager->isFrequencyValid(frequency);
+    }
+    
+    // Fallback to hardware limits and basic ISM bands
+    return (frequency >= HARDWARE_MIN_FREQ && frequency <= HARDWARE_MAX_FREQ);
 }
 
 bool LoRaRadio::isTxPowerValid(int8_t power)
@@ -528,5 +537,66 @@ void LoRaRadio::handle()
         // Start receiving again
         startReceive();
         return;
+    }
+}
+
+bool LoRaRadio::selectBand(const String& bandId)
+{
+    if (bandManager && bandManager->selectBand(bandId)) {
+        config.frequency = bandManager->getCurrentFrequency();
+        
+        // Apply the new frequency to the radio hardware
+        int state = radio.setFrequency(config.frequency);
+        if (state == RADIOLIB_ERR_NONE) {
+            Serial.printf("[LoRa] Selected band: %s @ %.3f MHz\n", 
+                         bandId.c_str(), config.frequency);
+            return true;
+        } else {
+            Serial.printf("[LoRa] Failed to apply frequency for band %s, error: %d\n", 
+                         bandId.c_str(), state);
+            return false;
+        }
+    }
+    
+    Serial.printf("[LoRa] Failed to select band: %s\n", bandId.c_str());
+    return false;
+}
+
+bool LoRaRadio::setFrequencyWithBand(float frequency)
+{
+    if (bandManager && bandManager->setFrequency(frequency)) {
+        config.frequency = frequency;
+        
+        // Apply the new frequency to the radio hardware
+        int state = radio.setFrequency(frequency);
+        if (state == RADIOLIB_ERR_NONE) {
+            Serial.printf("[LoRa] Frequency set to %.3f MHz\n", frequency);
+            return true;
+        } else {
+            Serial.printf("[LoRa] Failed to apply frequency %.3f MHz, error: %d\n", 
+                         frequency, state);
+            return false;
+        }
+    }
+    
+    Serial.printf("[LoRa] Frequency %.3f MHz not allowed by current band configuration\n", frequency);
+    return false;
+}
+
+void LoRaRadio::printAvailableBands()
+{
+    if (bandManager) {
+        bandManager->printAvailableBands();
+    } else {
+        Serial.println("[LoRa] Band manager not initialized");
+    }
+}
+
+void LoRaRadio::printCurrentBand()
+{
+    if (bandManager) {
+        bandManager->printCurrentConfiguration();
+    } else {
+        Serial.println("[LoRa] Band manager not initialized");
     }
 }

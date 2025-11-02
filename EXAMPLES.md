@@ -128,18 +128,32 @@ For faster data rates:
 
 ### Frequency Band Examples
 
-#### 433 MHz Band Usage:
-Build with `heltec_wifi_lora_32_V4_433` environment:
+#### 433 MHz ISM Band Usage:
 ```
-> lora freq 434.0         # Set to 434 MHz
+> lora band ISM_433       # Select 433 MHz ISM band
+> lora freq 434.0         # Set to 434 MHz (within band limits)
 > lora send Test 433 MHz
 ```
 
-#### 915 MHz Band Usage (North America):
-Build with `heltec_wifi_lora_32_V4_915` environment:
+#### 915 MHz ISM Band Usage (North America):
 ```
+> lora band ISM_902_928   # Select North American ISM band
 > lora freq 915.0         # Set to 915 MHz
 > lora send Test 915 MHz
+```
+
+#### Amateur Radio 70cm Band:
+```
+> lora band AMATEUR_70CM  # Select 70cm amateur band
+> lora freq 432.1         # Set to amateur frequency
+> lora send CQ CQ DE CALL # Amateur radio transmission
+```
+
+#### View Available Bands:
+```
+> lora bands              # Show all available bands
+> lora bands ism          # Show ISM bands only
+> lora bands amateur      # Show amateur radio bands
 ```
 
 ## Testing Between Different Boards

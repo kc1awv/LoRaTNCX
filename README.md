@@ -22,29 +22,45 @@ This project uses the [RadioLib](https://github.com/jgromes/RadioLib) library ve
 - **Default TX Power**: 14 dBm
 - **PA Control**: Available (automatic TX/RX switching)
 
+## Frequency Band System
+
+LoRaTNCX features a comprehensive runtime frequency band management system:
+
+### Supported Bands
+- **ISM Bands**: 433MHz, 470-510MHz, 863-870MHz, 902-928MHz (No license required)
+- **Amateur Radio**: 70cm (420-450MHz), 33cm (902-928MHz), 23cm (1240-1300MHz)
+- **Custom Bands**: User-defined regional configurations
+
+### Key Features
+- **Runtime Selection**: Change bands without recompiling
+- **Legal Compliance**: Built-in frequency validation and licensing awareness
+- **Regional Support**: Extensible configuration files for local regulations
+- **Hardware Validation**: Automatic compatibility checking
+
+### Getting Started
+- **Quick Start**: [Quick Start Guide](docs/QUICK_START_BANDS.md) - Get up and running fast
+- **Detailed Docs**: [Frequency Band System](docs/FREQUENCY_BAND_SYSTEM.md) - Complete documentation
+- **Custom Regions**: [SPIFFS Upload Guide](docs/SPIFFS_UPLOAD_GUIDE.md) - Add regional bands
+
 ## Build Environments
 
-The project provides 4 build environments for different hardware versions and frequency bands:
+The project provides multiple build environments for different hardware versions:
 
-### V3 Environments
-- `heltec_wifi_lora_32_V3` - 868 MHz band (863-928 MHz, includes 915 MHz)
-- `heltec_wifi_lora_32_V3_433` - 433 MHz band (433-510 MHz)
+### Available Environments
+- `heltec_wifi_lora_32_V3` - Heltec WiFi LoRa 32 V3
+- `heltec_wifi_lora_32_V4` - Heltec WiFi LoRa 32 V4  
 
-### V4 Environments
-- `heltec_wifi_lora_32_V4` - 868 MHz band (863-928 MHz, includes 915 MHz)
-- `heltec_wifi_lora_32_V4_433` - 433 MHz band (433-510 MHz)
-
-**Note**: The 868 MHz band covers 863-928 MHz, which includes the North American 915 MHz ISM band. You can set any frequency within the supported range using the `lora freq` command.
+**Note**: All frequency bands are available at runtime regardless of build environment. Use `lora band` commands to select your desired frequency band.
 
 ## Building
 
-To build for a specific environment:
+To build for a specific hardware version:
 ```bash
-# Build V3 for 868 MHz band (includes 915 MHz)
+# Build for Heltec V3
 platformio run -e heltec_wifi_lora_32_V3
 
-# Build V4 for 433 MHz band
-platformio run -e heltec_wifi_lora_32_V4_433
+# Build for Heltec V4  
+platformio run -e heltec_wifi_lora_32_V4
 
 # Build all environments
 platformio run
@@ -66,11 +82,18 @@ The device provides a serial console interface with the following commands:
 - `lora stats` - Show transmission/reception statistics
 - `lora send <message>` - Transmit a LoRa message
 - `lora rx` - Start continuous receive mode
-- `lora freq <mhz>` - Set frequency in MHz (e.g., 868.0)
+- `lora freq <mhz>` - Set frequency in MHz (validates against current band)
 - `lora power <dbm>` - Set TX power in dBm
 - `lora sf <sf>` - Set spreading factor (7-12)
 - `lora bw <khz>` - Set bandwidth in kHz (125/250/500) or shorthand (0/1/2)
 - `lora cr <cr>` - Set coding rate (5-8 for 4/5-4/8) or legacy (1-4)
+
+### Frequency Band Commands
+- `lora bands` - Show all available frequency bands
+- `lora bands ism` - Show ISM bands (no license required)
+- `lora bands amateur` - Show amateur radio bands
+- `lora band` - Show current band configuration  
+- `lora band <id>` - Select frequency band (e.g., ISM_915, AMATEUR_70CM)
 
 ## LoRa Configuration
 
@@ -82,12 +105,8 @@ The device provides a serial console interface with the following commands:
 - **CRC**: Enabled
 - **IQ Inversion**: Disabled
 
-### Frequency Bands
-The frequency band is set at compile time using build flags:
-- `FREQ_BAND_433` - 433 MHz (433-510 MHz range)
-- `FREQ_BAND_868` - 868 MHz (863-928 MHz range, includes 915 MHz)
-
-The 868 MHz band covers the full 863-928 MHz range, which includes both European 868 MHz and North American 915 MHz ISM bands. You can set any frequency within the supported range at runtime using `lora freq <mhz>`.
+### Frequency Configuration
+Frequency bands are configured at runtime using the new band management system. The device defaults to the North American ISM band (902-928 MHz) and users can select any available band using console commands. See the Frequency Band Commands section for usage details.
 
 ### Power Settings
 Power levels are automatically limited based on hardware:
