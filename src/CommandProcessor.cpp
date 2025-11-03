@@ -92,10 +92,14 @@ void CommandProcessor::poll()
       }
       continue;
     }
-    if (c == '\r')
-      continue; // ignore CR
-    if (c == '\n')
+    // Accept both \r and \n as line terminators for compatibility with different terminals
+    // (minicom sends \r, VSCode serial monitor sends \r\n, etc.)
+    if (c == '\r' || c == '\n')
     {
+      // Ignore if line is empty (handles \r\n sequences)
+      if (_line.length() == 0)
+        continue;
+        
       if (_localEcho)
         _io.print("\r\n");
       handleLine(_line);
