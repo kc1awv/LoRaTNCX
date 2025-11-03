@@ -8,9 +8,10 @@
 
 class LoRaRadio;
 
-class CommandProcessor {
+class CommandProcessor
+{
 public:
-  using Handler = std::function<void(const String& args)>;
+  using Handler = std::function<void(const String &args)>;
 
   CommandProcessor(Stream &io, LoRaRadio &radio);
 
@@ -18,7 +19,7 @@ public:
   void poll();
 
   // register a command (uppercase command name)
-  void registerCommand(const char* name, Handler h);
+  void registerCommand(const char *name, Handler h);
 
   // print help (list of registered commands)
   void printHelp();

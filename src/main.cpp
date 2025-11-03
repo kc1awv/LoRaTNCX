@@ -9,7 +9,8 @@
 #define LED_BUILTIN 2
 #endif
 
-void setup() {
+void setup()
+{
   Serial.begin(115200);
   delay(10);
   Serial.println();
@@ -18,21 +19,26 @@ void setup() {
 #else
   Serial.println("LoRaTNCX test: Board: heltec_wifi_lora_32_V4 or unknown");
 #endif
-  Serial.print("LED_BUILTIN pin: "); Serial.println(LED_BUILTIN);
+  Serial.print("LED_BUILTIN pin: ");
+  Serial.println(LED_BUILTIN);
   pinMode(LED_BUILTIN, OUTPUT);
 }
 
 unsigned long lastMillis = 0;
 bool ledState = false;
 
-void loop() {
+void loop()
+{
   unsigned long now = millis();
-  if (now - lastMillis >= 500) {
+  if (now - lastMillis >= 500)
+  {
     lastMillis = now;
     ledState = !ledState;
     digitalWrite(LED_BUILTIN, ledState ? HIGH : LOW);
-    Serial.print("millis: "); Serial.print(now);
-    Serial.print("  LED: "); Serial.println(ledState ? "ON" : "OFF");
+    Serial.print("millis: ");
+    Serial.print(now);
+    Serial.print("  LED: ");
+    Serial.println(ledState ? "ON" : "OFF");
   }
 }
 

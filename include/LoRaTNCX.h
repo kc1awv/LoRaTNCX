@@ -5,8 +5,10 @@
 #include "LoRaRadio.h"
 #include "CommandProcessor.h"
 #include <Preferences.h>
+#include <vector>
 
-class LoRaTNCX {
+class LoRaTNCX
+{
 public:
   LoRaTNCX(Stream &io, LoRaRadio &radio);
   // initialize the TNC (wire radio defaults, command registrations)
@@ -26,7 +28,12 @@ private:
   bool _monitorOn = false;
 
   // Beacon settings
-  enum BeaconMode { BEACON_OFF = 0, BEACON_EVERY, BEACON_AFTER };
+  enum BeaconMode
+  {
+    BEACON_OFF = 0,
+    BEACON_EVERY,
+    BEACON_AFTER
+  };
   BeaconMode _beaconMode = BEACON_OFF;
   uint32_t _beaconInterval = 0; // seconds
   String _beaconText;

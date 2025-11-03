@@ -26,16 +26,17 @@
 #define DIO0 14
 #endif
 
-// V4 PA pins (use these values when building for V4)
 #if defined(ARDUINO_heltec_wifi_lora_32_V4)
+// Use HelTec V4 PA pin mapping discovered in board/factory code
+// Some firmwares report different mappings; try these pins for V4 testing.
 #ifndef LORA_PA_EN
-#define LORA_PA_EN 36
+#define LORA_PA_EN 2
 #endif
 #ifndef LORA_PA_TX_EN
-#define LORA_PA_TX_EN 37
+#define LORA_PA_TX_EN 46
 #endif
 #ifndef LORA_PA_POWER
-#define LORA_PA_POWER 38
+#define LORA_PA_POWER 7
 #endif
 #else
 // Non-V4: no PA pins
@@ -47,32 +48,63 @@
 LoRaRadio radio(LORA_NSS, BUSY_LoRa, DIO0, RST_LoRa, LORA_PA_EN, LORA_PA_TX_EN, LORA_PA_POWER);
 LoRaTNCX tnc(Serial, radio);
 
-void setup() {
+void setup()
+{
   Serial.begin(115200);
-  while (!Serial && millis() < 2000);
+  while (!Serial && millis() < 2000)
+    ;
   Serial.println("LoRa test: initializing radio...");
 
+  // Print configured pins for debugging (helps verify V3 vs V4 mapping)
+  Serial.print("LORA_NSS (CS): "); Serial.println(LORA_NSS);
+  Serial.print("RST_LoRa: "); Serial.println(RST_LoRa);
+  Serial.print("BUSY_LoRa: "); Serial.println(BUSY_LoRa);
+  Serial.print("DIO0: "); Serial.println(DIO0);
+#if (LORA_PA_EN >= 0)
+  Serial.print("LORA_PA_EN: "); Serial.println(LORA_PA_EN);
+#else
+  Serial.println("LORA_PA_EN: <not defined>");
+#endif
+#if (LORA_PA_TX_EN >= 0)
+  Serial.print("LORA_PA_TX_EN: "); Serial.println(LORA_PA_TX_EN);
+#else
+  Serial.println("LORA_PA_TX_EN: <not defined>");
+#endif
+#if (LORA_PA_POWER >= 0)
+  Serial.print("LORA_PA_POWER: "); Serial.println(LORA_PA_POWER);
+#else
+  Serial.println("LORA_PA_POWER: <not defined>");
+#endif
+
   float freq = 868.0; // follow HelTec factory test (MHz)
-  if (!radio.begin(freq)) {
+  if (!radio.begin(freq))
+  {
     Serial.println("Radio init failed");
     return;
   }
 
-  Serial.print("Radio initialized at "); Serial.print(freq); Serial.println(" MHz");
+  Serial.print("Radio initialized at ");
+  Serial.print(freq);
+  Serial.println(" MHz");
 
   const char *msg = "LoRaTNCX test";
-  int res = radio.send((const uint8_t*)msg, strlen(msg));
-  if (res == 0) {
+  int res = radio.send((const uint8_t *)msg, strlen(msg));
+  if (res == 0)
+  {
     Serial.println("Transmit OK");
-  } else {
-    Serial.print("Transmit failed: "); Serial.println(res);
+  }
+  else
+  {
+    Serial.print("Transmit failed: ");
+    Serial.println(res);
   }
 
   // start TNC command processor (uses Serial)
   tnc.begin();
 }
 
-void loop() {
+void loop()
+{
   // poll the TNC for serial commands and radio RX
   tnc.poll();
   delay(10);

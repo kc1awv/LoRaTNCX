@@ -5,10 +5,12 @@
 #include <Preferences.h>
 
 LoRaTNCX::LoRaTNCX(Stream &io, LoRaRadio &radio)
-  : _io(io), _radio(radio), _cmd(io, radio) {
+    : _io(io), _radio(radio), _cmd(io, radio)
+{
 }
 
-void LoRaTNCX::begin() {
+void LoRaTNCX::begin()
+{
   // open preferences namespace
   _prefs.begin("loratncx", false);
 
@@ -21,45 +23,66 @@ void LoRaTNCX::begin() {
   // load UNPROTO (comma-separated list)
   String up = _prefs.getString("unproto", "");
   _unproto.clear();
-  if (up.length()) {
+  if (up.length())
+  {
     int start = 0;
-    while (start < (int)up.length()) {
+    while (start < (int)up.length())
+    {
       int comma = up.indexOf(',', start);
       String part;
-      if (comma == -1) { part = up.substring(start); start = up.length(); }
-      else { part = up.substring(start, comma); start = comma+1; }
+      if (comma == -1)
+      {
+        part = up.substring(start);
+        start = up.length();
+      }
+      else
+      {
+        part = up.substring(start, comma);
+        start = comma + 1;
+      }
       part.trim();
-      if (part.length()) _unproto.push_back(part);
-      if (_unproto.size() >= UNPROTO_MAX) break;
+      if (part.length())
+        _unproto.push_back(part);
+      if (_unproto.size() >= UNPROTO_MAX)
+        break;
     }
   }
 
   // register commands
-  _cmd.registerCommand("HELP", [this](const String &a){ cmdHelp(a); });
-  _cmd.registerCommand("?", [this](const String &a){ cmdHelp(a); });
-  _cmd.registerCommand("VERSION", [this](const String &a){ cmdVersion(a); });
-  _cmd.registerCommand("STATUS", [this](const String &a){ cmdStatus(a); });
-  _cmd.registerCommand("FREQ", [this](const String &a){ cmdFreq(a); });
-  _cmd.registerCommand("PWR", [this](const String &a){ cmdPwr(a); });
-  _cmd.registerCommand("SEND", [this](const String &a){ cmdSend(a); });
-  _cmd.registerCommand("RADIOINIT", [this](const String &a){ cmdRadioInit(a); });
+  _cmd.registerCommand("HELP", [this](const String &a)
+                       { cmdHelp(a); });
+  _cmd.registerCommand("?", [this](const String &a)
+                       { cmdHelp(a); });
+  _cmd.registerCommand("VERSION", [this](const String &a)
+                       { cmdVersion(a); });
+  _cmd.registerCommand("STATUS", [this](const String &a)
+                       { cmdStatus(a); });
+  _cmd.registerCommand("FREQ", [this](const String &a)
+                       { cmdFreq(a); });
+  _cmd.registerCommand("PWR", [this](const String &a)
+                       { cmdPwr(a); });
+  _cmd.registerCommand("SEND", [this](const String &a)
+                       { cmdSend(a); });
+  _cmd.registerCommand("RADIOINIT", [this](const String &a)
+                       { cmdRadioInit(a); });
 
   // MYCALL - set/get callsign
-  _cmd.registerCommand("MYCALL", [this](const String &a){
+  _cmd.registerCommand("MYCALL", [this](const String &a)
+                       {
     if (a.length() == 0) {
       _io.printf("MYCALL %s\r\n", _myCall.c_str());
       return;
     }
     _myCall = a;
     _prefs.putString("mycall", _myCall);
-    _io.printf("OK MYCALL %s\r\n", _myCall.c_str());
-  });
+    _io.printf("OK MYCALL %s\r\n", _myCall.c_str()); });
 
   // enable local echo so interactive serial shows typed characters
   _cmd.setLocalEcho(true);
 
   // MONITOR ON|OFF
-  _cmd.registerCommand("MONITOR", [this](const String &a){
+  _cmd.registerCommand("MONITOR", [this](const String &a)
+                       {
     String s = a;
     s.trim(); s.toUpperCase();
     if (s == "ON") {
@@ -72,18 +95,18 @@ void LoRaTNCX::begin() {
       _io.println("OK MONITOR OFF");
     } else {
       _io.printf("MONITOR %s\r\n", _monitorOn?"ON":"OFF");
-    }
-  });
+    } });
 
   // MHEARD - list heard stations
-  _cmd.registerCommand("MHEARD", [this](const String &a){
+  _cmd.registerCommand("MHEARD", [this](const String &a)
+                       {
     (void)a;
     if (_mheard_count == 0) { _io.println("MHEARD none"); return; }
-    for (int i=0;i<_mheard_count;i++) _io.printf("%d: %s\r\n", i+1, _mheard[i].c_str());
-  });
+    for (int i=0;i<_mheard_count;i++) _io.printf("%d: %s\r\n", i+1, _mheard[i].c_str()); });
 
   // UNPROTO - show/set digipeat path (comma-separated list)
-  _cmd.registerCommand("UNPROTO", [this](const String &a){
+  _cmd.registerCommand("UNPROTO", [this](const String &a)
+                       {
     String s = a; s.trim();
     if (s.length() == 0) {
       // show
@@ -118,11 +141,11 @@ void LoRaTNCX::begin() {
     String stored = "";
     for (size_t i=0;i<_unproto.size();i++) { if (i) stored += ","; stored += _unproto[i]; }
     _prefs.putString("unproto", stored);
-    _io.println("OK UNPROTO set");
-  });
+    _io.println("OK UNPROTO set"); });
 
   // BEACON - show/set
-  _cmd.registerCommand("BEACON", [this](const String &a){
+  _cmd.registerCommand("BEACON", [this](const String &a)
+                       {
     String s = a; s.trim();
     if (s.length() == 0) {
       _io.printf("BEACON mode=%d interval=%u text=%s\r\n", (int)_beaconMode, _beaconInterval, _beaconText.c_str());
@@ -170,11 +193,11 @@ void LoRaTNCX::begin() {
       _io.printf("OK BEACON TEXT %s\r\n", _beaconText.c_str());
     } else {
       _io.println("ERR BEACON syntax");
-    }
-  });
+    } });
 
   // CONNECT <callsign> - simple stub
-  _cmd.registerCommand("CONNECT", [this](const String &a){
+  _cmd.registerCommand("CONNECT", [this](const String &a)
+                       {
     String tgt = a; tgt.trim();
     if (tgt.length() == 0) { _io.println("ERR missing callsign"); return; }
     _connectedTo = tgt;
@@ -189,59 +212,76 @@ void LoRaTNCX::begin() {
       _io.printf("ERR CONNECT frame too large (%u bytes)\r\n", (unsigned)frame.size());
     } else {
       _radio.send(frame.data(), frame.size());
-    }
-  });
+    } });
   // wire radio RX handler so incoming packets reach TNC
-  _radio.setRxHandler([this](const String &from, const String &payload, int rssi){
-    this->onPacketReceived(from, payload, rssi);
-  });
+  _radio.setRxHandler([this](const String &from, const String &payload, int rssi)
+                      { this->onPacketReceived(from, payload, rssi); });
 
   _io.println(F("LoRaTNCX ready. Type HELP for commands."));
 }
 
-void LoRaTNCX::poll() {
+void LoRaTNCX::poll()
+{
   // poll radio first to surface any received packets to the TNC
   _radio.poll();
 
   _cmd.poll();
 
   // beacon handling
-  if (_beaconMode != BEACON_OFF && _beaconInterval > 0) {
+  if (_beaconMode != BEACON_OFF && _beaconInterval > 0)
+  {
     uint32_t now = millis();
     // convert interval seconds to ms
     uint32_t iv = _beaconInterval * 1000UL;
-    if (_beaconMode == BEACON_EVERY) {
-      if ((now - _lastBeaconMs) >= iv) {
+    if (_beaconMode == BEACON_EVERY)
+    {
+      if ((now - _lastBeaconMs) >= iv)
+      {
         // send beacon as AX.25 UI frame (dest=NOCALL by default)
         String b = _beaconText.length() ? _beaconText : (String("BEACON ") + _myCall);
         std::vector<uint8_t> payload;
-        for (size_t i=0;i<(size_t)b.length();i++) payload.push_back((uint8_t)b[i]);
-  // build vector<String> digis from _unproto
-  std::vector<String> digis;
-  for (auto &d : _unproto) digis.push_back(d);
-      std::vector<uint8_t> frame = AX25::encodeUIFrame(String("BEACON"), _myCall.length()?_myCall:String("NOCALL"), digis, payload);
-      if (frame.size() > (size_t)RADIOLIB_SX126X_MAX_PACKET_LENGTH) {
-        _io.printf("ERR BEACON frame too large (%u bytes)\r\n", (unsigned)frame.size());
-      } else {
-        _radio.send(frame.data(), frame.size());
-      }
+        for (size_t i = 0; i < (size_t)b.length(); i++)
+          payload.push_back((uint8_t)b[i]);
+        // build vector<String> digis from _unproto
+        std::vector<String> digis;
+        for (auto &d : _unproto)
+          digis.push_back(d);
+        std::vector<uint8_t> frame = AX25::encodeUIFrame(String("BEACON"), _myCall.length() ? _myCall : String("NOCALL"), digis, payload);
+        if (frame.size() > (size_t)RADIOLIB_SX126X_MAX_PACKET_LENGTH)
+        {
+          _io.printf("ERR BEACON frame too large (%u bytes)\r\n", (unsigned)frame.size());
+        }
+        else
+        {
+          _radio.send(frame.data(), frame.size());
+        }
         _lastBeaconMs = now;
       }
-    } else if (_beaconMode == BEACON_AFTER) {
+    }
+    else if (_beaconMode == BEACON_AFTER)
+    {
       // send once after interval then disable
-      if (_lastBeaconMs == 0) {
+      if (_lastBeaconMs == 0)
+      {
         // first-time: set reference
         _lastBeaconMs = now;
-      } else if ((now - _lastBeaconMs) >= iv) {
+      }
+      else if ((now - _lastBeaconMs) >= iv)
+      {
         String b = _beaconText.length() ? _beaconText : (String("BEACON ") + _myCall);
         std::vector<uint8_t> payload;
-        for (size_t i=0;i<(size_t)b.length();i++) payload.push_back((uint8_t)b[i]);
+        for (size_t i = 0; i < (size_t)b.length(); i++)
+          payload.push_back((uint8_t)b[i]);
         std::vector<String> digis;
-        for (auto &d : _unproto) digis.push_back(d);
-        std::vector<uint8_t> frame = AX25::encodeUIFrame(String("BEACON"), _myCall.length()?_myCall:String("NOCALL"), digis, payload);
-        if (frame.size() > (size_t)RADIOLIB_SX126X_MAX_PACKET_LENGTH) {
+        for (auto &d : _unproto)
+          digis.push_back(d);
+        std::vector<uint8_t> frame = AX25::encodeUIFrame(String("BEACON"), _myCall.length() ? _myCall : String("NOCALL"), digis, payload);
+        if (frame.size() > (size_t)RADIOLIB_SX126X_MAX_PACKET_LENGTH)
+        {
           _io.printf("ERR BEACON frame too large (%u bytes)\r\n", (unsigned)frame.size());
-        } else {
+        }
+        else
+        {
           _radio.send(frame.data(), frame.size());
         }
         _beaconMode = BEACON_OFF;
@@ -251,42 +291,57 @@ void LoRaTNCX::poll() {
   }
 }
 
-void LoRaTNCX::addMHeard(const String &callsign) {
-  if (callsign.length() == 0) return;
+void LoRaTNCX::addMHeard(const String &callsign)
+{
+  if (callsign.length() == 0)
+    return;
   // avoid duplicates (simple linear scan)
-  for (int i=0;i<_mheard_count;i++) if (_mheard[i] == callsign) return;
-  if (_mheard_count < MHEARD_MAX) {
+  for (int i = 0; i < _mheard_count; i++)
+    if (_mheard[i] == callsign)
+      return;
+  if (_mheard_count < MHEARD_MAX)
+  {
     _mheard[_mheard_count++] = callsign;
-  } else {
+  }
+  else
+  {
     // rotate
-    for (int i=1;i<MHEARD_MAX;i++) _mheard[i-1] = _mheard[i];
-    _mheard[MHEARD_MAX-1] = callsign;
+    for (int i = 1; i < MHEARD_MAX; i++)
+      _mheard[i - 1] = _mheard[i];
+    _mheard[MHEARD_MAX - 1] = callsign;
   }
 }
 
-void LoRaTNCX::onPacketReceived(const String &from, const String &payload, int rssi) {
+void LoRaTNCX::onPacketReceived(const String &from, const String &payload, int rssi)
+{
   // record heard station
   addMHeard(from);
   // optionally print to monitor
-  if (_monitorOn) {
-    if (from.length()) _io.printf("[%s] ", from.c_str());
-    if (payload.length()) _io.printf("%s ", payload.c_str());
+  if (_monitorOn)
+  {
+    if (from.length())
+      _io.printf("[%s] ", from.c_str());
+    if (payload.length())
+      _io.printf("%s ", payload.c_str());
     _io.printf("(rssi=%d)\r\n", rssi);
   }
 }
 
 // --- Handlers ---
-void LoRaTNCX::cmdHelp(const String &args) {
+void LoRaTNCX::cmdHelp(const String &args)
+{
   (void)args;
   _cmd.printHelp();
 }
 
-void LoRaTNCX::cmdVersion(const String &args) {
+void LoRaTNCX::cmdVersion(const String &args)
+{
   (void)args;
   _io.println(F("LoRaTNCX 0.1 - minimal TNC-2 compatible command set"));
 }
 
-void LoRaTNCX::cmdStatus(const String &args) {
+void LoRaTNCX::cmdStatus(const String &args)
+{
   (void)args;
   _io.print(F("Radio freq (MHz): "));
   _io.println(_radio.getFrequency());
@@ -294,65 +349,85 @@ void LoRaTNCX::cmdStatus(const String &args) {
   _io.println(_radio.getTxPower());
 }
 
-void LoRaTNCX::cmdFreq(const String &args) {
-  if (args.length() == 0) {
+void LoRaTNCX::cmdFreq(const String &args)
+{
+  if (args.length() == 0)
+  {
     _io.print(F("Current frequency: "));
     _io.println(_radio.getFrequency());
     return;
   }
   float f = args.toFloat();
-  if (f <= 0) {
+  if (f <= 0)
+  {
     _io.println(F("Invalid frequency. Provide MHz (e.g. 868.0)"));
     return;
   }
   int r = _radio.setFrequency(f);
-  if (r == 0) {
+  if (r == 0)
+  {
     _io.print(F("Frequency set to: "));
     _io.println(f);
-  } else {
+  }
+  else
+  {
     _io.print(F("Failed to set frequency (err "));
     _io.print(r);
     _io.println(")");
   }
 }
 
-void LoRaTNCX::cmdPwr(const String &args) {
-  if (args.length() == 0) {
+void LoRaTNCX::cmdPwr(const String &args)
+{
+  if (args.length() == 0)
+  {
     _io.print(F("Current tx power: "));
     _io.println(_radio.getTxPower());
     return;
   }
   int p = args.toInt();
   int r = _radio.setTxPower((int8_t)p);
-  if (r == 0) {
+  if (r == 0)
+  {
     _io.print(F("Tx power set to: "));
     _io.println(p);
-  } else {
+  }
+  else
+  {
     _io.print(F("Failed to set tx power (err "));
     _io.print(r);
     _io.println(")");
   }
 }
 
-void LoRaTNCX::cmdSend(const String &args) {
-  if (args.length() == 0) {
+void LoRaTNCX::cmdSend(const String &args)
+{
+  if (args.length() == 0)
+  {
     _io.println(F("Usage: SEND text..."));
     return;
   }
-  int r = _radio.send((const uint8_t*)args.c_str(), args.length());
-  if (r == 0) {
+  int r = _radio.send((const uint8_t *)args.c_str(), args.length());
+  if (r == 0)
+  {
     _io.println(F("Send OK"));
-  } else {
+  }
+  else
+  {
     _io.print(F("Send failed: "));
     _io.println(r);
   }
 }
 
-void LoRaTNCX::cmdRadioInit(const String &args) {
+void LoRaTNCX::cmdRadioInit(const String &args)
+{
   (void)args;
-  if (_radio.begin(_radio.getFrequency())) {
+  if (_radio.begin(_radio.getFrequency()))
+  {
     _io.println(F("Radio init OK"));
-  } else {
+  }
+  else
+  {
     _io.println(F("Radio init FAILED"));
   }
 }
