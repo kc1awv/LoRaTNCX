@@ -222,8 +222,8 @@ void LoRaTNCX::begin()
 
 void LoRaTNCX::poll()
 {
-  // poll radio first to surface any received packets to the TNC
-  _radio.poll();
+  // Radio polling now runs in separate FreeRTOS task (started in begin())
+  // No need to call _radio.poll() here anymore
 
   _cmd.poll();
 

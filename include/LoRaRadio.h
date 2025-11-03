@@ -20,6 +20,8 @@ public:
   LoRaRadio(int8_t cs, int8_t busy, int8_t dio0, int8_t rst,
             int8_t paEnPin = -1, int8_t paTxEnPin = -1, int8_t paPowerPin = -1);
 
+  ~LoRaRadio();
+
   // Initialize the radio. Returns true on success.
   bool begin(float freq = 915.0);
 
@@ -42,10 +44,19 @@ public:
   using RxHandler = std::function<void(const String &from, const String &payload, int rssi)>;
   void setRxHandler(RxHandler h);
 
-  // call regularly from loop() to poll for incoming packets
+  // Start/stop the RX task (runs in separate FreeRTOS task)
+  void startRxTask();
+  void stopRxTask();
+
+  // call regularly from loop() to poll for incoming packets (deprecated - use startRxTask() instead)
   void poll();
 
 private:
+  // Static task function for FreeRTOS
+  static void rxTaskFunction(void *parameter);
+
+  // Internal poll method called by task
+  void pollInternal();
   int8_t _cs, _busy, _dio0, _rst;
   int8_t _paEnPin = -1;
   int8_t _paTxEnPin = -1;
@@ -56,4 +67,8 @@ private:
   float _freq = 915.0;
   int8_t _txPower = 0;
   RxHandler _rxHandler = nullptr;
+
+  // FreeRTOS task handle for RX polling
+  TaskHandle_t _rxTaskHandle = nullptr;
+  volatile bool _rxTaskRunning = false;
 };

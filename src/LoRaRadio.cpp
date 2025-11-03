@@ -8,6 +8,24 @@ LoRaRadio::LoRaRadio(int8_t cs, int8_t busy, int8_t dio0, int8_t rst,
 {
 }
 
+LoRaRadio::~LoRaRadio()
+{
+  // Stop the RX task if running
+  stopRxTask();
+
+  // Clean up dynamically allocated objects
+  if (_radio)
+  {
+    delete _radio;
+    _radio = nullptr;
+  }
+  if (_mod)
+  {
+    delete _mod;
+    _mod = nullptr;
+  }
+}
+
 void LoRaRadio::setRxHandler(RxHandler h)
 {
   _rxHandler = h;
@@ -66,6 +84,18 @@ bool LoRaRadio::begin(float freq)
   _radio->setCodingRate(5);
   _radio->setOutputPower(14);
   _txPower = 14;
+
+  // Start in receive mode (proven method from previous implementation)
+  int16_t rxState = _radio->startReceive();
+  if (rxState != RADIOLIB_ERR_NONE)
+  {
+    Serial.print("Failed to start receive mode, error: ");
+    Serial.println(rxState);
+    return false;
+  }
+
+  // Start the RX polling task on separate core
+  startRxTask();
 
   return true;
 }
@@ -144,36 +174,166 @@ int LoRaRadio::send(const uint8_t *buf, size_t len, unsigned long timeout)
   if (_paTxEnPin >= 0)
     digitalWrite(_paTxEnPin, LOW);
 
+  // Restart receive mode after transmit (proven method)
+  _radio->startReceive();
+
   return result;
+}
+
+// Static task function for FreeRTOS
+void LoRaRadio::rxTaskFunction(void *parameter)
+{
+  LoRaRadio *radio = static_cast<LoRaRadio *>(parameter);
+
+  while (radio->_rxTaskRunning)
+  {
+    radio->pollInternal();
+    // Small delay to yield to other tasks and prevent watchdog issues
+    vTaskDelay(pdMS_TO_TICKS(5));
+  }
+
+  // Task ending, delete itself
+  radio->_rxTaskHandle = nullptr;
+  vTaskDelete(nullptr);
+}
+
+void LoRaRadio::startRxTask()
+{
+  if (_rxTaskHandle != nullptr)
+    return; // Already running
+
+  _rxTaskRunning = true;
+
+  // Create task on core 0 (core 1 typically runs Arduino loop)
+  // Stack size: 4096 bytes, priority: 1 (low priority, won't block serial)
+  xTaskCreatePinnedToCore(
+      rxTaskFunction, // Task function
+      "LoRaRxTask",   // Task name
+      4096,           // Stack size (bytes)
+      this,           // Parameter passed to task
+      1,              // Priority (1 = low, lower than default loop priority)
+      &_rxTaskHandle, // Task handle
+      0               // Core 0 (Arduino loop runs on core 1)
+  );
+}
+
+void LoRaRadio::stopRxTask()
+{
+  if (_rxTaskHandle == nullptr)
+    return; // Not running
+
+  _rxTaskRunning = false;
+
+  // Wait for task to finish (max 1 second)
+  unsigned long start = millis();
+  while (_rxTaskHandle != nullptr && (millis() - start) < 1000)
+  {
+    delay(10);
+  }
 }
 
 void LoRaRadio::poll()
 {
+  // Deprecated: for backward compatibility, just call internal poll
+  pollInternal();
+}
+
+void LoRaRadio::pollInternal()
+{
   if (!_radio)
     return;
 
-  // try a short non-blocking receive window by calling RadioLib receive with a small timeout
   uint8_t buf[256];
   size_t buflen = sizeof(buf);
-  // call RadioLib receive with a short timeout
-  int16_t res = _radio->receive(buf, buflen, 10);
-  if (res == RADIOLIB_ERR_NONE)
+
+  // Use receive() with 0 timeout instead of readData() in startReceive() mode
+  // This properly handles the RX complete flag and won't return the same packet repeatedly
+  String str;
+  int16_t res = _radio->receive(str, 0); // 0 = non-blocking, return immediately
+
+  // Check result
+  if (res == RADIOLIB_ERR_RX_TIMEOUT)
   {
-    // query actual packet length
-    size_t plen = _radio->getPacketLength();
-    if (plen > 0 && plen <= buflen)
+    // No packet available, this is normal in non-blocking mode
+    return;
+  }
+
+  if (res != RADIOLIB_ERR_NONE)
+  {
+    // Actual error occurred
+    if (res != RADIOLIB_ERR_CRC_MISMATCH)
     {
-      String payload((const char *)buf, plen);
-      int rssi = (int)_radio->getRSSI(true);
-      String from = String("");
-      // try to parse AX.25 addresses to extract source callsign
-      AX25::AddrInfo ai = AX25::parseAddresses(buf, plen);
+      Serial.print("Receive error: ");
+      Serial.println(res);
+    }
+    return;
+  }
+
+  // Success! We have a packet
+  if (str.length() == 0)
+  {
+    // Got success but no data - shouldn't happen, but handle it
+    return;
+  }
+
+  // We have actual data - process it
+  size_t plen = min((size_t)str.length(), buflen);
+  memcpy(buf, str.c_str(), plen);
+
+  if (plen > 0 && plen <= buflen)
+  {
+    int rssi = (int)_radio->getRSSI();
+    String from = String("");
+    String payload = String("");
+
+    // try to parse AX.25 addresses to extract source callsign and payload
+    AX25::AddrInfo ai = AX25::parseAddresses(buf, plen);
+
+    // Debug: print received packet summary to Serial to aid troubleshooting
+    {
+      Serial.printf("[LoRaRadio] RX len=%u rssi=%d parse_ok=%d\r\n", (unsigned)plen, rssi, ai.ok ? 1 : 0);
+      // print parsed addresses when available
       if (ai.ok)
-        from = ai.src;
-      if (_rxHandler)
       {
-        _rxHandler(from, payload, rssi);
+        Serial.printf("[LoRaRadio] dest=%s src=%s hdr_len=%u\r\n", ai.dest.c_str(), ai.src.c_str(), (unsigned)ai.header_len);
+      }
+      // hex dump first up to 64 bytes
+      Serial.print("[LoRaRadio] data= ");
+      for (size_t i = 0; i < plen && i < 64; i++)
+      {
+        Serial.printf("%02X", buf[i]);
+        if (i + 1 < plen && (i + 1) % 16 == 0)
+          Serial.print(' ');
+      }
+      Serial.println();
+    }
+
+    if (ai.ok)
+    {
+      from = ai.src;
+      // Extract payload: skip AX.25 header, exclude trailing FCS (2 bytes)
+      if (ai.header_len < plen)
+      {
+        size_t payload_len = plen - ai.header_len;
+        // AX.25 frames have 2-byte FCS at the end, exclude it
+        if (payload_len > 2)
+        {
+          payload_len -= 2;
+        }
+        payload = String((const char *)(buf + ai.header_len), payload_len);
       }
     }
+    else
+    {
+      // If parsing failed, treat entire packet as payload (fallback for non-AX25 packets)
+      payload = String((const char *)buf, plen);
+    }
+
+    if (_rxHandler)
+    {
+      _rxHandler(from, payload, rssi);
+    }
   }
+
+  // receive() with timeout automatically manages RX state, no need to call startReceive() here
 }

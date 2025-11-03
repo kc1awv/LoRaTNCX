@@ -56,22 +56,29 @@ void setup()
   Serial.println("LoRa test: initializing radio...");
 
   // Print configured pins for debugging (helps verify V3 vs V4 mapping)
-  Serial.print("LORA_NSS (CS): "); Serial.println(LORA_NSS);
-  Serial.print("RST_LoRa: "); Serial.println(RST_LoRa);
-  Serial.print("BUSY_LoRa: "); Serial.println(BUSY_LoRa);
-  Serial.print("DIO0: "); Serial.println(DIO0);
+  Serial.print("LORA_NSS (CS): ");
+  Serial.println(LORA_NSS);
+  Serial.print("RST_LoRa: ");
+  Serial.println(RST_LoRa);
+  Serial.print("BUSY_LoRa: ");
+  Serial.println(BUSY_LoRa);
+  Serial.print("DIO0: ");
+  Serial.println(DIO0);
 #if (LORA_PA_EN >= 0)
-  Serial.print("LORA_PA_EN: "); Serial.println(LORA_PA_EN);
+  Serial.print("LORA_PA_EN: ");
+  Serial.println(LORA_PA_EN);
 #else
   Serial.println("LORA_PA_EN: <not defined>");
 #endif
 #if (LORA_PA_TX_EN >= 0)
-  Serial.print("LORA_PA_TX_EN: "); Serial.println(LORA_PA_TX_EN);
+  Serial.print("LORA_PA_TX_EN: ");
+  Serial.println(LORA_PA_TX_EN);
 #else
   Serial.println("LORA_PA_TX_EN: <not defined>");
 #endif
 #if (LORA_PA_POWER >= 0)
-  Serial.print("LORA_PA_POWER: "); Serial.println(LORA_PA_POWER);
+  Serial.print("LORA_PA_POWER: ");
+  Serial.println(LORA_PA_POWER);
 #else
   Serial.println("LORA_PA_POWER: <not defined>");
 #endif
