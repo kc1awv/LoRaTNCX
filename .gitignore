@@ -18,4 +18,4 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 
-lora_chat_config*
+docs/
