@@ -48,6 +48,16 @@ void LoRaTNCX::begin()
     }
   }
 
+  // load retry parameter
+  _retry = (uint8_t)_prefs.getUInt("retry", 10);
+  // load frack parameter
+  _frack = (uint8_t)_prefs.getUInt("frack", 8);
+  // initialize stream 0 from single-stream fields
+  _streams[0].state = _l2state;
+  _streams[0].connectedTo = _connectedTo;
+  _streams[0].tries = _tries;
+  _streams[0].lastFrackMs = _lastFrackMs;
+
   // register commands
   _cmd.registerCommand("HELP", [this](const String &a)
                        { cmdHelp(a); });
@@ -65,6 +75,46 @@ void LoRaTNCX::begin()
                        { cmdSend(a); });
   _cmd.registerCommand("RADIOINIT", [this](const String &a)
                        { cmdRadioInit(a); });
+
+  // SF - get/set spreading factor
+  _cmd.registerCommand("SF", [this](const String &a)
+                       {
+    String s = a; s.trim();
+    if (s.length() == 0) { _io.printf("SF %d\r\n", _radio.getSpreadingFactor()); return; }
+    int sf = s.toInt();
+    int r = _radio.setSpreadingFactor(sf);
+    if (r == 0) _io.printf("OK SF %d\r\n", sf); else _io.printf("ERR set SF %d -> %d\r\n", sf, r);
+  });
+
+  // BW - get/set bandwidth (kHz)
+  _cmd.registerCommand("BW", [this](const String &a)
+                       {
+    String s = a; s.trim();
+    if (s.length() == 0) { _io.printf("BW %ld\r\n", _radio.getBandwidth()); return; }
+    long bw = s.toInt();
+    int r = _radio.setBandwidth(bw);
+    if (r == 0) _io.printf("OK BW %ld\r\n", bw); else _io.printf("ERR set BW %ld -> %d\r\n", bw, r);
+  });
+
+  // DISCONNE - disconnect
+  _cmd.registerCommand("DISCONNE", [this](const String &a)
+                       { cmdDisconne(a); });
+
+  // RESTART - reload persisted settings
+  _cmd.registerCommand("RESTART", [this](const String &a)
+                       { cmdRestart(a); });
+
+  // RESET - clear persisted settings and re-init
+  _cmd.registerCommand("RESET", [this](const String &a)
+                       { cmdReset(a); });
+
+  // RETRY - get/set retry count
+  _cmd.registerCommand("RETRY", [this](const String &a)
+                       { cmdRetry(a); });
+
+  // FRACK - get/set frame ack timeout (seconds)
+  _cmd.registerCommand("FRACK", [this](const String &a)
+                       { cmdFrack(a); });
 
   // MYCALL - set/get callsign
   _cmd.registerCommand("MYCALL", [this](const String &a)
@@ -195,27 +245,29 @@ void LoRaTNCX::begin()
       _io.println("ERR BEACON syntax");
     } });
 
-  // CONNECT <callsign> - simple stub
+  // CONNECT <callsign> - initiate connect state machine (simple L2 approximation)
   _cmd.registerCommand("CONNECT", [this](const String &a)
                        {
     String tgt = a; tgt.trim();
     if (tgt.length() == 0) { _io.println("ERR missing callsign"); return; }
+    // initiate connecting
     _connectedTo = tgt;
+    _l2state = L2_CONNECTING;
+    _tries = 0;
+    _lastFrackMs = millis();
     if (_mheard_count < MHEARD_MAX) _mheard[_mheard_count++] = tgt;
-    _io.printf("CONNECT %s\r\n", tgt.c_str());
-    // send an AX.25 UI frame for CONNECT
-    std::vector<uint8_t> payload;
-    String body = String("[CONNECT]") + _myCall + ">" + tgt;
-    for (size_t i=0;i<(size_t)body.length();i++) payload.push_back((uint8_t)body[i]);
-    std::vector<uint8_t> frame = AX25::encodeUIFrame(tgt, _myCall.length()?_myCall:String("NOCALL"), payload);
+    _io.printf("CONNECT %s (attempting)\r\n", tgt.c_str());
+    // send an AX.25 SABM control frame to initiate link (L2)
+    std::vector<uint8_t> frame = AX25::encodeControlFrame(tgt, _myCall.length()?_myCall:String("NOCALL"), AX25::CTL_SABM);
     if (frame.size() > (size_t)RADIOLIB_SX126X_MAX_PACKET_LENGTH) {
       _io.printf("ERR CONNECT frame too large (%u bytes)\r\n", (unsigned)frame.size());
     } else {
       _radio.send(frame.data(), frame.size());
-    } });
+    }
+  });
   // wire radio RX handler so incoming packets reach TNC
-  _radio.setRxHandler([this](const String &from, const String &payload, int rssi)
-                      { this->onPacketReceived(from, payload, rssi); });
+  _radio.setRxHandler([this](const uint8_t *buf, size_t len, const AX25::AddrInfo &ai, int rssi)
+                      { this->onPacketReceived(buf, len, ai, rssi); });
 
   _io.println(F("LoRaTNCX ready. Type HELP for commands."));
 }
@@ -289,6 +341,32 @@ void LoRaTNCX::poll()
       }
     }
   }
+
+  // simple L2 state machine: handle CONNECTING retries (FRACK)
+  if (_l2state == L2_CONNECTING) {
+    uint32_t now = millis();
+    uint32_t frackMs = ((uint32_t)_frack) * 1000UL;
+    if (frackMs == 0) frackMs = 1000UL; // guard
+    if ((now - _lastFrackMs) >= frackMs) {
+      // timeout: retry or fail
+      _tries++;
+      if (_tries > _retry) {
+        _io.println(F("*** retry limit exceeded"));
+        _l2state = L2_DISCONNECTED;
+        _connectedTo = String();
+      } else {
+        // resend SABM control frame
+        std::vector<uint8_t> frame = AX25::encodeControlFrame(_connectedTo, _myCall.length()?_myCall:String("NOCALL"), AX25::CTL_SABM);
+        if (frame.size() <= (size_t)RADIOLIB_SX126X_MAX_PACKET_LENGTH) {
+          _radio.send(frame.data(), frame.size());
+          _io.printf("RETRY %u: resent SABM to %s\r\n", (unsigned)_tries, _connectedTo.c_str());
+        } else {
+          _io.println(F("ERR CONNECT frame too large to retry"));
+        }
+        _lastFrackMs = now;
+      }
+    }
+  }
 }
 
 void LoRaTNCX::addMHeard(const String &callsign)
@@ -312,18 +390,89 @@ void LoRaTNCX::addMHeard(const String &callsign)
   }
 }
 
-void LoRaTNCX::onPacketReceived(const String &from, const String &payload, int rssi)
+void LoRaTNCX::onPacketReceived(const uint8_t *buf, size_t len, const AX25::AddrInfo &ai, int rssi)
 {
-  // record heard station
-  addMHeard(from);
-  // optionally print to monitor
+  // record heard station (if parsed)
+  if (ai.ok && ai.src.length())
+    addMHeard(ai.src);
+
+  // Optionally print to monitor: include header info and payload when available
   if (_monitorOn)
   {
-    if (from.length())
-      _io.printf("[%s] ", from.c_str());
-    if (payload.length())
-      _io.printf("%s ", payload.c_str());
+    if (ai.ok)
+      _io.printf("[%s] ", ai.src.c_str());
+    // extract payload portion (if any)
+    size_t payload_len = 0;
+    if (ai.ok && ai.header_len < len) {
+      payload_len = len - ai.header_len;
+      // exclude trailing FCS if present
+      if (payload_len > 2) payload_len -= 2;
+    }
+    if (payload_len > 0)
+      _io.printf("%.*s ", (int)payload_len, (const char *)(buf + ai.header_len));
     _io.printf("(rssi=%d)\r\n", rssi);
+  }
+
+  // If this is a control frame (no PID/payload, but has control), inspect control byte
+  if (ai.ok && ai.hasControl) {
+    uint8_t ctl = ai.control;
+    _io.printf("(control=0x%02X)\r\n", ctl);
+    
+    // Handle incoming SABM from any station (connection request)
+    // This allows a remote station to initiate a connection even if we're DISCONNECTED
+    if (ctl == AX25::CTL_SABM) {
+      // If we're already connecting to someone else or connected to someone else, ignore
+      if (_l2state != L2_DISCONNECTED && !ai.src.equalsIgnoreCase(_connectedTo)) {
+        _io.printf("*** Ignored SABM from %s (busy)\r\n", ai.src.c_str());
+        return;
+      }
+      // send UA back
+      auto frame = AX25::encodeControlFrame(ai.src, _myCall.length()? _myCall : String("NOCALL"), AX25::CTL_UA);
+      if (frame.size() <= (size_t)RADIOLIB_SX126X_MAX_PACKET_LENGTH) {
+        _io.println(F("Sending UA response"));
+        _radio.send(frame.data(), frame.size());
+      }
+      // adopt remote as connected
+      _connectedTo = ai.src;
+      _l2state = L2_CONNECTED;
+      _tries = 0;
+      _io.printf("*** CONNECTED to %s (peer)\r\n", _connectedTo.c_str());
+      return;
+    }
+    
+    // If we are CONNECTING and we receive UA or any frame from target, finish connect
+    if (_l2state == L2_CONNECTING && ai.src.equalsIgnoreCase(_connectedTo)) {
+      if (ctl == AX25::CTL_UA || ctl == AX25::CTL_RR || ctl == AX25::CTL_RNR) {
+        _l2state = L2_CONNECTED;
+        _tries = 0;
+        _io.printf("*** CONNECTED to %s\r\n", _connectedTo.c_str());
+        return;
+      }
+
+      // If remote sent DISC, consider disconnected
+      if (ctl == AX25::CTL_DISC) {
+        _l2state = L2_DISCONNECTED;
+        _connectedTo = String();
+        _io.println(F("*** DISCONNECTED (peer DISC)"));
+        return;
+      }
+    }
+
+    // If we are CONNECTED and receive DISC from peer, clear state and notify
+    if (_l2state == L2_CONNECTED && ai.src.equalsIgnoreCase(_connectedTo) && ai.control == AX25::CTL_DISC) {
+      _l2state = L2_DISCONNECTED;
+      _connectedTo = String();
+      _io.println(F("*** DISCONNECTED (peer DISC)"));
+      return;
+    }
+  } else {
+    // Non-control frames: if connecting and we hear payload from target, consider connected
+    if (_l2state == L2_CONNECTING && ai.ok && ai.src.equalsIgnoreCase(_connectedTo)) {
+      _l2state = L2_CONNECTED;
+      _tries = 0;
+      _io.printf("*** CONNECTED to %s\r\n", _connectedTo.c_str());
+      return;
+    }
   }
 }
 
@@ -430,4 +579,107 @@ void LoRaTNCX::cmdRadioInit(const String &args)
   {
     _io.println(F("Radio init FAILED"));
   }
+}
+
+void LoRaTNCX::cmdDisconne(const String &args)
+{
+  (void)args;
+  if (_connectedTo.length() == 0) {
+    _io.println(F("Not connected"));
+    return;
+  }
+  // send a DISC control frame to peer
+  std::vector<uint8_t> frame = AX25::encodeControlFrame(_connectedTo, _myCall.length()?_myCall:String("NOCALL"), AX25::CTL_DISC);
+  if (frame.size() <= (size_t)RADIOLIB_SX126X_MAX_PACKET_LENGTH) {
+    _radio.send(frame.data(), frame.size());
+  }
+  // clear L2 state
+  _l2state = L2_DISCONNECTED;
+  _connectedTo = String();
+  _io.println(F("*** DISCONNECTED"));
+}
+
+void LoRaTNCX::cmdRestart(const String &args)
+{
+  (void)args;
+  // re-open prefs and reload persisted settings
+  _prefs.end();
+  _prefs.begin("loratncx", false);
+  _myCall = _prefs.getString("mycall", "");
+  _monitorOn = _prefs.getBool("monitor", false);
+  _beaconMode = (BeaconMode)_prefs.getUInt("beacon_mode", BEACON_OFF);
+  _beaconInterval = _prefs.getUInt("beacon_interval", 0);
+  _beaconText = _prefs.getString("beacon_text", "");
+  // reload unproto
+  _unproto.clear();
+  String up = _prefs.getString("unproto", "");
+  if (up.length()) {
+    int start = 0;
+    while (start < (int)up.length()) {
+      int comma = up.indexOf(',', start);
+      String part;
+      if (comma == -1) { part = up.substring(start); start = up.length(); }
+      else { part = up.substring(start, comma); start = comma + 1; }
+      part.trim(); if (part.length()) _unproto.push_back(part);
+      if (_unproto.size() >= UNPROTO_MAX) break;
+    }
+  }
+  // reload retry
+  _retry = (uint8_t)_prefs.getUInt("retry", 10);
+  // reload frack
+  _frack = (uint8_t)_prefs.getUInt("frack", 8);
+  _io.println(F("OK RESTART"));
+}
+
+void LoRaTNCX::cmdReset(const String &args)
+{
+  (void)args;
+  // clear persisted preferences
+  _prefs.clear();
+  // write defaults explicitly
+  _prefs.putString("mycall", "");
+  _prefs.putBool("monitor", false);
+  _prefs.putUInt("beacon_mode", (uint32_t)BEACON_OFF);
+  _prefs.putUInt("beacon_interval", 0);
+  _prefs.putString("beacon_text", "");
+  _prefs.putString("unproto", "");
+  _prefs.putUInt("retry", 10);
+  _prefs.putUInt("frack", 8);
+  // apply to RAM
+  _myCall = String();
+  _monitorOn = false;
+  _beaconMode = BEACON_OFF;
+  _beaconInterval = 0;
+  _beaconText = String();
+  _unproto.clear();
+  _retry = 10;
+  _io.println(F("OK RESET"));
+}
+
+void LoRaTNCX::cmdRetry(const String &args)
+{
+  String s = args; s.trim();
+  if (s.length() == 0) {
+    _io.printf("RETRY %u\r\n", (unsigned)_retry);
+    return;
+  }
+  int v = s.toInt();
+  if (v < 0 || v > 255) { _io.println(F("ERR invalid retry value")); return; }
+  _retry = (uint8_t)v;
+  _prefs.putUInt("retry", (uint32_t)_retry);
+  _io.printf("OK RETRY %u\r\n", (unsigned)_retry);
+}
+
+void LoRaTNCX::cmdFrack(const String &args)
+{
+  String s = args; s.trim();
+  if (s.length() == 0) {
+    _io.printf("FRACK %u\r\n", (unsigned)_frack);
+    return;
+  }
+  int v = s.toInt();
+  if (v < 0 || v > 255) { _io.println(F("ERR invalid FRACK value")); return; }
+  _frack = (uint8_t)v;
+  _prefs.putUInt("frack", (uint32_t)_frack);
+  _io.printf("OK FRACK %u\r\n", (unsigned)_frack);
 }

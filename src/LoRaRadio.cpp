@@ -134,14 +134,28 @@ int LoRaRadio::setSpreadingFactor(int sf)
 {
   if (!_radio)
     return -1;
-  return _radio->setSpreadingFactor(sf);
+  int r = _radio->setSpreadingFactor(sf);
+  if (r == RADIOLIB_ERR_NONE) _spreadingFactor = sf;
+  return r;
 }
 
 int LoRaRadio::setBandwidth(long bw)
 {
   if (!_radio)
     return -1;
-  return _radio->setBandwidth(bw);
+  int r = _radio->setBandwidth(bw);
+  if (r == RADIOLIB_ERR_NONE) _bandwidth = bw;
+  return r;
+}
+
+int LoRaRadio::getSpreadingFactor() const
+{
+  return _spreadingFactor;
+}
+
+long LoRaRadio::getBandwidth() const
+{
+  return _bandwidth;
 }
 
 int LoRaRadio::send(const uint8_t *buf, size_t len, unsigned long timeout)
@@ -166,6 +180,11 @@ int LoRaRadio::send(const uint8_t *buf, size_t len, unsigned long timeout)
   }
 
   // send packet (blocking)
+  // Debug: print outgoing packet hex for troubleshooting
+  Serial.printf("[LoRaRadio] TX len=%u data= ", (unsigned)len);
+  for (size_t i = 0; i < len; i++) Serial.printf("%02X", buf[i]);
+  Serial.println();
+
   int16_t result = _radio->transmit(buf, len);
 
   // disable PA pins after transmit
@@ -322,6 +341,10 @@ void LoRaRadio::pollInternal()
         }
         payload = String((const char *)(buf + ai.header_len), payload_len);
       }
+      // Debug: print control field when present
+      if (ai.hasControl) {
+        Serial.printf("[LoRaRadio] control=0x%02X\r\n", ai.control);
+      }
     }
     else
     {
@@ -331,7 +354,7 @@ void LoRaRadio::pollInternal()
 
     if (_rxHandler)
     {
-      _rxHandler(from, payload, rssi);
+      _rxHandler(buf, plen, ai, rssi);
     }
   }
 

@@ -48,13 +48,37 @@ private:
 
   // connect state
   String _connectedTo;
+  // retry parameter (number of retransmits before giving up). persisted
+  uint8_t _retry = 10;
+  // FRACK (frame ack timeout) in seconds
+  uint8_t _frack = 8; // default matches TNC doc
+  // simple AX.25 Level-2 state for a single stream
+  enum L2State {
+    L2_DISCONNECTED = 0,
+    L2_CONNECTING,
+    L2_CONNECTED
+  };
+  L2State _l2state = L2_DISCONNECTED;
+  // per-connection tries counter and last timer reference
+  uint8_t _tries = 0;
+  uint32_t _lastFrackMs = 0;
+  // Basic per-stream state (A..J) scaffold for future multi-connection support
+  struct StreamState {
+    L2State state = L2_DISCONNECTED;
+    String connectedTo;
+    uint8_t tries = 0;
+    uint32_t lastFrackMs = 0;
+  };
+  static const int STREAMS = 10;
+  StreamState _streams[STREAMS];
+  int _activeStream = 0; // 0 == A
   // beacon scheduling
   uint32_t _lastBeaconMs = 0;
 
   // add a received packet or heard station
   void addMHeard(const String &callsign);
-  // interface for external RX code to notify TNC of a received packet
-  void onPacketReceived(const String &from, const String &payload, int rssi = 0);
+  // interface for external RX code to notify TNC of a received packet (raw buffer + parsed AX.25 info)
+  void onPacketReceived(const uint8_t *buf, size_t len, const AX25::AddrInfo &ai, int rssi = 0);
 
   // command handlers
   void cmdHelp(const String &args);
@@ -64,4 +88,9 @@ private:
   void cmdPwr(const String &args);
   void cmdSend(const String &args);
   void cmdRadioInit(const String &args);
+  void cmdDisconne(const String &args);
+  void cmdRestart(const String &args);
+  void cmdReset(const String &args);
+  void cmdRetry(const String &args);
+  void cmdFrack(const String &args);
 };

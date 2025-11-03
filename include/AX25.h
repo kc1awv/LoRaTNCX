@@ -12,6 +12,9 @@ namespace AX25
     String dest;
     String src;
     uint8_t src_ssid = 0;
+    // control field info (if present)
+    bool hasControl = false;
+    uint8_t control = 0;
     size_t header_len = 0; // bytes consumed by address+control+pid
     bool ok = false;
   };
@@ -29,5 +32,18 @@ namespace AX25
   std::vector<uint8_t> encodeUIFrame(const String &dest, const String &src, const std::vector<uint8_t> &payload);
   // encode with digipeater path (addresses after src)
   std::vector<uint8_t> encodeUIFrame(const String &dest, const String &src, const std::vector<String> &digis, const std::vector<uint8_t> &payload);
+
+  // control frame encoding (addresses + control + FCS)
+  std::vector<uint8_t> encodeControlFrame(const String &dest, const String &src, uint8_t control);
+
+  // AX.25 control field constants (common values)
+  enum ControlField : uint8_t {
+    CTL_RR = 0x01,
+    CTL_RNR = 0x05,
+    CTL_REJ = 0x09,
+    CTL_SABM = 0x2F,
+    CTL_DISC = 0x43,
+    CTL_UA = 0x63
+  };
 
 } // namespace AX25

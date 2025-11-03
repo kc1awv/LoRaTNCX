@@ -78,10 +78,19 @@ namespace AX25
     info.src = decodeAddress(buf + 7);
     info.src_ssid = (buf[7 + 6] >> 1) & 0x0F;
 
-    // header length includes all address fields plus control (1) and PID (1) when present
+    // header length includes all address fields. Control/PID may follow.
     size_t hdr = fields * 7;
-    if (len >= hdr + 2)
-      hdr += 2; // control + PID
+    // If we have at least one more byte, that's the control field
+    if (len >= hdr + 1)
+    {
+      info.hasControl = true;
+      info.control = buf[hdr];
+      // if we have at least two more bytes, assume PID present as well
+      if (len >= hdr + 2)
+        hdr += 2; // control + PID
+      else
+        hdr += 1; // only control present
+    }
     info.header_len = hdr;
     info.ok = true;
     return info;
@@ -174,6 +183,28 @@ namespace AX25
     for (auto b : payload)
       out.push_back(b);
     // compute FCS (CRC-16-CCITT) and append low byte then high byte
+    uint16_t crc = crc16_ccitt(out.data(), out.size());
+    out.push_back((uint8_t)(crc & 0xFF));
+    out.push_back((uint8_t)((crc >> 8) & 0xFF));
+    return out;
+  }
+
+  std::vector<uint8_t> encodeControlFrame(const String &dest, const String &src, uint8_t control)
+  {
+    std::vector<uint8_t> out;
+    out.reserve(2 * 7 + 1 + 2);
+    uint8_t a[7];
+    // dest (not last)
+    packAddressField(dest, a, false);
+    for (int i = 0; i < 7; i++)
+      out.push_back(a[i]);
+    // src (last)
+    packAddressField(src, a, true);
+    for (int i = 0; i < 7; i++)
+      out.push_back(a[i]);
+    // control only (no PID)
+    out.push_back(control);
+    // compute FCS and append
     uint16_t crc = crc16_ccitt(out.data(), out.size());
     out.push_back((uint8_t)(crc & 0xFF));
     out.push_back((uint8_t)((crc >> 8) & 0xFF));

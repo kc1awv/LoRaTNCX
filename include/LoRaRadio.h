@@ -9,6 +9,7 @@
 #include <Arduino.h>
 #include <RadioLib.h>
 #include <functional>
+#include "AX25.h"
 
 class LoRaRadio
 {
@@ -31,6 +32,10 @@ public:
   int setSpreadingFactor(int sf);
   int setBandwidth(long bw);
 
+  // getters for modem params
+  int getSpreadingFactor() const;
+  long getBandwidth() const;
+
   // getters
   float getFrequency() const;
   int8_t getTxPower() const;
@@ -41,7 +46,8 @@ public:
   int send(const uint8_t *buf, size_t len, unsigned long timeout = 5000);
 
   // Rx support: set a receive handler (from, payload, rssi)
-  using RxHandler = std::function<void(const String &from, const String &payload, int rssi)>;
+  // Rx handler now provides the raw frame buffer, its length, parsed AX.25 address info and RSSI
+  using RxHandler = std::function<void(const uint8_t *buf, size_t len, const AX25::AddrInfo &ai, int rssi)>;
   void setRxHandler(RxHandler h);
 
   // Start/stop the RX task (runs in separate FreeRTOS task)
@@ -66,6 +72,8 @@ private:
   // store some current settings
   float _freq = 915.0;
   int8_t _txPower = 0;
+  int _spreadingFactor = 7;
+  long _bandwidth = 125;
   RxHandler _rxHandler = nullptr;
 
   // FreeRTOS task handle for RX polling
