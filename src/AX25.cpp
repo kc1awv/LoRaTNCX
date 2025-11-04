@@ -78,6 +78,27 @@ namespace AX25
     info.src = decodeAddress(buf + 7);
     info.src_ssid = (buf[7 + 6] >> 1) & 0x0F;
 
+    // Any fields beyond src are digipeaters
+    for (int i = 2; i < fields; i++)
+    {
+      size_t offset = i * 7;
+      info.digis.push_back(decodeAddress(buf + offset));
+      // Check if this digi has been used (H bit, bit 7 of addr[6])
+      bool used = (buf[offset + 6] & 0x80) != 0;
+      info.digi_used.push_back(used);
+    }
+
+    // Find next unused digi
+    info.next_digi_index = -1;
+    for (size_t i = 0; i < info.digi_used.size(); i++)
+    {
+      if (!info.digi_used[i])
+      {
+        info.next_digi_index = (int)i;
+        break;
+      }
+    }
+
     // header length includes all address fields. Control/PID may follow.
     size_t hdr = fields * 7;
     // If we have at least one more byte, that's the control field
@@ -94,6 +115,58 @@ namespace AX25
     info.header_len = hdr;
     info.ok = true;
     return info;
+  }
+
+  bool validateFCS(const uint8_t *buf, size_t len)
+  {
+    // Need at least 2 bytes for FCS
+    if (len < 2)
+      return false;
+
+    // Calculate CRC over all data except the last 2 bytes (the FCS itself)
+    uint16_t calculated = crc16_ccitt(buf, len - 2);
+    
+    // Extract the FCS from the packet (last 2 bytes, little-endian)
+    uint16_t received = ((uint16_t)buf[len - 2]) | (((uint16_t)buf[len - 1]) << 8);
+    
+    return calculated == received;
+  }
+
+  bool isValidPacket(const uint8_t *buf, size_t len, bool checkFCS)
+  {
+    // Minimum AX.25 frame: dest(7) + src(7) + control(1) + FCS(2) = 17 bytes
+    // But we'll be lenient and just check for dest + src = 14 bytes
+    if (len < 14)
+      return false;
+
+    // Check for maximum packet size - LoRa hardware limit is 255 bytes (RADIOLIB_SX126X_MAX_PACKET_LENGTH)
+    if (len > 255)
+      return false;
+
+    // Validate FCS if requested
+    if (checkFCS && !validateFCS(buf, len))
+      return false;
+
+    // Check that at least one address field has the extension bit set (indicates last address)
+    bool foundExtension = false;
+    size_t pos = 0;
+    int fieldCount = 0;
+    while (pos + 7 <= len && fieldCount < 10)
+    {
+      uint8_t ssidByte = buf[pos + 6];
+      fieldCount++;
+      pos += 7;
+      if (ssidByte & 0x01)
+      {
+        foundExtension = true;
+        break;
+      }
+    }
+
+    if (!foundExtension || fieldCount < 2)
+      return false; // Need at least dest + src with proper extension bit
+
+    return true;
   }
 
   // pack callsign ("CALL" or "CALL-1") into 7-byte AX.25 address field
@@ -208,6 +281,69 @@ namespace AX25
     uint16_t crc = crc16_ccitt(out.data(), out.size());
     out.push_back((uint8_t)(crc & 0xFF));
     out.push_back((uint8_t)((crc >> 8) & 0xFF));
+    return out;
+  }
+
+  bool shouldDigipeat(const AddrInfo &info, const String &myCall, const String &myAlias)
+  {
+    // Can only digipeat if there's a next unused digi
+    if (info.next_digi_index < 0 || info.next_digi_index >= (int)info.digis.size())
+      return false;
+
+    // Get the next digi callsign
+    String nextDigi = info.digis[info.next_digi_index];
+    
+    // Match against our callsign or alias (case-insensitive)
+    nextDigi.toUpperCase();
+    String myCallUpper = myCall;
+    myCallUpper.toUpperCase();
+    String myAliasUpper = myAlias;
+    myAliasUpper.toUpperCase();
+
+    if (myCallUpper.length() > 0 && nextDigi == myCallUpper)
+      return true;
+    if (myAliasUpper.length() > 0 && nextDigi == myAliasUpper)
+      return true;
+
+    return false;
+  }
+
+  std::vector<uint8_t> digipeatPacket(const uint8_t *buf, size_t len, const AddrInfo &info)
+  {
+    std::vector<uint8_t> out;
+    
+    // Validate
+    if (!info.ok || info.next_digi_index < 0)
+      return out; // empty = error
+
+    // Calculate total address fields (dest + src + digis)
+    int totalAddrs = 2 + (int)info.digis.size();
+    size_t addrBytes = totalAddrs * 7;
+    
+    if (len < addrBytes)
+      return out; // invalid packet
+
+    // Copy entire packet to output buffer
+    out.resize(len);
+    for (size_t i = 0; i < len; i++)
+      out[i] = buf[i];
+
+    // Mark the next_digi as used by setting H bit (bit 7) in its SSID byte
+    size_t digiOffset = (2 + info.next_digi_index) * 7;
+    if (digiOffset + 6 < addrBytes)
+    {
+      out[digiOffset + 6] |= 0x80; // set H bit
+    }
+
+    // Recalculate FCS for the modified packet
+    // FCS covers everything except the last 2 bytes (the FCS itself)
+    if (len >= 2)
+    {
+      uint16_t crc = crc16_ccitt(out.data(), len - 2);
+      out[len - 2] = (uint8_t)(crc & 0xFF);
+      out[len - 1] = (uint8_t)((crc >> 8) & 0xFF);
+    }
+
     return out;
   }
 

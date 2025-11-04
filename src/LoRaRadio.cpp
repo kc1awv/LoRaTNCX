@@ -66,10 +66,11 @@ bool LoRaRadio::begin(float freq)
     delay(5);
   }
 
-  // try to initialize
+  // try to initialize radio
   int16_t state = _radio->begin(_freq);
   if (state != RADIOLIB_ERR_NONE)
   {
+    Serial.printf("[LoRaRadio] ERROR: Radio initialization failed, code: %d\r\n", state);
     delete _radio;
     _radio = nullptr;
     delete _mod;
@@ -77,27 +78,68 @@ bool LoRaRadio::begin(float freq)
     return false;
   }
 
-  // default radio settings - these can be adjusted via setters
-  _radio->setFrequency(915.0);
-  _radio->setBandwidth(125.0);
-  _radio->setSpreadingFactor(7);
-  _radio->setCodingRate(5);
-  _radio->setOutputPower(14);
+  // Configure default radio settings
+  // These can be adjusted via setters after begin() returns
+  state = _radio->setFrequency(915.0);
+  if (state != RADIOLIB_ERR_NONE)
+  {
+    Serial.printf("[LoRaRadio] ERROR: Failed to set frequency, code: %d\r\n", state);
+    goto cleanup;
+  }
+  _freq = 915.0;
+
+  state = _radio->setBandwidth(125.0);
+  if (state != RADIOLIB_ERR_NONE)
+  {
+    Serial.printf("[LoRaRadio] ERROR: Failed to set bandwidth, code: %d\r\n", state);
+    goto cleanup;
+  }
+  _bandwidth = 125;
+
+  state = _radio->setSpreadingFactor(7);
+  if (state != RADIOLIB_ERR_NONE)
+  {
+    Serial.printf("[LoRaRadio] ERROR: Failed to set spreading factor, code: %d\r\n", state);
+    goto cleanup;
+  }
+  _spreadingFactor = 7;
+
+  state = _radio->setCodingRate(5);
+  if (state != RADIOLIB_ERR_NONE)
+  {
+    Serial.printf("[LoRaRadio] ERROR: Failed to set coding rate, code: %d\r\n", state);
+    goto cleanup;
+  }
+  _codingRate = 5;
+
+  state = _radio->setOutputPower(14);
+  if (state != RADIOLIB_ERR_NONE)
+  {
+    Serial.printf("[LoRaRadio] ERROR: Failed to set output power, code: %d\r\n", state);
+    goto cleanup;
+  }
   _txPower = 14;
 
-  // Start in receive mode (proven method from previous implementation)
-  int16_t rxState = _radio->startReceive();
-  if (rxState != RADIOLIB_ERR_NONE)
+  // Start in receive mode
+  state = _radio->startReceive();
+  if (state != RADIOLIB_ERR_NONE)
   {
-    Serial.print("Failed to start receive mode, error: ");
-    Serial.println(rxState);
-    return false;
+    Serial.printf("[LoRaRadio] ERROR: Failed to start receive mode, code: %d\r\n", state);
+    goto cleanup;
   }
 
   // Start the RX polling task on separate core
   startRxTask();
 
   return true;
+
+cleanup:
+  // Cleanup on error
+  delete _radio;
+  _radio = nullptr;
+  delete _mod;
+  _mod = nullptr;
+  return false;
 }
 
 int LoRaRadio::setTxPower(int8_t power)
@@ -130,6 +172,21 @@ int8_t LoRaRadio::getTxPower() const
   return _txPower;
 }
 
+int LoRaRadio::getLastRSSI() const
+{
+  return _lastRSSI;
+}
+
+float LoRaRadio::getLastSNR() const
+{
+  return _lastSNR;
+}
+
+int LoRaRadio::getLastFreqError() const
+{
+  return _lastFreqError;
+}
+
 int LoRaRadio::setSpreadingFactor(int sf)
 {
   if (!_radio)
@@ -148,6 +205,15 @@ int LoRaRadio::setBandwidth(long bw)
   return r;
 }
 
+int LoRaRadio::setCodingRate(int cr)
+{
+  if (!_radio)
+    return -1;
+  int r = _radio->setCodingRate(cr);
+  if (r == RADIOLIB_ERR_NONE) _codingRate = cr;
+  return r;
+}
+
 int LoRaRadio::getSpreadingFactor() const
 {
   return _spreadingFactor;
@@ -156,6 +222,11 @@ int LoRaRadio::getSpreadingFactor() const
 long LoRaRadio::getBandwidth() const
 {
   return _bandwidth;
+}
+
+int LoRaRadio::getCodingRate() const
+{
+  return _codingRate;
 }
 
 int LoRaRadio::send(const uint8_t *buf, size_t len, unsigned long timeout)
@@ -180,11 +251,6 @@ int LoRaRadio::send(const uint8_t *buf, size_t len, unsigned long timeout)
   }
 
   // send packet (blocking)
-  // Debug: print outgoing packet hex for troubleshooting
-  Serial.printf("[LoRaRadio] TX len=%u data= ", (unsigned)len);
-  for (size_t i = 0; i < len; i++) Serial.printf("%02X", buf[i]);
-  Serial.println();
-
   int16_t result = _radio->transmit(buf, len);
 
   // disable PA pins after transmit
@@ -251,12 +317,6 @@ void LoRaRadio::stopRxTask()
   }
 }
 
-void LoRaRadio::poll()
-{
-  // Deprecated: for backward compatibility, just call internal poll
-  pollInternal();
-}
-
 void LoRaRadio::pollInternal()
 {
   if (!_radio)
@@ -301,31 +361,21 @@ void LoRaRadio::pollInternal()
 
   if (plen > 0 && plen <= buflen)
   {
-    int rssi = (int)_radio->getRSSI();
+    // Capture packet statistics
+    _lastRSSI = (int)_radio->getRSSI();
+    _lastSNR = _radio->getSNR();
+    _lastFreqError = (int)_radio->getFrequencyError();
+    
+    int rssi = _lastRSSI;
     String from = String("");
     String payload = String("");
 
+    // Validate packet format and FCS
+    bool fcsValid = AX25::validateFCS(buf, plen);
+    bool packetValid = AX25::isValidPacket(buf, plen, true);
+
     // try to parse AX.25 addresses to extract source callsign and payload
     AX25::AddrInfo ai = AX25::parseAddresses(buf, plen);
-
-    // Debug: print received packet summary to Serial to aid troubleshooting
-    {
-      Serial.printf("[LoRaRadio] RX len=%u rssi=%d parse_ok=%d\r\n", (unsigned)plen, rssi, ai.ok ? 1 : 0);
-      // print parsed addresses when available
-      if (ai.ok)
-      {
-        Serial.printf("[LoRaRadio] dest=%s src=%s hdr_len=%u\r\n", ai.dest.c_str(), ai.src.c_str(), (unsigned)ai.header_len);
-      }
-      // hex dump first up to 64 bytes
-      Serial.print("[LoRaRadio] data= ");
-      for (size_t i = 0; i < plen && i < 64; i++)
-      {
-        Serial.printf("%02X", buf[i]);
-        if (i + 1 < plen && (i + 1) % 16 == 0)
-          Serial.print(' ');
-      }
-      Serial.println();
-    }
 
     if (ai.ok)
     {
@@ -340,10 +390,6 @@ void LoRaRadio::pollInternal()
           payload_len -= 2;
         }
         payload = String((const char *)(buf + ai.header_len), payload_len);
-      }
-      // Debug: print control field when present
-      if (ai.hasControl) {
-        Serial.printf("[LoRaRadio] control=0x%02X\r\n", ai.control);
       }
     }
     else

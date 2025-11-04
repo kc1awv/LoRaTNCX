@@ -31,14 +31,21 @@ public:
   int setFrequency(float freq);
   int setSpreadingFactor(int sf);
   int setBandwidth(long bw);
+  int setCodingRate(int cr);
 
   // getters for modem params
   int getSpreadingFactor() const;
   long getBandwidth() const;
+  int getCodingRate() const;
 
   // getters
   float getFrequency() const;
   int8_t getTxPower() const;
+  
+  // Get statistics from last received packet
+  int getLastRSSI() const;
+  float getLastSNR() const;
+  int getLastFreqError() const;
 
   // Simple blocking send. Returns 0 on success, non-zero error code on failure.
   // max payload enforced to RADIOLIB_SX126X_MAX_PACKET_LENGTH (usually 255)
@@ -53,9 +60,6 @@ public:
   // Start/stop the RX task (runs in separate FreeRTOS task)
   void startRxTask();
   void stopRxTask();
-
-  // call regularly from loop() to poll for incoming packets (deprecated - use startRxTask() instead)
-  void poll();
 
 private:
   // Static task function for FreeRTOS
@@ -74,7 +78,13 @@ private:
   int8_t _txPower = 0;
   int _spreadingFactor = 7;
   long _bandwidth = 125;
+  int _codingRate = 5;
   RxHandler _rxHandler = nullptr;
+
+  // Last packet statistics
+  int _lastRSSI = 0;
+  float _lastSNR = 0.0;
+  int _lastFreqError = 0;
 
   // FreeRTOS task handle for RX polling
   TaskHandle_t _rxTaskHandle = nullptr;
