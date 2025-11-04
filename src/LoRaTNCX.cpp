@@ -9,7 +9,7 @@
 // ============================================================================
 
 LoRaTNCX::LoRaTNCX(Stream &io, LoRaRadio &radio)
-    : _io(io), _radio(radio), _cmd(io, radio)
+    : _io(io), _radio(radio), _cmd(io)
 {
 }
 
@@ -239,7 +239,7 @@ void LoRaTNCX::loadSettings()
         break;
     }
   }
-  
+
   // Load EPATH
   String ep = _prefs.getString("epath", "");
   _protocol.epath.clear();
@@ -256,6 +256,9 @@ void LoRaTNCX::loadSettings()
         _protocol.epath.push_back(part);
     }
   }
+
+  // Load KISS
+  _kissEnabled = _prefs.getBool("kiss", false);
 }
 
 void LoRaTNCX::saveSettings()
@@ -311,7 +314,7 @@ void LoRaTNCX::saveSettings()
     stored += _unproto[i];
   }
   _prefs.putString("unproto", stored);
-  
+
   // Save EPATH
   String epathStored = "";
   for (size_t i = 0; i < _protocol.epath.size(); i++)
@@ -321,6 +324,9 @@ void LoRaTNCX::saveSettings()
     epathStored += _protocol.epath[i];
   }
   _prefs.putString("epath", epathStored);
+
+  // Save KISS
+  _prefs.putBool("kiss", _kissEnabled);
 }
 
 // ============================================================================
@@ -351,6 +357,15 @@ void LoRaTNCX::addMHeard(const String &callsign)
       _mheard[i - 1] = _mheard[i];
     }
     _mheard[MHEARD_MAX - 1] = callsign;
+  }
+}
+
+void LoRaTNCX::onKissFrame(const uint8_t *data, size_t len)
+{
+  // Received a KISS data frame - transmit it over LoRa
+  if (len > 0 && len <= (size_t)RADIOLIB_SX126X_MAX_PACKET_LENGTH)
+  {
+    _radio.send(data, len);
   }
 }
 
@@ -428,7 +443,7 @@ void LoRaTNCX::onPacketReceived(const uint8_t *buf, size_t len, const AX25::Addr
         if (ai.ok)
         {
           _io.printf("[%s", ai.src.c_str());
-          
+
           // Display digipeat path if MRPT is ON and path exists
           if (_monitor.mrpt && !ai.digis.empty())
           {
@@ -443,7 +458,7 @@ void LoRaTNCX::onPacketReceived(const uint8_t *buf, size_t len, const AX25::Addr
               }
             }
           }
-          
+
           _io.print("] ");
         }
 
@@ -470,18 +485,18 @@ void LoRaTNCX::onPacketReceived(const uint8_t *buf, size_t len, const AX25::Addr
   {
     // Build modified packet with H bit set for our digi
     std::vector<uint8_t> newPacket = AX25::digipeatPacket(buf, len, ai);
-    
+
     if (!newPacket.empty() && newPacket.size() <= (size_t)RADIOLIB_SX126X_MAX_PACKET_LENGTH)
     {
       // Transmit the digipeated packet
       _radio.send(newPacket.data(), newPacket.size());
-      
+
       // Start/reset HID timer
       if (_digi.hid)
       {
         _digi.lastHidMs = millis();
       }
-      
+
       // Log the digipeat action
       if (_monitor.enabled)
       {
@@ -493,8 +508,8 @@ void LoRaTNCX::onPacketReceived(const uint8_t *buf, size_t len, const AX25::Addr
           unsigned long hours = minutes / 60;
           _io.printf("[%02lu:%02lu:%02lu] ", hours % 24, minutes % 60, seconds % 60);
         }
-        _io.printf("*** DIGIPEATED from %s via %s\r\n", 
-                   ai.src.c_str(), 
+        _io.printf("*** DIGIPEATED from %s via %s\r\n",
+                   ai.src.c_str(),
                    ai.digis[ai.next_digi_index].c_str());
       }
     }
@@ -588,6 +603,12 @@ void LoRaTNCX::onPacketReceived(const uint8_t *buf, size_t len, const AX25::Addr
       maybeSendConnectText();
     }
   }
+
+  // Forward packet to KISS mode if active
+  if (_cmd.getMode() == CommandProcessor::MODE_KISS)
+  {
+    _cmd.sendKissFrame(buf, len);
+  }
 }
 
 void LoRaTNCX::maybeSendConnectText()
@@ -636,7 +657,7 @@ void LoRaTNCX::sendId()
   // Build ID packet with callsign
   String idText = String("ID ") + (_station.myCall.length() ? _station.myCall : String("NOCALL"));
   std::vector<uint8_t> payload(idText.begin(), idText.end());
-  
+
   // Send as UI frame to ID destination
   std::vector<uint8_t> frame = AX25::encodeUIFrame(
       String("ID"),
@@ -953,6 +974,15 @@ void LoRaTNCX::cmdDisplay(const String &args)
     _io.printf("LTEXT:    %s\r\n", _location.ltext.c_str());
   }
   _io.printf("LTMON:    %u seconds\r\n", _location.ltmon);
+
+  // KISS mode
+  _io.println();
+  _io.printf("KISS:     %s\r\n", _kissEnabled ? "ON" : "OFF");
+  if (_kissEnabled)
+  {
+    _io.println("  Use RESTART to enter KISS mode");
+    _io.println("  Exit with ESC (0x1B) or CMD_RETURN (0xFF)");
+  }
 }
 
 void LoRaTNCX::cmdEcho(const String &args)
@@ -2168,7 +2198,7 @@ void LoRaTNCX::cmdEPath(const String &args)
   String s = args;
   s.trim();
   s.toUpperCase();
-  
+
   if (s.length() == 0)
   {
     // Display current EPATH
@@ -2321,7 +2351,7 @@ void LoRaTNCX::cmdDayTime(const String &args)
 {
   String s = args;
   s.trim();
-  
+
   if (s.length() == 0)
   {
     // Display current date/time if set
@@ -2340,7 +2370,7 @@ void LoRaTNCX::cmdDayTime(const String &args)
         String hh = _datetime.value.substring(6, 8);
         String min = _datetime.value.substring(8, 10);
         String ss = _datetime.value.substring(10, 12);
-        
+
         if (_datetime.dayusa)
         {
           _io.printf("DAYTIME %s/%s/%s %s:%s:%s\r\n", mm.c_str(), dd.c_str(), yy.c_str(), hh.c_str(), min.c_str(), ss.c_str());
@@ -2383,14 +2413,14 @@ void LoRaTNCX::cmdDayTime(const String &args)
 
   _datetime.value = s;
   saveSettings();
-  
+
   String yy = _datetime.value.substring(0, 2);
   String mm = _datetime.value.substring(2, 4);
   String dd = _datetime.value.substring(4, 6);
   String hh = _datetime.value.substring(6, 8);
   String min = _datetime.value.substring(8, 10);
   String ss = _datetime.value.substring(10, 12);
-  
+
   if (_datetime.dayusa)
   {
     _io.printf("OK DAYTIME set to %s/%s/%s %s:%s:%s\r\n", mm.c_str(), dd.c_str(), yy.c_str(), hh.c_str(), min.c_str(), ss.c_str());
@@ -2410,7 +2440,7 @@ void LoRaTNCX::cmdLocation(const String &args)
   String s = args;
   s.trim();
   s.toUpperCase();
-  
+
   if (s.length() == 0)
   {
     // Display current setting
@@ -2440,7 +2470,7 @@ void LoRaTNCX::cmdLocation(const String &args)
   String mode = s.substring(0, spaceIdx);
   String valStr = s.substring(spaceIdx + 1);
   valStr.trim();
-  
+
   int val = valStr.toInt();
   if (val < 0 || val > 250)
   {
@@ -2483,7 +2513,7 @@ void LoRaTNCX::cmdLPath(const String &args)
   String s = args;
   s.trim();
   s.toUpperCase();
-  
+
   if (s.length() == 0)
   {
     _io.printf("LPATH %s\r\n", _location.lpath.c_str());
@@ -2499,7 +2529,7 @@ void LoRaTNCX::cmdLText(const String &args)
 {
   String s = args;
   s.trim();
-  
+
   if (s.length() == 0)
   {
     if (_location.ltext.length() == 0)
@@ -2538,7 +2568,7 @@ void LoRaTNCX::cmdLtMon(const String &args)
 {
   String s = args;
   s.trim();
-  
+
   if (s.length() == 0)
   {
     _io.printf("LTMON %u seconds\r\n", _location.ltmon);
@@ -2555,6 +2585,42 @@ void LoRaTNCX::cmdLtMon(const String &args)
   _location.ltmon = (uint8_t)val;
   saveSettings();
   _io.printf("OK LTMON %u seconds\r\n", _location.ltmon);
+}
+
+// ============================================================================
+// COMMAND HANDLERS - KISS Mode
+// ============================================================================
+
+void LoRaTNCX::cmdKiss(const String &args)
+{
+  String s = args;
+  s.trim();
+  s.toUpperCase();
+
+  if (s.length() == 0)
+  {
+    _io.printf("KISS %s\r\n", _kissEnabled ? "ON" : "OFF");
+    _io.println(F("  Use RESTART to enter/exit KISS mode when enabled"));
+    return;
+  }
+
+  if (s == "ON")
+  {
+    _kissEnabled = true;
+    _prefs.putBool("kiss", true);
+    _io.println(F("OK KISS ON"));
+    _io.println(F("  Use RESTART to enter KISS mode"));
+  }
+  else if (s == "OFF")
+  {
+    _kissEnabled = false;
+    _prefs.putBool("kiss", false);
+    _io.println(F("OK KISS OFF"));
+  }
+  else
+  {
+    _io.println(F("ERR KISS must be ON or OFF"));
+  }
 }
 
 // ============================================================================
@@ -2583,6 +2649,37 @@ void LoRaTNCX::cmdSend(const String &args)
 void LoRaTNCX::cmdRestart(const String &args)
 {
   (void)args;
+
+  // Check if we should enter KISS mode
+  if (_kissEnabled)
+  {
+    _io.println(F("Entering KISS mode..."));
+    _io.println(F("Send ESC (0x1B) or CMD_RETURN (0xFF) to exit"));
+    _io.flush();
+
+    // Enter KISS mode
+    _cmd.setMode(CommandProcessor::MODE_KISS);
+
+    // Set up KISS frame handler
+    _cmd.setKissFrameHandler([this](const uint8_t *data, size_t len)
+                             { this->onKissFrame(data, len); });
+
+    // Poll until exit requested
+    while (!_cmd.isKissExitRequested())
+    {
+      _cmd.poll();
+      delay(1); // Small delay to avoid busy-wait
+    }
+
+    // Exit KISS mode
+    _cmd.setMode(CommandProcessor::MODE_COMMAND);
+    _cmd.clearKissExit();
+    _io.println();
+    _io.println(F("Exited KISS mode"));
+    return;
+  }
+
+  // Normal restart without KISS mode
   _prefs.end();
   _prefs.begin("loratncx", false);
   loadSettings();
@@ -2759,6 +2856,9 @@ void LoRaTNCX::registerAllCommands()
   REG_CMD("LT", cmdLText);
   REG_CMD("LTMON", cmdLtMon);
   REG_CMD("LTM", cmdLtMon);
+
+  // KISS mode
+  REG_CMD("KISS", cmdKiss);
 
   // Utility
   REG_CMD("SEND", cmdSend);

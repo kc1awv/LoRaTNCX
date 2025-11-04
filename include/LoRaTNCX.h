@@ -138,6 +138,9 @@ private:
     uint32_t lastLtmonMs = 0;    // last LTEXT display time
   } _location;
 
+  // KISS mode control
+  bool _kissEnabled = false;     // when ON, RESTART enters KISS mode
+
   // ============================================================================
   // RUNTIME STATE
   // ============================================================================
@@ -194,6 +197,9 @@ private:
   // Settings persistence
   void loadSettings();
   void saveSettings();
+  
+  // KISS mode handling
+  void onKissFrame(const uint8_t *data, size_t len);
   
   // Heard list management
   void addMHeard(const String &callsign);
@@ -308,6 +314,11 @@ private:
   void cmdLPath(const String &args);
   void cmdLText(const String &args);
   void cmdLtMon(const String &args);
+  
+  // ============================================================================
+  // COMMAND HANDLERS - KISS Mode
+  // ============================================================================
+  void cmdKiss(const String &args);
   
   // ============================================================================
   // COMMAND HANDLERS - Utility

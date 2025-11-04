@@ -192,7 +192,8 @@ int LoRaRadio::setSpreadingFactor(int sf)
   if (!_radio)
     return -1;
   int r = _radio->setSpreadingFactor(sf);
-  if (r == RADIOLIB_ERR_NONE) _spreadingFactor = sf;
+  if (r == RADIOLIB_ERR_NONE)
+    _spreadingFactor = sf;
   return r;
 }
 
@@ -201,7 +202,8 @@ int LoRaRadio::setBandwidth(long bw)
   if (!_radio)
     return -1;
   int r = _radio->setBandwidth(bw);
-  if (r == RADIOLIB_ERR_NONE) _bandwidth = bw;
+  if (r == RADIOLIB_ERR_NONE)
+    _bandwidth = bw;
   return r;
 }
 
@@ -210,7 +212,8 @@ int LoRaRadio::setCodingRate(int cr)
   if (!_radio)
     return -1;
   int r = _radio->setCodingRate(cr);
-  if (r == RADIOLIB_ERR_NONE) _codingRate = cr;
+  if (r == RADIOLIB_ERR_NONE)
+    _codingRate = cr;
   return r;
 }
 
@@ -365,7 +368,7 @@ void LoRaRadio::pollInternal()
     _lastRSSI = (int)_radio->getRSSI();
     _lastSNR = _radio->getSNR();
     _lastFreqError = (int)_radio->getFrequencyError();
-    
+
     int rssi = _lastRSSI;
     String from = String("");
     String payload = String("");

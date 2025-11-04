@@ -125,10 +125,10 @@ namespace AX25
 
     // Calculate CRC over all data except the last 2 bytes (the FCS itself)
     uint16_t calculated = crc16_ccitt(buf, len - 2);
-    
+
     // Extract the FCS from the packet (last 2 bytes, little-endian)
     uint16_t received = ((uint16_t)buf[len - 2]) | (((uint16_t)buf[len - 1]) << 8);
-    
+
     return calculated == received;
   }
 
@@ -292,7 +292,7 @@ namespace AX25
 
     // Get the next digi callsign
     String nextDigi = info.digis[info.next_digi_index];
-    
+
     // Match against our callsign or alias (case-insensitive)
     nextDigi.toUpperCase();
     String myCallUpper = myCall;
@@ -311,7 +311,7 @@ namespace AX25
   std::vector<uint8_t> digipeatPacket(const uint8_t *buf, size_t len, const AddrInfo &info)
   {
     std::vector<uint8_t> out;
-    
+
     // Validate
     if (!info.ok || info.next_digi_index < 0)
       return out; // empty = error
@@ -319,7 +319,7 @@ namespace AX25
     // Calculate total address fields (dest + src + digis)
     int totalAddrs = 2 + (int)info.digis.size();
     size_t addrBytes = totalAddrs * 7;
-    
+
     if (len < addrBytes)
       return out; // invalid packet
 

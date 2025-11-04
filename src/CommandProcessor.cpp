@@ -1,9 +1,8 @@
 // CommandProcessor.cpp
 #include "CommandProcessor.h"
-#include "LoRaRadio.h"
 
-CommandProcessor::CommandProcessor(Stream &io, LoRaRadio &radio)
-    : _io(io), _radio(radio)
+CommandProcessor::CommandProcessor(Stream &io)
+    : _io(io), _kiss(io)
 {
 }
 
@@ -144,8 +143,10 @@ void CommandProcessor::poll()
       {
         if (_line.length() > 0)
         {
-          if (_localEcho) _io.print("\r\n");
-          if (_converseHandler) _converseHandler(_line, true);
+          if (_localEcho)
+            _io.print("\r\n");
+          if (_converseHandler)
+            _converseHandler(_line, true);
           _line = "";
         }
         continue;
@@ -160,7 +161,8 @@ void CommandProcessor::poll()
         }
         if (_localEcho)
           _io.print("\r\n");
-        if (_converseHandler) _converseHandler(_line, true);
+        if (_converseHandler)
+          _converseHandler(_line, true);
         _line = "";
         continue;
       }
@@ -173,6 +175,13 @@ void CommandProcessor::poll()
       {
         _line = _line.substring(_line.length() - 512);
       }
+      continue;
+    }
+
+    // KISS: binary frame protocol
+    if (_mode == MODE_KISS)
+    {
+      _kiss.processByte(c);
       continue;
     }
 
@@ -210,3 +219,30 @@ void CommandProcessor::poll()
     }
   }
 }
+
+// ============================================================================
+// KISS PROTOCOL IMPLEMENTATION
+// ============================================================================
+
+// KISS delegation methods
+void CommandProcessor::setKissFrameHandler(KISSProtocol::FrameHandler h)
+{
+  _kiss.setFrameHandler(h);
+}
+
+void CommandProcessor::sendKissFrame(const uint8_t *data, size_t len)
+{
+  _kiss.sendFrame(data, len);
+}
+
+bool CommandProcessor::isKissExitRequested() const
+{
+  return _kiss.isExitRequested();
+}
+
+void CommandProcessor::clearKissExit()
+{
+  _kiss.clearExitRequest();
+}
+
+

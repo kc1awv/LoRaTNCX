@@ -5,8 +5,7 @@
 #include <functional>
 #include <map>
 #include <string>
-
-class LoRaRadio;
+#include "KISSProtocol.h"
 
 class CommandProcessor
 {
@@ -15,7 +14,7 @@ public:
   // Converse handler: (text, endOfLine)
   using ConverseHandler = std::function<void(const String &text, bool endOfLine)>;
 
-  CommandProcessor(Stream &io, LoRaRadio &radio);
+  CommandProcessor(Stream &io);
 
   // call periodically from loop()
   void poll();
@@ -29,8 +28,8 @@ public:
   // enable/disable local echo of received characters
   void setLocalEcho(bool on);
 
-  // Modes for type-in: COMMAND, CONVERSE (line-based), TRANSPARENT (char-based)
-  enum Mode { MODE_COMMAND=0, MODE_CONVERSE, MODE_TRANSPARENT };
+  // Modes for type-in: COMMAND, CONVERSE (line-based), TRANSPARENT (char-based), KISS (binary frames)
+  enum Mode { MODE_COMMAND=0, MODE_CONVERSE, MODE_TRANSPARENT, MODE_KISS };
 
   // set current mode
   void setMode(Mode m);
@@ -42,16 +41,25 @@ public:
   void setSendPacChar(char c);
   Mode getMode();
 
+  // KISS protocol support (delegated to KISSProtocol)
+  void setKissFrameHandler(KISSProtocol::FrameHandler h);
+  void sendKissFrame(const uint8_t *data, size_t len);
+  bool isKissExitRequested() const;
+  void clearKissExit();
+
 private:
   Stream &_io;
-  LoRaRadio &_radio;
   String _line;
   std::map<String, Handler> _cmds;
   bool _localEcho = false;
-  // mode state and converse handler
+  
+  // Mode state and handlers
   Mode _mode = MODE_COMMAND;
   ConverseHandler _converseHandler = nullptr;
   char _sendPacChar = 0;
+
+  // KISS protocol handler
+  KISSProtocol _kiss;
 
   void handleLine(const String &line);
   static String toUpper(const String &s);
