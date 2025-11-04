@@ -12,6 +12,26 @@ void CommandProcessor::setLocalEcho(bool on)
   _localEcho = on;
 }
 
+void CommandProcessor::setMode(Mode m)
+{
+  _mode = m;
+}
+
+void CommandProcessor::setConverseHandler(ConverseHandler h)
+{
+  _converseHandler = h;
+}
+
+void CommandProcessor::setSendPacChar(char c)
+{
+  _sendPacChar = c;
+}
+
+CommandProcessor::Mode CommandProcessor::getMode()
+{
+  return _mode;
+}
+
 void CommandProcessor::registerCommand(const char *name, Handler h)
 {
   String k = toUpper(String(name));
@@ -81,6 +101,82 @@ void CommandProcessor::poll()
   while (_io.available())
   {
     char c = _io.read();
+
+    // Ctrl-C (ASCII 3) returns to command mode
+    if (c == 3)
+    {
+      _mode = MODE_COMMAND;
+      _io.println();
+      _io.println(F("<CMD MODE>"));
+      continue;
+    }
+
+    // TRANSPARENT: forward every char immediately
+    if (_mode == MODE_TRANSPARENT)
+    {
+      if (_converseHandler)
+      {
+        char ch[2] = {c, 0};
+        _converseHandler(String(ch), false);
+      }
+      if (_localEcho)
+        _io.print(c);
+      continue;
+    }
+
+    // CONVERSE: collect until CR/LF or SENDPAC, but detect SENDPAC mid-line and deliver immediate
+    if (_mode == MODE_CONVERSE)
+    {
+      // handle backspace/delete
+      if (c == 8 || c == 127)
+      {
+        if (_line.length() > 0)
+        {
+          _line.remove(_line.length() - 1);
+          if (_localEcho)
+            _io.print("\b \b");
+        }
+        continue;
+      }
+
+      // If this char equals SENDPAC, deliver the current line immediately (if non-empty)
+      if (_sendPacChar != 0 && c == _sendPacChar)
+      {
+        if (_line.length() > 0)
+        {
+          if (_localEcho) _io.print("\r\n");
+          if (_converseHandler) _converseHandler(_line, true);
+          _line = "";
+        }
+        continue;
+      }
+
+      if (c == '\r' || c == '\n')
+      {
+        if (_line.length() == 0)
+        {
+          // ignore empty (handles CRLF)
+          continue;
+        }
+        if (_localEcho)
+          _io.print("\r\n");
+        if (_converseHandler) _converseHandler(_line, true);
+        _line = "";
+        continue;
+      }
+
+      // Normal char in converse mode: accumulate but do not call handler yet
+      _line += c;
+      if (_localEcho)
+        _io.print(c);
+      if (_line.length() > 512)
+      {
+        _line = _line.substring(_line.length() - 512);
+      }
+      continue;
+    }
+
+    // Default: COMMAND mode behavior
     // handle backspace/delete
     if (c == 8 || c == 127)
     {
@@ -92,29 +188,25 @@ void CommandProcessor::poll()
       }
       continue;
     }
-    // Accept both \r and \n as line terminators for compatibility with different terminals
-    // (minicom sends \r, VSCode serial monitor sends \r\n, etc.)
+
+    // Accept both \r and \n as line terminators
     if (c == '\r' || c == '\n')
     {
-      // Ignore if line is empty (handles \r\n sequences)
       if (_line.length() == 0)
         continue;
-        
       if (_localEcho)
         _io.print("\r\n");
       handleLine(_line);
       _line = "";
+      continue;
     }
-    else
+
+    _line += c;
+    if (_localEcho)
+      _io.print(c);
+    if (_line.length() > 512)
     {
-      _line += c;
-      if (_localEcho)
-        _io.print(c);
-      if (_line.length() > 512)
-      {
-        // safety - drop overly long lines
-        _line = _line.substring(_line.length() - 512);
-      }
+      _line = _line.substring(_line.length() - 512);
     }
   }
 }

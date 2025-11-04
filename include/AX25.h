@@ -42,6 +42,7 @@ namespace AX25
     CTL_RNR = 0x05,
     CTL_REJ = 0x09,
     CTL_SABM = 0x2F,
+    CTL_DM = 0x0F,
     CTL_DISC = 0x43,
     CTL_UA = 0x63
   };
