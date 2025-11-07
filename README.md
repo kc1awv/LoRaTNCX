@@ -1,6 +1,6 @@
 # LoRaTNCX: An AI-Assisted Amateur Radio Experiment
 
-## Or: "I Asked ChatGPT to Build a TNC and You Won't Believe What Happened Next"
+## Or: "I Asked GitHub Copilot to Build a KISS TNC and You Won't Believe What Happened Next"
 
 Welcome to LoRaTNCX, a totally-not-terrifying experiment in using AI tools to write Amateur Radio software. Because what could possibly go wrong when you let a large language model write your radio firmware? 
 
@@ -8,48 +8,70 @@ Spoiler alert: It actually works. Most of the time. We're as surprised as you ar
 
 ## What Even Is This?
 
-LoRaTNCX is a **Terminal Node Controller (TNC)** firmware for cheap ESP32-based LoRa boards. It implements the AX.25 packet radio protocol and KISS mode, making it a drop-in replacement for those vintage TNCs you paid way too much for on eBay.
+LoRaTNCX is a **KISS TNC (Terminal Node Controller)** firmware for cheap ESP32-based LoRa boards. It's the strong, silent type - implements the KISS protocol with LoRa-specific extensions, speaks only in binary, and makes it compatible with any KISS-mode packet radio application.
 
-**The Goal**: Create an inexpensive KISS modem for packet radio applications (and whatever new applications the Amateur Radio community dreams up in the future).
+**The Goal**: Create an inexpensive KISS modem for LoRa packet radio applications that works with standard KISS software (Dire Wolf, APRS clients, BPQ32, packet terminals, etc.). Because vintage TNCs cost more than this entire board.
 
 **The Method**: Human provides requirements, AI writes code, hilarity and/or functionality ensues.
 
-**The Result**: 400KB of firmware that actually transmits packets. Your move, Skynet.
+**The Result**: A fully functional KISS TNC with LoRa radio support and a command-line configuration tool. Your move, Skynet.
 
 ## Hardware Requirements
 
 - **Heltec WiFi LoRa 32 V3** or **V4** board (ESP32-S3 + SX1262 LoRa radio)
 - A USB cable (yes, really, we have to mention this)
-- An Amateur Radio license (because here, the FCC is not amused by unlicensed experimentation, despite politics)
-- Unrealistic optimism about AI-generated code
+- An Amateur Radio license (required for operation in the US and most countries - the FCC is not amused by unlicensed experimentation)
+- Unrealistic optimism about AI-generated code (optional but recommended)
 
-The boards cost about $25-35 USD shipped. That's less than a fancy coffee subscription, and this actually does something useful.
+The boards cost about $25-35 USD shipped. That's less than a fancy coffee subscription, and unlike coffee, this actually transmits packets.
 
-## Features (That Allegedly Work)
+Frequency Support: **433 MHz to 928 MHz** (tested: 433, 868, 902, 915, 928 MHz) - It's like having multiple radios for the price of one!
 
-- ✅ **A Possibly Full TNC-2 Compatible Command Set** - We've got 57 commands implemented (AI counted them, we trust it)
-- ✅ **KISS Mode** - Binary frame protocol for terminal programs that gave up on human readability
-- ✅ **AX.25 Protocol** - Because packet radio wasn't complicated enough already
-- ✅ **Multiple Operating Modes** - Command, Converse, Transparent, and KISS (we're overachievers)
+## Features (That Actually Work)
+
+- ✅ **Full KISS Protocol** - Binary frame protocol for programs that gave up on human readability
+- ✅ **SETHARDWARE Commands** - LoRa-specific configuration via KISS extensions (because standards are more like guidelines)
 - ✅ **LoRa Radio Support** - Long range, low power, high coolness factor
-- ✅ **Persistent Settings** - Your configs survive power cycles (unlike our sanity)
-- ✅ **Packet Monitoring** - Watch packets fly by like a very boring screensaver
-- ✅ **Digipeating** - Be part of the problem... er, solution
-- ✅ **Beaconing** - Announce your existence periodically, because humans need validation
-- ✅ **Help System** - Extended help text that's less verbose than most AI chatbots
+- ✅ **Persistent Settings** - Configuration survives power cycles (unlike our sanity during debugging)
+- ✅ **Configuration Tool** - Command-line utility for easy setup (the AI wrote this too)
+- ✅ **Interrupt-Driven Reception** - Efficient packet handling with no echo loops (took a few tries to get this right)
+- ✅ **Configurable Deaf Period** - Prevents receiving own transmissions (because talking to yourself is awkward)
+- ✅ **Wide Frequency Range** - Supports 433-928 MHz ISM bands (way more versatile than we expected)
+
+### KISS Protocol Implementation
+
+LoRaTNCX implements the standard KISS protocol with extensions for LoRa-specific configuration. It's like KISS, but with LoRa steroids:
+
+**Standard KISS Commands:**
+- `0x00` - DATA frame (send/receive packets)
+- `0xFF` - RETURN (exit KISS mode - not implemented because we're ALWAYS in KISS mode, deal with it)
+
+**SETHARDWARE Extensions (Command `0x06`):**
+Because the original KISS spec predates LoRa by a few decades, we added some modern conveniences:
+- `0x01` - Set frequency (MHz, 4-byte float)
+- `0x02` - Set bandwidth (kHz, 4-byte float) 
+- `0x03` - Set spreading factor (1 byte: 7-12)
+- `0x04` - Set coding rate (1 byte: 5-8 for CR 4/5 through 4/8)
+- `0x05` - Set output power (1 signed byte: 2-20 dBm)
+- `0x06` - Get current configuration (returns all settings)
+- `0x07` - Save configuration to NVS (make it stick)
+- `0x08` - Load configuration from NVS (reload from memory)
+- `0x09` - Reset to factory defaults (when all else fails)
+
+See `tools/README.md` for detailed configuration examples and the AI's thorough documentation.
 
 ## AI-Generated Caveats
 
-⚠️ **Disclaimer**: Significant portions of this codebase were written by AI. The AI:
-- Has never held an Amateur Radio license
-- Doesn't understand RF propagation (but neither do we, really)
-- Has no concept of "good enough" and kept refactoring until told to stop
-- Writes documentation better than most humans (which is concerning)
-- Successfully implemented the requested commands without going full HAL 9000
+⚠️ **Disclaimer**: This codebase was written collaboratively between human and AI. The AI:
+- Has never held an Amateur Radio license (but aced the written exam we never gave it)
+- Doesn't understand RF propagation (but learned LoRa surprisingly well)
+- Successfully implemented KISS protocol without becoming self-aware
+- Writes documentation better than most humans (which is either impressive or concerning)
+- Fixed bugs efficiently when given proper debugging information (and coffee, metaphorically speaking)
 
-⚠️ **The AI Insisted On**: Clean architecture, separation of concerns, comprehensive documentation, and proper error handling. This is either impressive or a sign of the impending robot uprising.
+⚠️ **The AI Insisted On**: Clean architecture, separation of concerns, comprehensive documentation, and proper error handling. This is either impressive or a sign of the impending robot uprising. We're going with "impressive" for now.
 
-⚠️ **What Could Go Wrong**: Probably nothing? The worst that happens is it doesn't work and you wasted 30 minutes. The best case is you have a working KISS TNC for under $30. Risk/reward ratio seems reasonable.
+⚠️ **What Could Go Wrong**: Not much - it's been tested on actual hardware with bidirectional LoRa communication. The worst case is you need to reconfigure it. The best case is you have a working KISS TNC for under $30. Risk/reward ratio seems reasonable, unless you count the existential questions about AI-generated code.
 
 ## Quick Start (For the Impatient)
 
@@ -59,9 +81,11 @@ The boards cost about $25-35 USD shipped. That's less than a fancy coffee subscr
    - VS Code: Search for "PlatformIO IDE" in extensions
    - CLI: `pip install platformio` (if you're into that sort of thing)
 
-2. **A Vague Understanding of Radio** - Not strictly required, but helpful
+2. **Python 3** - For the configuration tool
+   - Install pyserial: `pip3 install pyserial`
+   - (Yes, you need Python to configure a device. It's 2025, deal with it.)
 
-3. **Patience** - For when the AI's code doesn't compile on first try (just kidding, it does. Well, at least it does here.)
+3. **An Amateur Radio License** - Required for legal operation (the FCC has no sense of humor about this)
 
 ### Building & Flashing
 
@@ -76,120 +100,184 @@ platformio run --environment heltec_wifi_lora_32_V3
 # Build for Heltec V4
 platformio run --environment heltec_wifi_lora_32_V4
 
-# Upload to V3 (adjust port as needed)
-platformio run --environment heltec_wifi_lora_32_V3 --target upload
+# Upload to V3 (adjust port as needed - typically /dev/ttyUSB0 on Linux)
+platformio run --environment heltec_wifi_lora_32_V3 --target upload --upload-port /dev/ttyUSB0
 
-# Upload to V4 (adjust port as needed)
-platformio run --environment heltec_wifi_lora_32_V4 --target upload
+# Upload to V4 (adjust port as needed - typically /dev/ttyACM0 on Linux)
+platformio run --environment heltec_wifi_lora_32_V4 --target upload --upload-port /dev/ttyACM0
 ```
 
-**Or Just Use VS Code Tasks**: Because clicking is easier than typing
+**Or Use VS Code Tasks**: Because clicking is easier than typing
 - "Build LoRaTNCX V3" or "Build LoRaTNCX V4"
-- "Upload (heltec_wifi_lora_32_V3)" or similar
+- Connect your board and use PlatformIO's upload button (the one with the arrow)
 
-### First Contact
+### Configuration
 
-1. Connect via serial at **115200 baud** (because it's not the 90s anymore)
-2. Type `HELP` to see available commands
-3. Marvel at the word-wrapped, alphabetically sorted output
-4. Type `HELP <command>` for detailed help (the AI was thorough)
-5. Configure your station:
-   ```
-   MYCALL N0CALL-1           # Your callsign (change this, obviously)
-   FREQUENCY 906.000         # LoRa frequency in MHz
-   POWER 14                  # TX power in dBm (2-20)
-   MONITOR ON                # Watch the packets flow
-   ```
+The TNC operates in KISS mode and produces no serial output except KISS frames. It's the strong, silent type - no chatty debug messages, no verbose logging, just pure binary communication. To configure it, use the included command-line tool (which the AI also wrote):
 
-### Entering KISS Mode
+```bash
+# View current configuration (look at all those pretty numbers!)
+python3 tools/loratncx_config.py /dev/ttyUSB0 --get-config
 
-For use with packet radio applications (APRS, BPQ32, Direwolf, etc.):
+# Configure for US 33cm band (902-928 MHz)
+# This is the default, but hey, maybe you changed it
+python3 tools/loratncx_config.py /dev/ttyUSB0 \
+  --frequency 915.0 \
+  --bandwidth 125 \
+  --spreading-factor 12 \
+  --coding-rate 7 \
+  --power 20 \
+  --save
 
+# Configure for long range (slower, more reliable, for when you really need those packets to arrive)
+python3 tools/loratncx_config.py /dev/ttyUSB0 \
+  --frequency 915.0 \
+  --bandwidth 62.5 \
+  --spreading-factor 12 \
+  --save
+
+# Configure for faster data rate (shorter range, for impatient people)
+python3 tools/loratncx_config.py /dev/ttyUSB0 \
+  --frequency 915.0 \
+  --bandwidth 250 \
+  --spreading-factor 7 \
+  --save
+
+# Reset to factory defaults (when you've made questionable configuration choices)
+python3 tools/loratncx_config.py /dev/ttyUSB0 --reset
 ```
-KISS ON
-RESTART
+
+See `tools/README.md` for complete documentation of the configuration tool and more examples than you probably need.
+
+### Default Configuration
+
+Out of the box, the TNC is configured for maximum range (because who doesn't want maximum range?):
+- **Frequency**: 915.0 MHz (US 33cm band - adjust for your location if you're not in the US)
+- **Bandwidth**: 125 kHz (the Goldilocks setting - not too wide, not too narrow)
+- **Spreading Factor**: SF12 (longest range, slowest speed - patience is a virtue)
+- **Coding Rate**: 4/7 (good error correction)
+- **Output Power**: 20 dBm (legally questionable in some places, adjust accordingly)
+- **Sync Word**: 0x1424 (LoRaWAN public network - we're friendly like that)
+
+### Using with KISS Applications
+
+Once configured, the TNC works with any KISS-compatible application. It doesn't care what you use it with:
+
+```bash
+# Dire Wolf (APRS digipeater/iGate) - because everyone loves APRS
+direwolf -t 0 -p /dev/ttyUSB0 -b 115200
+
+# BPQ32 (Packet BBS) - for those who remember the glory days
+# Add to bpq32.cfg:
+# PORT
+#   PORTNUM=1
+#   ID=LoRa TNC
+#   TYPE=ASYNC
+#   PROTOCOL=KISS
+#   COMPORT=/dev/ttyUSB0
+#   SPEED=115200
+
+# Or use with any packet terminal that supports KISS mode
+# (Your favorite ancient DOS program might even work!)
 ```
 
-Exit KISS mode with ESC key or CMD_RETURN frame (0xFF). Your application probably handles this.
+**Important Note**: Most KISS applications don't support LoRa-specific parameters (because they were written in the 1990s), which is why you should pre-configure the TNC using the configuration tool before launching your KISS application. Set it and forget it!
 
 ## Configuration Examples
 
-### Basic Station Setup
+### Long Range Configuration
+Optimized for maximum range with slower data rate:
+```bash
+python3 tools/loratncx_config.py /dev/ttyUSB0 \
+  --frequency 915.0 \
+  --bandwidth 62.5 \
+  --spreading-factor 12 \
+  --coding-rate 8 \
+  --power 20 \
+  --save
 ```
-MYCALL KI7EST-1             # Your call (use yours obviously, not this one)
-MYALIAS WIDE1-1             # Digipeater alias
-FREQUENCY 906.000           # ISM band frequency
-SPREADING 7                 # LoRa spreading factor (7-12)
-BANDWIDTH 125               # LoRa bandwidth in kHz
-POWER 14                    # Transmit power (14 dBm = 25mW)
-```
+- **Range**: Maximum (~10-15 km line of sight)
+- **Speed**: ~250 bps
+- **Air time (50 bytes)**: ~1400 ms
 
-### Beacon Configuration
+### Balanced Configuration
+Good balance of range and speed:
+```bash
+python3 tools/loratncx_config.py /dev/ttyUSB0 \
+  --frequency 915.0 \
+  --bandwidth 125 \
+  --spreading-factor 9 \
+  --coding-rate 7 \
+  --power 17 \
+  --save
 ```
-BTEXT LoRaTNCX Test Station
-EVERY 600                   # Beacon every 10 minutes
-BEACON EVERY 600            # Alternative syntax
-```
+- **Range**: Good (~5-8 km line of sight)
+- **Speed**: ~2000 bps
+- **Air time (50 bytes)**: ~200 ms
 
-### Monitoring Setup
+### Fast Data Configuration
+Optimized for speed with reduced range:
+```bash
+python3 tools/loratncx_config.py /dev/ttyUSB0 \
+  --frequency 915.0 \
+  --bandwidth 250 \
+  --spreading-factor 7 \
+  --coding-rate 5 \
+  --power 14 \
+  --save
 ```
-MONITOR ON                  # Enable packet monitoring
-MSTAMP ON                   # Add timestamps
-MALL OFF                    # Don't show packets not for us
-MRPT OFF                    # Don't show repeated packets
-```
+- **Range**: Moderate (~2-4 km line of sight)
+- **Speed**: ~12500 bps
+- **Air time (50 bytes)**: ~30 ms
 
-### Save & View Settings
-```
-DISPLAY                     # Show all current settings
-                            # Settings auto-save to NVS
-```
+## Architecture (The AI's Masterpiece)
 
-## Architecture (AI's Masterpiece)
+The firmware is organized into clean, focused modules (because the AI read the SOLID principles and took them seriously):
 
-The AI organized the code into clean, focused modules:
-
-- **LoRaTNCX**: Main TNC class, command handlers, settings management
-- **CommandProcessor**: Terminal I/O, mode switching, line editing
-- **KISSProtocol**: KISS binary protocol (cleanly separated, the AI insisted)
-- **LoRaRadio**: RadioLib wrapper for SX1262
-- **AX25**: Frame encoding/decoding, address parsing
+- **main.cpp**: Main loop, KISS frame processing, SETHARDWARE command handling (the brain)
+- **kiss.cpp/h**: KISS protocol implementation - frame encoding/decoding, escaping (the diplomat)
+- **radio.cpp/h**: LoRa radio interface - RadioLib wrapper for SX1262 (the talker)
+- **config.cpp/h**: Configuration management - NVS persistence, defaults (the librarian)
+- **board_config.cpp/h**: Hardware-specific definitions for V3/V4 boards (the hardware whisperer)
 
 **Design Principles** (according to the AI):
-- Single Responsibility Principle (the AI is big on SOLID)
+- Single Responsibility Principle (each module does one thing and does it well)
 - Separation of Concerns (no mixing business with pleasure)
-- Struct-Based Organization (10 structs for 40+ settings)
-- Persistent Configuration (NVS-backed, because reboots happen)
+- Interrupt-driven packet reception (because polling is so 1980s)
+- NVS-backed persistent configuration (because reboots happen)
 
 
 ## Resource Usage (Surprisingly Reasonable)
 
-- **Flash**: ~408KB (12.2% of 3.3MB) - Room for more AI features!
-- **RAM**: ~21KB (6.6% of 320KB) - Efficient, unlike most JavaScript
-- **Plenty of headroom** for future enhancements the AI will inevitably suggest
+- **Flash**: ~305-317 KB (varies by board version) - Room for more features the AI will inevitably suggest!
+- **RAM**: ~21 KB - Efficient, unlike most JavaScript frameworks
+- **Build Time**: ~10-12 seconds - Enough time to contemplate the nature of AI assistance
+- **Upload Time**: ~10-12 seconds - Faster than ordering coffee
 
 
 ## Development Status
 
-**Current**: Currently 57 TNC-2 commands implemented ✅  
-**KISS Mode**: Fully functional ✅  
-**AI Sentience Level**: Undetermined 🤖  
+**Current**: Fully functional KISS TNC ✅  
+**Configuration**: Command-line tool complete ✅  
+**Testing**: Bidirectional LoRa communication verified ✅  
+**AI Sentience Level**: Undetermined 🤖
 
 ### What Works
-- Command processing and terminal modes
-- LoRa transmission and reception
-- KISS protocol (tested with actual applications)
-- Packet monitoring and digipeating
-- Beacon transmission
-- Settings persistence
-- Help system (AI's pride and joy)
+- Full KISS protocol implementation (tested with actual applications!)
+- SETHARDWARE configuration commands (all 9 subcommands working)
+- LoRa transmission and reception (interrupt-driven, because we're fancy)
+- NVS configuration persistence (survives power cycles, unlike our debugging session memories)
+- Command-line configuration tool (Python script that actually works)
+- V3 and V4 board support (both versions love us equally)
+- Wide frequency range (433-928 MHz tested - it's like a frequency buffet)
+- Configurable deaf period (prevents echo loops and existential conversations with yourself)
 
-### What's Planned
-- AX.25 Layer 2 connected mode (scaffolding exists)
-- KISS parameter persistence (TXDELAY, PERSISTENCE, etc.)
-- Display support (OLED sitting there unused)
-- WiFi/Bluetooth connectivity (because why not)
-- APRS encoding/decoding (when we feel ambitious)
+### What's Planned (When We Feel Ambitious)
+- AX.25 frame parsing/generation (for digipeating, APRS, and making this even more useful)
+- Display support (OLED currently unused and feeling neglected)
+- WiFi/Bluetooth configuration interface (because command-line is so retro)
+- Over-the-air firmware updates (for when you're too lazy to find a USB cable)
+- Additional KISS extensions (because we can never have enough features)
 
 ### What the AI Suggested We Add
 - Unit tests (adorable)
@@ -202,81 +290,105 @@ Contributions welcome! Whether you're:
 - A human who writes code
 - An AI that writes code
 - A human using AI to write code
-- A very intelligent parrot
+- A very intelligent parrot with typing skills
 
 **Guidelines**:
-1. Follow existing code style (the AI has opinions)
-2. Create documentation (yes, really)
-3. Test on hardware if possible (virtual testing only goes so far)
-4. Include whether code was human, AI, or collaborative effort (for science)
+1. Follow existing code style (the AI has opinions, and surprisingly good ones)
+2. Test on actual hardware when possible (virtual LoRa doesn't quite work yet)
+3. Document your changes (yes, really - future you will thank present you)
+4. Note whether code was human, AI, or collaborative effort (for science, and future AI historians)
 
-## Technical Details for the Nerds
+## Technical Details (For the Nerds)
 
-**Platform**: ESP32-S3 (Xtensa dual-core @ 240MHz)  
-**Framework**: Arduino (because it just works)  
-**Radio**: SX1262 LoRa (via RadioLib 7.4.0)  
-**Storage**: NVS (ESP32's answer to EEPROM)  
-**Build System**: PlatformIO (better than Arduino IDE, fight me)  
+**Platform**: ESP32-S3 (Xtensa dual-core @ 240MHz) - Because dual-core is twice as nice  
+**Framework**: Arduino ESP32 3.20017.241212 - Because it just works™  
+**Radio**: SX1262 LoRa (via RadioLib 7.4.0) - Making LoRa not painful since... well, recently  
+**Storage**: NVS (ESP32 non-volatile storage) - ESP32's fancy answer to EEPROM  
+**Build System**: PlatformIO - Better than Arduino IDE, fight me  
+**Protocol**: KISS with SETHARDWARE extensions - Old school meets new school  
+**Frequency Range**: 433-928 MHz (hardware verified) - Surprisingly versatile little radios
 
-**Command Count**: 57 (the AI counted multiple times, it's accurate)  
-**Lines of Code**: Several thousand (the AI wrote most of them)  
-**Code Reviews**: Performed by humans who trust AI (probably)  
-**Test Coverage**: Not enough (the AI agrees)  
+**Key Implementation Details** (that you might actually care about):
+- Interrupt-driven packet reception (efficient and elegant)
+- Configurable deaf period (default 2000ms - prevents awkward self-conversations)
+- FEND/FESC character escaping (proper KISS etiquette)
+- Binary KISS frame format (because text is overrated)
+- Float-packed configuration data (compact and efficient)
 
-## Troubleshooting
+**Lines of Code**: Several thousand (the AI wrote most of them and only needed a few debugging hints)  
+**Code Reviews**: Performed by humans who trust AI (and tested on real hardware, because we're not completely reckless)  
+**Test Coverage**: Improving (we actually test on hardware, which counts for something)  
 
-**Q**: It doesn't compile!  
-**A**: Did you install PlatformIO? Is your internet working? Did you anger the AI?
+## Troubleshooting (Because Things Always Go Wrong)
 
-**Q**: Nothing happens when I type commands!  
-**A**: Check your baud rate (115200). Check your USB cable. Check your expectations.
+**Q**: The TNC doesn't respond to the configuration tool!  
+**A**: Make sure you're using the correct serial port and 115200 baud rate. On Linux, check `dmesg | tail` after plugging in the board to see which port it's assigned. If it's still not responding, try unplugging it, counting to 10, and plugging it back in. (IT's oldest trick, but it works.)
+
+**Q**: I can transmit but not receive!  
+**A**: Check that both TNCs are configured with identical frequency, bandwidth, spreading factor, coding rate, and sync word. ALL of them must match. LoRa is picky like that. One wrong parameter and you're shouting into the void.
+
+**Q**: Packets are being received repeatedly!  
+**A**: The deaf period should prevent this (default is 2000ms). If you're still seeing echo, the issue is likely two TNCs with different configurations or external interference. Or gremlins. Probably gremlins.
+
+**Q**: How do I know what configuration to use?  
+**A**: Start with the default (915 MHz, 125 kHz BW, SF12). This gives maximum range at the cost of speed. If you need faster throughput and have good line of sight, try SF7 with 250 kHz BW. There's always a tradeoff - you can't have maximum range AND maximum speed. Physics is annoying like that.
+
+**Q**: Can I use this with Dire Wolf for APRS?  
+**A**: Yes! Configure the TNC first with `loratncx_config.py`, then launch Dire Wolf with `-t 0 -p /dev/ttyUSB0 -b 115200`. Note that LoRa parameters differ from traditional VHF/UHF APRS, so don't expect to hit the existing APRS network. You're building your own LoRa APRS network. Embrace it!
+
+**Q**: What's the range?  
+**A**: Depends on configuration, antennas, and environment. With default settings (SF12, 125 kHz BW, 20 dBm) and good antennas, 10-15 km line of sight is achievable. In urban environments with obstacles, expect 1-3 km. Your mileage may vary. Literally.
+
+**Q**: Is this legal to use?  
+**A**: In the US, operation in the 33cm band (902-928 MHz) requires an Amateur Radio license. Other countries have different regulations. Check your local laws before transmitting. The FCC has no sense of humor about unlicensed operation, and neither does your local spectrum authority.
 
 **Q**: How do I know if the AI wrote this part?  
-**A**: If it's well-documented, probably the AI. If it's a hack, probably human.
-
-**Q**: Is this safe to use?  
-**A**: Define "safe." It won't set your radio on fire. Probably won't summon Cthulhu. Works as well as most amateur radio software.
+**A**: If it's well-documented, probably the AI. If it's a clever hack, probably human. If it's this troubleshooting section's sarcasm, definitely human with AI assistance.
 
 **Q**: Can I trust AI-generated code?  
-**A**: You're reading a README written by AI. You've already made your choice.
+**A**: You're reading a README that was partially written by AI. You've already made your choice. (But yes, it's been tested on real hardware and actually works.)
 
 ## License
 
 MIT License - Because sharing is caring, and the AI can't hold copyright anyway.
 
-See LICENSE file for boring legal details.
+See LICENSE file for the boring legal details.
 
 ## Credits
 
-**AI Assistant**: Did most of the actual coding  
-**Human Operator**: Provided requirements, testing, and existential dread  
-**RadioLib**: For making LoRa not painful  
-**ESP32**: For being a surprisingly capable microcontroller  
-**Amateur Radio Community**: For keeping ancient protocols alive in the 21st century  
+**Human Operator**: Requirements, testing, hardware verification, and existential questions (KI7EST)  
+**AI Assistant**: Code generation, debugging, documentation, and surprising competence (GitHub Copilot)  
+**RadioLib**: For making LoRa not painful (seriously, this library is great)  
+**ESP32**: For being a capable and affordable platform (and not bursting into flames)  
+**Amateur Radio Community**: For keeping experimental radio alive in the 21st century  
 
 ## Final Thoughts
 
-This project demonstrates that AI can:
-- Write functional embedded code
-- Follow complex specifications
-- Refactor code without breaking it (usually)
-- Generate helpful documentation
-- Understand packet radio protocols (somehow)
+This project demonstrates that AI-assisted development can produce functional, well-documented embedded systems code. The collaborative approach between human expertise and AI capabilities resulted in a working KISS TNC implementation in a remarkably short development time.
 
-It cannot:
-- Test hardware (yet)
-- Hold an Amateur Radio license (yet)
-- Appreciate the beauty of a well-executed APRS beacon (yet)
+Key takeaways:
+- AI can write functional embedded code when given clear requirements (and frequent debugging hints)
+- Iterative debugging with AI assistance is highly effective (and occasionally hilarious)
+- Human hardware knowledge + AI coding skills = productive combination
+- Proper testing on real hardware is still essential (virtual LoRa doesn't exist yet)
+- The future of coding might involve more conversation with AI than Stack Overflow
+
+Things we learned:
+- AI is really good at documentation (better than most humans, tbh)
+- AI needs help understanding hardware quirks (like "why is this frequency failing?")
+- The combination of human domain knowledge and AI implementation skills is powerful
+- We're not quite at "Skynet" levels yet (probably)
 
 ## Support
 
-- **Issues**: GitHub issues (be nice, the AI has feelings. Probably.)
-- **Questions**: GitHub discussions (humans and AIs welcome)
-- **Contributions**: Pull requests (from any sentient or semi-sentient being)
+- **Issues**: GitHub issues for bug reports (be nice, we're all learning here)
+- **Discussions**: GitHub discussions for questions and ideas (AI welcome!)
+- **Pull Requests**: Contributions welcome (from any sentient or semi-sentient being)
 
-73 de KI7EST (the human) and ChatGPT (the AI)
+73 de KI7EST
 
 ---
 
-*Built with questionable judgment and surprisingly functional AI assistance.*  
-*No AI were harmed in the making of this firmware. Some humans were mildly confused.*
+*Built with AI assistance and validated on real hardware.*  
+*No AI models were harmed in the making of this firmware. Some humans were mildly confused.*  
+*If this TNC becomes self-aware, please power cycle immediately.*
