@@ -356,7 +356,7 @@ See LICENSE file for the boring legal details.
 
 ## Credits
 
-**Human Operator**: Requirements, testing, hardware verification, and existential questions (KI7EST)  
+**Human Operator**: Requirements, testing, hardware verification, and existential questions (KC1AWV)  
 **AI Assistant**: Code generation, debugging, documentation, and surprising competence (GitHub Copilot)  
 **RadioLib**: For making LoRa not painful (seriously, this library is great)  
 **ESP32**: For being a capable and affordable platform (and not bursting into flames)  
