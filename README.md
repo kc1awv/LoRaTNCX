@@ -385,7 +385,7 @@ Things we learned:
 - **Discussions**: GitHub discussions for questions and ideas (AI welcome!)
 - **Pull Requests**: Contributions welcome (from any sentient or semi-sentient being)
 
-73 de KI7EST
+73 de KC1AWV
 
 ---
 
