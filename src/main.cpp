@@ -1,116 +1,251 @@
-// LoRaTNCX - TNC implementation for Heltec WiFi LoRa 32 V3/V4
-// Main application file
-
 #include <Arduino.h>
-#include "LoRaRadio.h"
-#include "LoRaTNCX.h"
+#include "config.h"
+#include "board_config.h"
+#include "config_manager.h"
+#include "kiss.h"
+#include "radio.h"
 
-// Common LoRa pin mappings from variants
-#ifndef LORA_NSS
-#define LORA_NSS SS
-#endif
+// Temporary debug mode
+// #define DEBUG_MODE 1
 
-#ifndef RST_LoRa
-// fall back to typical variant names
-#define RST_LoRa 12
-#endif
-
-#ifndef BUSY_LoRa
-#define BUSY_LoRa 13
-#endif
-
-#ifndef DIO0
-#define DIO0 14
-#endif
-
-#if defined(ARDUINO_heltec_wifi_lora_32_V4)
-// Use HelTec V4 PA pin mapping discovered in board/factory code
-// Some firmwares report different mappings; try these pins for V4 testing.
-#ifndef LORA_PA_EN
-#define LORA_PA_EN 2
-#endif
-#ifndef LORA_PA_TX_EN
-#define LORA_PA_TX_EN 46
-#endif
-#ifndef LORA_PA_POWER
-#define LORA_PA_POWER 7
-#endif
+#ifdef DEBUG_MODE
+#define DEBUG_PRINT(x) Serial.print(x)
+#define DEBUG_PRINTLN(x) Serial.println(x)
 #else
-// Non-V4: no PA pins
-#define LORA_PA_EN -1
-#define LORA_PA_TX_EN -1
-#define LORA_PA_POWER -1
+#define DEBUG_PRINT(x)
+#define DEBUG_PRINTLN(x)
 #endif
 
-LoRaRadio radio(LORA_NSS, BUSY_LoRa, DIO0, RST_LoRa, LORA_PA_EN, LORA_PA_TX_EN, LORA_PA_POWER);
-LoRaTNCX tnc(Serial, radio);
+// Global objects
+KISSProtocol kiss;
+LoRaRadio loraRadio;
+ConfigManager configManager;
 
-void setup()
-{
-  Serial.begin(115200);
-  while (!Serial && millis() < 2000)
-    ;
-  Serial.println("LoRaTNCX: initializing radio...");
+// Buffers
+uint8_t rxBuffer[LORA_BUFFER_SIZE];
 
-  // Print configured pins for debugging (helps verify V3 vs V4 mapping)
-  Serial.print("LORA_NSS (CS): ");
-  Serial.println(LORA_NSS);
-  Serial.print("RST_LoRa: ");
-  Serial.println(RST_LoRa);
-  Serial.print("BUSY_LoRa: ");
-  Serial.println(BUSY_LoRa);
-  Serial.print("DIO0: ");
-  Serial.println(DIO0);
-#if (LORA_PA_EN >= 0)
-  Serial.print("LORA_PA_EN: ");
-  Serial.println(LORA_PA_EN);
-#else
-  Serial.println("LORA_PA_EN: <not defined>");
-#endif
-#if (LORA_PA_TX_EN >= 0)
-  Serial.print("LORA_PA_TX_EN: ");
-  Serial.println(LORA_PA_TX_EN);
-#else
-  Serial.println("LORA_PA_TX_EN: <not defined>");
-#endif
-#if (LORA_PA_POWER >= 0)
-  Serial.print("LORA_PA_POWER: ");
-  Serial.println(LORA_PA_POWER);
-#else
-  Serial.println("LORA_PA_POWER: <not defined>");
-#endif
-
-  float freq = 868.0; // follow HelTec factory test (MHz)
-  if (!radio.begin(freq))
-  {
-    Serial.println("Radio init failed");
-    return;
-  }
-
-  Serial.print("Radio initialized at ");
-  Serial.print(freq);
-  Serial.println(" MHz");
-
-  const char *msg = "LoRaTNCX test";
-  int res = radio.send((const uint8_t *)msg, strlen(msg));
-  if (res == 0)
-  {
-    Serial.println("Transmit OK");
-  }
-  else
-  {
-    Serial.print("Transmit failed: ");
-    Serial.println(res);
-  }
-
-  // start TNC command processor (uses Serial)
-  tnc.begin();
+void setup() {
+    // Initialize serial
+    Serial.begin(115200);
+    delay(1000);
+    
+    DEBUG_PRINTLN("\n=== LoRaTNCX Debug Mode ===");
+    
+    // Initialize board-specific pins
+    DEBUG_PRINTLN("Initializing board pins...");
+    initializeBoardPins();
+    
+    // Board type check - halt if unknown
+    if (BOARD_TYPE == BOARD_UNKNOWN) {
+        DEBUG_PRINTLN("FATAL: Unknown board type!");
+        while (1) {
+            delay(1000);
+        }
+    }
+    DEBUG_PRINTLN("Board initialized");
+    
+    // Setup PA control (V4 only)
+    setupPAControl();
+    
+    // Initialize configuration manager
+    DEBUG_PRINTLN("Initializing config manager...");
+    configManager.begin();
+    
+    // Try to load saved configuration
+    LoRaConfig savedConfig;
+    if (configManager.loadConfig(savedConfig)) {
+        DEBUG_PRINTLN("Applying saved config...");
+        loraRadio.applyConfig(savedConfig);
+    } else {
+        DEBUG_PRINTLN("Using default config");
+    }
+    
+    // Initialize LoRa radio - halt if failed
+    DEBUG_PRINTLN("Initializing radio...");
+    int radioState = loraRadio.beginWithState();
+    if (radioState != RADIOLIB_ERR_NONE) {
+        DEBUG_PRINT("FATAL: Radio init failed with code: ");
+        DEBUG_PRINTLN(radioState);
+        while (1) {
+            delay(1000);
+        }
+    }
+    DEBUG_PRINTLN("Radio initialized!");
+    
+    DEBUG_PRINTLN("Entering KISS mode (debug enabled)\n");
+    // TNC is now ready and enters KISS mode (silent operation)
 }
 
-void loop()
-{
-  // poll the TNC for serial commands and radio RX
-  // (radio RX actually runs in separate FreeRTOS task on core 0)
-  tnc.poll();
-  delay(10);
+void handleHardwareConfig(uint8_t* frame, size_t frameLen) {
+    if (frameLen < 2) return;  // Need at least command and subcommand
+    
+    uint8_t subCmd = frame[1];
+    bool needsReconfig = false;
+    
+    switch (subCmd) {
+        case HW_SET_FREQUENCY:
+            if (frameLen >= 6) {  // Command + subcommand + 4 bytes for float
+                float freq;
+                memcpy(&freq, &frame[2], sizeof(float));
+                if (freq >= 150.0 && freq <= 960.0) {  // SX1262 range
+                    loraRadio.setFrequency(freq);
+                    needsReconfig = true;
+                }
+            }
+            break;
+            
+        case HW_SET_BANDWIDTH:
+            if (frameLen >= 3) {
+                uint8_t bwIdx = frame[2];
+                float bw = 125.0;
+                if (bwIdx == 0) bw = 125.0;
+                else if (bwIdx == 1) bw = 250.0;
+                else if (bwIdx == 2) bw = 500.0;
+                loraRadio.setBandwidth(bw);
+                needsReconfig = true;
+            }
+            break;
+            
+        case HW_SET_SPREADING:
+            if (frameLen >= 3) {
+                uint8_t sf = frame[2];
+                if (sf >= 7 && sf <= 12) {
+                    loraRadio.setSpreadingFactor(sf);
+                    needsReconfig = true;
+                }
+            }
+            break;
+            
+        case HW_SET_CODINGRATE:
+            if (frameLen >= 3) {
+                uint8_t cr = frame[2];
+                if (cr >= 5 && cr <= 8) {
+                    loraRadio.setCodingRate(cr);
+                    needsReconfig = true;
+                }
+            }
+            break;
+            
+        case HW_SET_POWER:
+            if (frameLen >= 3) {
+                int8_t power = (int8_t)frame[2];
+                if (power >= -9 && power <= 22) {  // SX1262 range
+                    loraRadio.setOutputPower(power);
+                    needsReconfig = true;
+                }
+            }
+            break;
+            
+        case HW_SET_SYNCWORD:
+            if (frameLen >= 4) {  // Command + subcommand + 2 bytes for sync word
+                uint16_t sw;
+                memcpy(&sw, &frame[2], sizeof(uint16_t));
+                loraRadio.setSyncWord(sw);
+                needsReconfig = true;
+            }
+            break;
+            
+        case HW_GET_CONFIG:
+            // Send current config back via KISS
+            // Format: HW_GET_CONFIG, freq(4 bytes float), bw(4 bytes float), 
+            //         sf(1 byte), cr(1 byte), pwr(1 byte signed), sync(2 bytes)
+            {
+                uint8_t config[14];
+                config[0] = HW_GET_CONFIG;
+                
+                // Frequency (4 bytes, little-endian float)
+                float freq = loraRadio.getFrequency();
+                memcpy(&config[1], &freq, sizeof(float));
+                
+                // Bandwidth (4 bytes, little-endian float)
+                float bw = loraRadio.getBandwidth();
+                memcpy(&config[5], &bw, sizeof(float));
+                
+                // Spreading factor (1 byte)
+                config[9] = loraRadio.getSpreadingFactor();
+                
+                // Coding rate (1 byte)
+                config[10] = loraRadio.getCodingRate();
+                
+                // Output power (1 byte, signed)
+                int8_t pwr = loraRadio.getOutputPower();
+                memcpy(&config[11], &pwr, sizeof(int8_t));
+                
+                // Sync word (2 bytes, little-endian)
+                uint16_t sw = loraRadio.getSyncWord();
+                memcpy(&config[12], &sw, sizeof(uint16_t));
+                
+                kiss.sendCommand(CMD_SETHARDWARE, config, 14);
+            }
+            break;
+            
+        case HW_SAVE_CONFIG:
+            // Save current configuration to NVS
+            {
+                LoRaConfig currentConfig;
+                loraRadio.getCurrentConfig(currentConfig);
+                configManager.saveConfig(currentConfig);
+            }
+            break;
+            
+        case HW_RESET_CONFIG:
+            loraRadio.setFrequency(LORA_FREQUENCY);
+            loraRadio.setBandwidth(LORA_BANDWIDTH);
+            loraRadio.setSpreadingFactor(LORA_SPREADING);
+            loraRadio.setCodingRate(LORA_CODINGRATE);
+            loraRadio.setOutputPower(LORA_POWER);
+            loraRadio.setSyncWord(LORA_SYNCWORD);
+            needsReconfig = true;
+            // Also clear saved config from NVS
+            configManager.clearConfig();
+            break;
+    }
+    
+    if (needsReconfig) {
+        loraRadio.reconfigure();
+    }
+}
+
+void loop() {
+    // Process incoming serial data (KISS frames from host)
+    while (Serial.available() > 0) {
+        uint8_t byte = Serial.read();
+        kiss.processSerialByte(byte);
+    }
+    
+    // Check if we have a complete KISS frame
+    if (kiss.hasFrame()) {
+        uint8_t* frame = kiss.getFrame();
+        size_t frameLen = kiss.getFrameLength();
+        
+        if (frameLen > 0) {
+            // First byte is the command
+            uint8_t cmd = frame[0] & 0x0F;
+            
+            if (cmd == CMD_SETHARDWARE && frameLen > 1) {
+                // Handle hardware configuration
+                handleHardwareConfig(frame, frameLen);
+            } 
+            else if (cmd == CMD_DATA && frameLen > 1) {
+                // Transmit data frame (skip command byte at frame[0])
+                if (frameLen - 1 <= LORA_BUFFER_SIZE) {
+                    loraRadio.transmit(frame + 1, frameLen - 1);
+                }
+            }
+        }
+        
+        kiss.clearFrame();
+    }
+    
+    // Check for received LoRa packets
+    size_t rxLen = 0;
+    if (loraRadio.receive(rxBuffer, &rxLen)) {
+        if (rxLen > 0) {
+            // Send received packet to host via KISS
+            kiss.sendFrame(rxBuffer, rxLen);
+        }
+    }
+    
+    // Small delay to prevent tight looping
+    delay(1);
 }
