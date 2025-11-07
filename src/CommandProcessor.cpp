@@ -1,5 +1,7 @@
 // CommandProcessor.cpp
 #include "CommandProcessor.h"
+#include <algorithm>
+#include <vector>
 
 CommandProcessor::CommandProcessor(Stream &io)
     : _io(io), _kiss(io)
@@ -37,6 +39,12 @@ void CommandProcessor::registerCommand(const char *name, Handler h)
   _cmds[k] = h;
 }
 
+void CommandProcessor::registerCommandHelp(const char *name, const char *helpText)
+{
+  String k = toUpper(String(name));
+  _helpTexts[k] = String(helpText);
+}
+
 String CommandProcessor::toUpper(const String &s)
 {
   String r = s;
@@ -44,13 +52,116 @@ String CommandProcessor::toUpper(const String &s)
   return r;
 }
 
-void CommandProcessor::printHelp()
+void CommandProcessor::printHelp(const String &args)
 {
+  // If a specific command was requested, show detailed help
+  if (args.length() > 0)
+  {
+    String cmd = args;
+    cmd.trim();
+    cmd.toUpperCase();
+    
+    // Check if this command exists
+    auto it = _cmds.find(cmd);
+    if (it == _cmds.end())
+    {
+      _io.print(F("Unknown command: "));
+      _io.println(cmd);
+      return;
+    }
+    
+    // Check if help text exists for this command
+    auto helpIt = _helpTexts.find(cmd);
+    if (helpIt != _helpTexts.end())
+    {
+      _io.println(helpIt->second);
+    }
+    else
+    {
+      _io.print(F("No detailed help available for "));
+      _io.println(cmd);
+    }
+    return;
+  }
+  
+  // Otherwise, show list of all commands
   _io.println(F("Available commands:"));
+  
+  // List of short-form command abbreviations to exclude from help
+  // These are aliases for longer command names
+  const char* shortForms[] = {
+    "?", "B", "BT", "BW", "C", "CMS", "CMSGD", "CONO", "CONS", "CONM", 
+    "CONV", "CP", "CRATE", "D", "DA", "DAYU", "DAYS", "DISP", "E", "F", 
+    "FR", "FREQ", "HI", "I", "K", "LOC", "LPA", "LT", "LTM", "M", "MA", 
+    "MC", "MCOM", "MR", "MS", "MY", "MYA", "NE", "NO", "P", "PASSA", 
+    "PACT", "PWR", "RADIO", "RE", "RES", "SE", "SF", "T", "TRAC", "U",
+    "DIG"
+  };
+  const int numShortForms = sizeof(shortForms) / sizeof(shortForms[0]);
+  
+  // Collect full command names (excluding short forms)
+  std::vector<String> fullNames;
   for (auto &p : _cmds)
   {
-    _io.println(p.first);
+    bool isShortForm = false;
+    for (int i = 0; i < numShortForms; i++)
+    {
+      if (p.first == shortForms[i])
+      {
+        isShortForm = true;
+        break;
+      }
+    }
+    
+    if (!isShortForm)
+    {
+      fullNames.push_back(p.first);
+    }
   }
+  
+  // Sort alphabetically
+  std::sort(fullNames.begin(), fullNames.end());
+  
+  // Word wrap at 80 characters
+  const int maxWidth = 80;
+  int currentLineLength = 0;
+  
+  for (size_t i = 0; i < fullNames.size(); i++)
+  {
+    const String &name = fullNames[i];
+    int nameLen = name.length();
+    
+    // Add space before command (except first on line)
+    if (currentLineLength > 0)
+    {
+      nameLen += 1; // Account for the space
+      
+      // Check if adding this command would exceed line width
+      if (currentLineLength + nameLen > maxWidth)
+      {
+        // Start new line
+        _io.println();
+        currentLineLength = 0;
+      }
+      else
+      {
+        // Add space separator
+        _io.print(" ");
+        currentLineLength += 1;
+      }
+    }
+    
+    // Print the command name
+    _io.print(name);
+    currentLineLength += name.length();
+  }
+  
+  // Final newline if we printed anything
+  if (currentLineLength > 0)
+  {
+    _io.println();
+  }
+  _io.println(F("Type 'HELP <command>' for detailed help on a specific command."));
 }
 
 void CommandProcessor::handleLine(const String &line)

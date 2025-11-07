@@ -800,8 +800,7 @@ void LoRaTNCX::flushConverseBuffer()
 
 void LoRaTNCX::cmdHelp(const String &args)
 {
-  (void)args;
-  _cmd.printHelp();
+  _cmd.printHelp(args);
 }
 
 void LoRaTNCX::cmdVersion(const String &args)
@@ -2727,6 +2726,11 @@ void LoRaTNCX::cmdReset(const String &args)
 #define REG_CMD(name, handler) \
   _cmd.registerCommand((name), [this](const String &a) { handler(a); })
 
+// Helper macro to register command with help text
+// Usage: REG_CMD_HELP("BEACON", "BEACON ON|OFF - Enable/disable periodic beacon transmission")
+#define REG_CMD_HELP(name, helpText) \
+  _cmd.registerCommandHelp((name), (helpText))
+
 void LoRaTNCX::registerAllCommands()
 {
   // Core commands
@@ -2864,4 +2868,91 @@ void LoRaTNCX::registerAllCommands()
   REG_CMD("SEND", cmdSend);
   REG_CMD("RESTART", cmdRestart);
   REG_CMD("RESET", cmdReset);
+
+  // Register help text for commands
+  // Core commands
+  REG_CMD_HELP("HELP", "HELP [command] - Show available commands or help for specific command");
+  REG_CMD_HELP("VERSION", "VERSION - Display firmware version");
+  REG_CMD_HELP("STATUS", "STATUS - Show current connection status");
+  REG_CMD_HELP("DISPLAY", "DISPLAY - Show all current settings");
+  REG_CMD_HELP("ECHO", "ECHO ON|OFF - Enable/disable local echo");
+
+  // Radio control
+  REG_CMD_HELP("FREQUENCY", "FREQUENCY <MHz> - Set radio frequency (e.g., 433.500)");
+  REG_CMD_HELP("POWER", "POWER <dBm> - Set transmit power (2-20 dBm)");
+  REG_CMD_HELP("SPREADING", "SPREADING <6-12> - Set LoRa spreading factor");
+  REG_CMD_HELP("BANDWIDTH", "BANDWIDTH <kHz> - Set LoRa bandwidth (7.8, 10.4, 15.6, 20.8, 31.25, 41.7, 62.5, 125, 250, 500)");
+  REG_CMD_HELP("CODING", "CODING <5-8> - Set LoRa coding rate");
+  REG_CMD_HELP("RADIOINIT", "RADIOINIT - Reinitialize radio with current settings");
+
+  // Station & monitoring
+  REG_CMD_HELP("MYCALL", "MYCALL <call-SSID> - Set station callsign (e.g., N0CALL-1)");
+  REG_CMD_HELP("MYALIAS", "MYALIAS <call-SSID> - Set digipeater alias (e.g., WIDE1-1)");
+  REG_CMD_HELP("MONITOR", "MONITOR ON|OFF - Enable/disable packet monitoring");
+  REG_CMD_HELP("MHEARD", "MHEARD - Show list of heard stations");
+  REG_CMD_HELP("DIGIPEAT", "DIGIPEAT ON|OFF - Enable/disable digipeating");
+  REG_CMD_HELP("MSTAMP", "MSTAMP ON|OFF - Enable/disable timestamps in monitor");
+  REG_CMD_HELP("MALL", "MALL ON|OFF - Monitor all packets (ignore address filtering)");
+  REG_CMD_HELP("MCOM", "MCOM ON|OFF - Monitor only command/response frames");
+  REG_CMD_HELP("MCON", "MCON ON|OFF - Monitor only connected mode frames");
+  REG_CMD_HELP("MRPT", "MRPT ON|OFF - Monitor digipeated (repeated) packets");
+  REG_CMD_HELP("ID", "ID <text> - Set station identification text");
+  REG_CMD_HELP("HID", "HID <text> - Set heard list ID text");
+
+  // Connection & link
+  REG_CMD_HELP("CONNECT", "CONNECT <call> [via <call>...] - Initiate AX.25 connection");
+  REG_CMD_HELP("DISCONNE", "DISCONNE - Disconnect current connection");
+  REG_CMD_HELP("CONOK", "CONOK ON|OFF - Enable/disable connection requests");
+  REG_CMD_HELP("RETRY", "RETRY <n> - Set number of retransmission attempts (0-15)");
+  REG_CMD_HELP("FRACK", "FRACK <seconds> - Set frame acknowledgment timeout (1-15)");
+
+  // Connect text
+  REG_CMD_HELP("CTEXT", "CTEXT <text> - Set text sent when connection established");
+  REG_CMD_HELP("CMSG", "CMSG <text> - Set busy message for incoming connections");
+  REG_CMD_HELP("CMSGDISC", "CMSGDISC <text> - Set message sent on disconnect");
+
+  // Beacon & unproto
+  REG_CMD_HELP("BEACON", "BEACON EVERY <n>|AFTER <n>|NOW - Configure beacon timing");
+  REG_CMD_HELP("BTEXT", "BTEXT <text> - Set beacon text");
+  REG_CMD_HELP("UNPROTO", "UNPROTO <call> [via <call>...] - Set unproto destination path");
+  REG_CMD_HELP("EVERY", "EVERY <seconds> - Set beacon interval (0=disable, 1-65535)");
+
+  // Converse & packetization
+  REG_CMD_HELP("CONVERSE", "CONVERSE - Enter converse mode (Ctrl+C or K)");
+  REG_CMD_HELP("TRANS", "TRANS - Enter transparent mode");
+  REG_CMD_HELP("PACLEN", "PACLEN <bytes> - Set max packet length (0-255)");
+  REG_CMD_HELP("PACTIME", "PACTIME <100ms> - Set packet assembly timeout (0-255)");
+  REG_CMD_HELP("SENDPAC", "SENDPAC <char> - Set character to force packet send ($ or @)");
+  REG_CMD_HELP("CR", "CR ON|OFF - Add CR to LF in converse mode");
+  REG_CMD_HELP("CONMODE", "CONMODE ON|OFF - Enable connected mode protocol");
+  REG_CMD_HELP("NEWMODE", "NEWMODE ON|OFF - Use new line-based converse mode");
+  REG_CMD_HELP("NOMODE", "NOMODE ON|OFF - Disable protocol in converse mode");
+  REG_CMD_HELP("CPACTIME", "CPACTIME <100ms> - Set connected mode packet timeout (0-255)");
+
+  // Advanced protocol
+  REG_CMD_HELP("TRACE", "TRACE ON|OFF - Enable/disable packet tracing");
+  REG_CMD_HELP("FLOW", "FLOW ON|OFF - Enable/disable flow control");
+  REG_CMD_HELP("PASSALL", "PASSALL ON|OFF - Pass invalid packets to host");
+  REG_CMD_HELP("RESPTIME", "RESPTIME <seconds> - Set response time delay (0-255)");
+  REG_CMD_HELP("EPATH", "EPATH <text> - Set echo path for digipeating");
+
+  // Date/Time
+  REG_CMD_HELP("CONSTAMP", "CONSTAMP ON|OFF - Enable/disable connection timestamps");
+  REG_CMD_HELP("DAYSTAMP", "DAYSTAMP ON|OFF - Enable/disable date stamps");
+  REG_CMD_HELP("DAYUSA", "DAYUSA ON|OFF - Use US date format (MM/DD/YY)");
+  REG_CMD_HELP("DAYTIME", "DAYTIME YYMMDDhhmmss|YYMMDDhhmm - Set current time");
+
+  // GPS/Location
+  REG_CMD_HELP("LOCATION", "LOCATION <lat> <lon> - Set station location");
+  REG_CMD_HELP("LPATH", "LPATH <call> [via <call>...] - Set location beacon path");
+  REG_CMD_HELP("LTEXT", "LTEXT <text> - Set location beacon comment");
+  REG_CMD_HELP("LTMON", "LTMON ON|OFF - Monitor location beacons");
+
+  // KISS mode
+  REG_CMD_HELP("KISS", "KISS ON|OFF - Enable/disable KISS mode (use RESTART to enter)");
+
+  // Utility
+  REG_CMD_HELP("SEND", "SEND - Force immediate transmission of buffered data");
+  REG_CMD_HELP("RESTART", "RESTART - Restart TNC (enter KISS mode if enabled)");
+  REG_CMD_HELP("RESET", "RESET - Reset all settings to factory defaults");
 }
