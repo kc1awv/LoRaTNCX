@@ -1,550 +1,411 @@
-/**
- * @file LoRaRadio.cpp
- * @brief LoRa radio interface implementation using proven communication methods
- * @author LoRaTNCX Project
- * @date October 28, 2025
- */
-
+// LoRaRadio.cpp
 #include "LoRaRadio.h"
-#include <math.h>
+#include "AX25.h"
 
-LoRaRadio::LoRaRadio()
+LoRaRadio::LoRaRadio(int8_t cs, int8_t busy, int8_t dio0, int8_t rst,
+                     int8_t paEnPin, int8_t paTxEnPin, int8_t paPowerPin)
+    : _cs(cs), _busy(busy), _dio0(dio0), _rst(rst), _paEnPin(paEnPin), _paTxEnPin(paTxEnPin), _paPowerPin(paPowerPin)
 {
-    radio = nullptr;
-    initialized = false;
-    spiInitialized = false;
-    paInitialized = false;
-    txCount = 0;
-    rxCount = 0;
-    lastRSSI = 0;
-    lastSNR = 0;
-
-    // Initialize current parameters with defaults
-    currentFrequency = LORA_FREQUENCY;
-    currentTxPower = LORA_OUTPUT_POWER;
-    currentSpreadingFactor = LORA_SPREADING_FACTOR;
-    currentBandwidth = LORA_BANDWIDTH;
-    currentCodingRate = LORA_CODING_RATE;
-    currentSyncWord = LORA_SYNC_WORD;
 }
 
-bool LoRaRadio::begin()
+LoRaRadio::~LoRaRadio()
 {
-    const bool reconfiguring = initialized;
-    Serial.println(reconfiguring ? "Reconfiguring LoRa radio with default configuration..."
-                                 : "Initializing LoRa radio...");
+  // Stop the RX task if running
+  stopRxTask();
 
-    // Initialize SPI and PA control only once
-    if (!spiInitialized)
-    {
-        initializeSPI();
-    }
-
-    if (!paInitialized)
-    {
-        initializePAControl();
-    }
-
-    // Initialize radio instance - using same pins as working ping/pong
-    if (radio == nullptr)
-    {
-        radio = new SX1262(new Module(LORA_SS_PIN, LORA_DIO0_PIN, LORA_RST_PIN, LORA_BUSY_PIN));
-    }
-
-    // Configure radio with proven settings
-    initialized = false;
-    int state = radio->begin(
-        LORA_FREQUENCY,
-        LORA_BANDWIDTH,
-        LORA_SPREADING_FACTOR,
-        LORA_CODING_RATE,
-        LORA_SYNC_WORD,
-        LORA_OUTPUT_POWER,
-        LORA_PREAMBLE_LENGTH);
-
-    if (state == RADIOLIB_ERR_NONE)
-    {
-        // Store current parameters
-        currentFrequency = LORA_FREQUENCY;
-        currentBandwidth = LORA_BANDWIDTH;
-        currentSpreadingFactor = LORA_SPREADING_FACTOR;
-        currentCodingRate = LORA_CODING_RATE;
-        currentSyncWord = LORA_SYNC_WORD;
-        currentTxPower = LORA_OUTPUT_POWER;
-
-        Serial.println(reconfiguring ? "✓ LoRa radio reconfigured successfully!"
-                                     : "✓ LoRa radio initialized successfully!");
-
-        // Set PA to receive mode after initialization
-        setPA(false);
-
-        // Start in receive mode
-        int rxState = radio->startReceive();
-        if (rxState == RADIOLIB_ERR_NONE)
-        {
-            Serial.println("✓ Radio started in receive mode");
-            initialized = true;
-        }
-        else
-        {
-            Serial.print("✗ Failed to start receive mode, error: ");
-            Serial.println(rxState);
-            return false;
-        }
-
-        // Print configuration
-        Serial.println("LoRa Configuration:");
-        Serial.printf("  Frequency: %.1f MHz\r\n", currentFrequency);
-        Serial.printf("  Bandwidth: %.1f kHz\r\n", currentBandwidth);
-        Serial.printf("  Spreading Factor: %d\r\n", currentSpreadingFactor);
-        Serial.printf("  Coding Rate: 4/%d\r\n", currentCodingRate);
-        Serial.printf("  Output Power: %d dBm\r\n", currentTxPower);
-        Serial.printf("  Sync Word: 0x%02X\r\n", currentSyncWord);
-    }
-    else
-    {
-        Serial.print(reconfiguring ? "✗ LoRa radio reconfiguration failed! Error: "
-                                   : "✗ LoRa radio initialization failed! Error: ");
-        Serial.println(state);
-        return false;
-    }
-
-    return initialized;
+  // Clean up dynamically allocated objects
+  if (_radio)
+  {
+    delete _radio;
+    _radio = nullptr;
+  }
+  if (_mod)
+  {
+    delete _mod;
+    _mod = nullptr;
+  }
 }
 
-bool LoRaRadio::begin(float frequency, float bandwidth, uint8_t spreadingFactor, uint8_t codingRate)
+void LoRaRadio::setRxHandler(RxHandler h)
 {
-    const bool reconfiguring = initialized;
-    Serial.println(reconfiguring ? "Reconfiguring LoRa radio with custom configuration..."
-                                 : "Initializing LoRa radio with custom configuration...");
-
-    // Initialize SPI and PA control only once
-    if (!spiInitialized)
-    {
-        initializeSPI();
-    }
-
-    if (!paInitialized)
-    {
-        initializePAControl();
-    }
-
-    // Initialize radio instance - using same pins as working ping/pong
-    if (radio == nullptr)
-    {
-        radio = new SX1262(new Module(LORA_SS_PIN, LORA_DIO0_PIN, LORA_RST_PIN, LORA_BUSY_PIN));
-    }
-
-    // Configure radio with custom settings
-    initialized = false;
-    int state = radio->begin(
-        frequency,
-        bandwidth,
-        spreadingFactor,
-        codingRate,
-        LORA_SYNC_WORD,
-        LORA_OUTPUT_POWER,
-        LORA_PREAMBLE_LENGTH);
-
-    if (state == RADIOLIB_ERR_NONE)
-    {
-        // Store current parameters
-        currentFrequency = frequency;
-        currentBandwidth = bandwidth;
-        currentSpreadingFactor = spreadingFactor;
-        currentCodingRate = codingRate;
-        currentSyncWord = LORA_SYNC_WORD;
-        currentTxPower = LORA_OUTPUT_POWER;
-
-        Serial.println(reconfiguring ? "✓ LoRa radio reconfigured successfully!"
-                                     : "✓ LoRa radio initialized successfully!");
-
-        // Set PA to receive mode after initialization
-        setPA(false);
-
-        // Start in receive mode
-        int rxState = radio->startReceive();
-        if (rxState == RADIOLIB_ERR_NONE)
-        {
-            Serial.println("✓ Radio started in receive mode");
-            initialized = true;
-        }
-        else
-        {
-            Serial.print("✗ Failed to start receive mode, error: ");
-            Serial.println(rxState);
-            return false;
-        }
-
-        // Print configuration
-        Serial.println("LoRa Configuration:");
-        Serial.printf("  Frequency: %.1f MHz\r\n", currentFrequency);
-        Serial.printf("  Bandwidth: %.1f kHz\r\n", currentBandwidth);
-        Serial.printf("  Spreading Factor: %d\r\n", currentSpreadingFactor);
-        Serial.printf("  Coding Rate: 4/%d\r\n", currentCodingRate);
-        Serial.printf("  Output Power: %d dBm\r\n", currentTxPower);
-        Serial.printf("  Sync Word: 0x%02X\r\n", currentSyncWord);
-    }
-    else
-    {
-        Serial.print(reconfiguring ? "✗ LoRa radio reconfiguration failed! Error: "
-                                   : "✗ LoRa radio initialization failed! Error: ");
-        Serial.println(state);
-        return false;
-    }
-
-    return initialized;
+  _rxHandler = h;
 }
 
-bool LoRaRadio::transmit(const uint8_t *data, size_t length)
+bool LoRaRadio::begin(float freq)
 {
-    if (!initialized)
-    {
-        return false;
-    }
+  _freq = freq;
+  // Create module and radio objects dynamically so we can keep header lightweight
+  // Module signature: Module(cs, dio0, rst, busy) is used by RadioLib examples. If this
+  // changes across versions, adapt accordingly.
+  _mod = new Module(_cs, _dio0, _rst, _busy);
+  // RadioLib's SX1262 constructor takes a Module* (SPI handled internally)
+  _radio = new SX1262(_mod);
 
-    // Set PA to transmit mode with proven timing
-    setPA(true);
+  // optional PA control pins (follow HelTec factory behavior)
+  if (_paPowerPin >= 0)
+  {
+    // set power control pin as an output and enable (factory uses analog write)
+    pinMode(_paPowerPin, OUTPUT);
+    digitalWrite(_paPowerPin, HIGH);
+  }
+  if (_paEnPin >= 0)
+  {
+    pinMode(_paEnPin, OUTPUT);
+    // enable PA by default during initialization (factory code enables PA pins before radio init)
+    digitalWrite(_paEnPin, HIGH);
+  }
+  if (_paTxEnPin >= 0)
+  {
+    pinMode(_paTxEnPin, OUTPUT);
+    digitalWrite(_paTxEnPin, HIGH);
+  }
 
-    // Transmit data
-    int state = radio->transmit(const_cast<uint8_t *>(data), length);
+  // small settle time after enabling PA pins
+  if ((_paEnPin >= 0) || (_paTxEnPin >= 0) || (_paPowerPin >= 0))
+  {
+    delay(5);
+  }
 
-    // Set PA back to receive mode with proven timing
-    setPA(false);
-
-    // Restart receive mode
-    radio->startReceive();
-
-    if (state == RADIOLIB_ERR_NONE)
-    {
-        txCount++;
-        return true;
-    }
-    else
-    {
-        Serial.print("Transmission failed, error: ");
-        Serial.println(state);
-        return false;
-    }
-}
-
-bool LoRaRadio::transmit(const String &message)
-{
-    if (!initialized)
-    {
-        return false;
-    }
-
-    // Set PA to transmit mode with proven timing
-    setPA(true);
-
-    // Transmit string - create a non-const copy for RadioLib
-    String msgCopy = message;
-    int state = radio->transmit(msgCopy);
-
-    // Set PA back to receive mode with proven timing
-    setPA(false);
-
-    // Restart receive mode
-    radio->startReceive();
-
-    if (state == RADIOLIB_ERR_NONE)
-    {
-        txCount++;
-        return true;
-    }
-    else
-    {
-        Serial.print("Transmission failed, error: ");
-        Serial.println(state);
-        return false;
-    }
-}
-
-bool LoRaRadio::available()
-{
-    if (!initialized)
-    {
-        return false;
-    }
-
-    // Check if packet received
-    return (radio->getIrqStatus() & RADIOLIB_SX126X_IRQ_RX_DONE);
-}
-
-size_t LoRaRadio::receive(uint8_t *buffer, size_t maxLength)
-{
-    if (!initialized || !available())
-    {
-        return 0;
-    }
-
-    // Use String-based readData (proven to work in ping/pong)
-    String str;
-    int state = radio->readData(str);
-
-    size_t length = 0;
-
-    if (state == RADIOLIB_ERR_NONE && str.length() > 0)
-    {
-        // Copy string data to buffer
-        length = min((size_t)str.length(), maxLength);
-        memcpy(buffer, str.c_str(), length);
-
-        rxCount++;
-        lastRSSI = radio->getRSSI();
-        lastSNR = radio->getSNR();
-
-        // Restart receive mode
-        radio->startReceive();
-    }
-    else if (state != RADIOLIB_ERR_RX_TIMEOUT)
-    {
-        Serial.print("Receive error: ");
-        Serial.println(state);
-
-        // Restart receive mode on error
-        radio->startReceive();
-    }
-
-    return length;
-}
-
-bool LoRaRadio::receive(String &message)
-{
-    if (!initialized || !available())
-    {
-        return false;
-    }
-
-    int state = radio->readData(message);
-
-    if (state == RADIOLIB_ERR_NONE)
-    {
-        rxCount++;
-        lastRSSI = radio->getRSSI();
-        lastSNR = radio->getSNR();
-
-        // Restart receive mode
-        radio->startReceive();
-        return true;
-    }
-    else if (state != RADIOLIB_ERR_RX_TIMEOUT)
-    {
-        Serial.print("Receive error: ");
-        Serial.println(state);
-
-        // Restart receive mode on error
-        radio->startReceive();
-    }
-
+  // try to initialize radio
+  int16_t state = _radio->begin(_freq);
+  if (state != RADIOLIB_ERR_NONE)
+  {
+    Serial.printf("[LoRaRadio] ERROR: Radio initialization failed, code: %d\r\n", state);
+    delete _radio;
+    _radio = nullptr;
+    delete _mod;
+    _mod = nullptr;
     return false;
+  }
+
+  // Configure default radio settings
+  // These can be adjusted via setters after begin() returns
+  state = _radio->setFrequency(915.0);
+  if (state != RADIOLIB_ERR_NONE)
+  {
+    Serial.printf("[LoRaRadio] ERROR: Failed to set frequency, code: %d\r\n", state);
+    goto cleanup;
+  }
+  _freq = 915.0;
+
+  state = _radio->setBandwidth(125.0);
+  if (state != RADIOLIB_ERR_NONE)
+  {
+    Serial.printf("[LoRaRadio] ERROR: Failed to set bandwidth, code: %d\r\n", state);
+    goto cleanup;
+  }
+  _bandwidth = 125;
+
+  state = _radio->setSpreadingFactor(7);
+  if (state != RADIOLIB_ERR_NONE)
+  {
+    Serial.printf("[LoRaRadio] ERROR: Failed to set spreading factor, code: %d\r\n", state);
+    goto cleanup;
+  }
+  _spreadingFactor = 7;
+
+  state = _radio->setCodingRate(5);
+  if (state != RADIOLIB_ERR_NONE)
+  {
+    Serial.printf("[LoRaRadio] ERROR: Failed to set coding rate, code: %d\r\n", state);
+    goto cleanup;
+  }
+  _codingRate = 5;
+
+  state = _radio->setOutputPower(14);
+  if (state != RADIOLIB_ERR_NONE)
+  {
+    Serial.printf("[LoRaRadio] ERROR: Failed to set output power, code: %d\r\n", state);
+    goto cleanup;
+  }
+  _txPower = 14;
+
+  // Start in receive mode
+  state = _radio->startReceive();
+  if (state != RADIOLIB_ERR_NONE)
+  {
+    Serial.printf("[LoRaRadio] ERROR: Failed to start receive mode, code: %d\r\n", state);
+    goto cleanup;
+  }
+
+  // Start the RX polling task on separate core
+  startRxTask();
+
+  return true;
+
+cleanup:
+  // Cleanup on error
+  delete _radio;
+  _radio = nullptr;
+  delete _mod;
+  _mod = nullptr;
+  return false;
 }
 
-float LoRaRadio::getRSSI()
+int LoRaRadio::setTxPower(int8_t power)
 {
-    return lastRSSI;
+  if (!_radio)
+    return -1;
+  int res = _radio->setOutputPower(power);
+  if (res == RADIOLIB_ERR_NONE)
+  {
+    _txPower = power;
+  }
+  return res;
 }
 
-float LoRaRadio::getSNR()
+int LoRaRadio::setFrequency(float freq)
 {
-    return lastSNR;
+  if (!_radio)
+    return -1;
+  _freq = freq;
+  return _radio->setFrequency(_freq);
 }
 
-String LoRaRadio::getStatus()
-{
-    String status = "LoRa Radio Status:\n";
-    status += "  Initialized: " + String(initialized ? "Yes" : "No") + "\n";
-    status += "  TX Count: " + String(txCount) + "\n";
-    status += "  RX Count: " + String(rxCount) + "\n";
-    status += "  Last RSSI: " + String(lastRSSI, 1) + " dBm\n";
-    status += "  Last SNR: " + String(lastSNR, 1) + " dB";
-    return status;
-}
-
-void LoRaRadio::initializePAControl()
-{
-    Serial.println("Configuring PA control pins (using proven method)...");
-
-    // PA Power Control (LORA_PA_POWER = 7) - ANALOG mode (factory firmware insight)
-    pinMode(LORA_PA_POWER_PIN, ANALOG);
-    Serial.printf("  PA_POWER (pin %d): ANALOG mode (factory style)\r\n", LORA_PA_POWER_PIN);
-
-    // PA Enable (LORA_PA_EN = 2) - Keep enabled
-    pinMode(LORA_PA_EN_PIN, OUTPUT);
-    digitalWrite(LORA_PA_EN_PIN, HIGH);
-    Serial.printf("  PA_EN (pin %d): HIGH\r\n", LORA_PA_EN_PIN);
-
-    // PA TX Enable (LORA_PA_TX_EN = 46) - Start in receive mode
-    pinMode(LORA_PA_TX_EN_PIN, OUTPUT);
-    digitalWrite(LORA_PA_TX_EN_PIN, LOW); // LOW for receive mode
-    Serial.printf("  PA_TX_EN (pin %d): LOW (RX mode)\r\n", LORA_PA_TX_EN_PIN);
-
-    Serial.println("PA configured: Power/Enable HIGH, TX_EN LOW for receive mode");
-
-    // Power stabilization delay
-    delay(200);
-    paInitialized = true;
-}
-
-void LoRaRadio::setPA(bool transmit)
-{
-    if (transmit)
-    {
-        // Enable PA for transmission using proven method
-        digitalWrite(LORA_PA_EN_PIN, HIGH);    // Keep PA enabled
-        digitalWrite(LORA_PA_TX_EN_PIN, HIGH); // Enable TX mode
-        analogWrite(LORA_PA_POWER_PIN, 255);   // Full power in ANALOG mode
-        delay(20);                             // Critical 20ms settling delay (proven in ping/pong)
-    }
-    else
-    {
-        // Switch PA to receive mode using proven method
-        digitalWrite(LORA_PA_EN_PIN, HIGH);   // Keep PA enabled
-        digitalWrite(LORA_PA_TX_EN_PIN, LOW); // DISABLE TX mode for RX
-        analogWrite(LORA_PA_POWER_PIN, 0);    // Reduce power for RX
-        delay(20);                            // Critical 20ms settling delay (proven in ping/pong)
-    }
-}
-
-void LoRaRadio::initializeSPI()
-{
-    Serial.println("Initializing SPI...");
-    SPI.begin(LORA_SCK_PIN, LORA_MISO_PIN, LORA_MOSI_PIN, LORA_SS_PIN);
-    Serial.println("✓ SPI initialized");
-    spiInitialized = true;
-}
-
-bool LoRaRadio::applyConfiguration(float frequency, float bandwidth, uint8_t spreadingFactor, uint8_t codingRate, int8_t txPower, uint8_t syncWord)
-{
-    bool modemOk = applyModemConfiguration(frequency, bandwidth, spreadingFactor, codingRate);
-
-    bool txPowerOk = setTxPower(txPower);
-    bool syncWordOk = setSyncWord(syncWord);
-
-    return modemOk && txPowerOk && syncWordOk;
-}
-
-bool LoRaRadio::applyModemConfiguration(float frequency, float bandwidth, uint8_t spreadingFactor, uint8_t codingRate)
-{
-    if (initialized)
-    {
-        const float freqDiff = fabsf(currentFrequency - frequency);
-        const float bwDiff = fabsf(currentBandwidth - bandwidth);
-        if (freqDiff < 0.001f && bwDiff < 0.001f &&
-            currentSpreadingFactor == spreadingFactor &&
-            currentCodingRate == codingRate)
-        {
-            // Configuration already matches requested values
-            return true;
-        }
-    }
-
-    return begin(frequency, bandwidth, spreadingFactor, codingRate);
-}
-
-// Parameter setter methods - these may reinitialize the radio with new parameters
-bool LoRaRadio::setFrequency(float frequency)
-{
-    if (!initialized || radio == nullptr)
-    {
-        return false;
-    }
-
-    return applyModemConfiguration(frequency, currentBandwidth, currentSpreadingFactor, currentCodingRate);
-}
-
-bool LoRaRadio::setTxPower(int8_t power)
-{
-    if (!initialized || radio == nullptr)
-    {
-        return false;
-    }
-
-    // Set power directly on radio (doesn't require full reinit)
-    int state = radio->setOutputPower(power);
-    if (state == RADIOLIB_ERR_NONE)
-    {
-        currentTxPower = power;
-        return true;
-    }
-    return false;
-}
-
-bool LoRaRadio::setSpreadingFactor(uint8_t sf)
-{
-    if (!initialized || radio == nullptr)
-    {
-        return false;
-    }
-
-    return applyModemConfiguration(currentFrequency, currentBandwidth, sf, currentCodingRate);
-}
-
-bool LoRaRadio::setBandwidth(float bw)
-{
-    if (!initialized || radio == nullptr)
-    {
-        return false;
-    }
-
-    return applyModemConfiguration(currentFrequency, bw, currentSpreadingFactor, currentCodingRate);
-}
-
-bool LoRaRadio::setCodingRate(uint8_t cr)
-{
-    if (!initialized || radio == nullptr)
-    {
-        return false;
-    }
-
-    return applyModemConfiguration(currentFrequency, currentBandwidth, currentSpreadingFactor, cr);
-}
-
-bool LoRaRadio::setSyncWord(uint8_t syncWord)
-{
-    if (!initialized || radio == nullptr)
-    {
-        return false;
-    }
-
-    // Set sync word directly on radio (doesn't require full reinit)
-    int state = radio->setSyncWord(syncWord);
-    if (state == RADIOLIB_ERR_NONE)
-    {
-        currentSyncWord = syncWord;
-        return true;
-    }
-    return false;
-}
-
-// Parameter getter methods
 float LoRaRadio::getFrequency() const
 {
-    return currentFrequency;
+  return _freq;
 }
 
 int8_t LoRaRadio::getTxPower() const
 {
-    return currentTxPower;
+  return _txPower;
 }
 
-uint8_t LoRaRadio::getSpreadingFactor() const
+int LoRaRadio::getLastRSSI() const
 {
-    return currentSpreadingFactor;
+  return _lastRSSI;
 }
 
-float LoRaRadio::getBandwidth() const
+float LoRaRadio::getLastSNR() const
 {
-    return currentBandwidth;
+  return _lastSNR;
 }
 
-uint8_t LoRaRadio::getCodingRate() const
+int LoRaRadio::getLastFreqError() const
 {
-    return currentCodingRate;
+  return _lastFreqError;
 }
 
-uint8_t LoRaRadio::getSyncWord() const
+int LoRaRadio::setSpreadingFactor(int sf)
 {
-    return currentSyncWord;
+  if (!_radio)
+    return -1;
+  int r = _radio->setSpreadingFactor(sf);
+  if (r == RADIOLIB_ERR_NONE)
+    _spreadingFactor = sf;
+  return r;
+}
+
+int LoRaRadio::setBandwidth(long bw)
+{
+  if (!_radio)
+    return -1;
+  int r = _radio->setBandwidth(bw);
+  if (r == RADIOLIB_ERR_NONE)
+    _bandwidth = bw;
+  return r;
+}
+
+int LoRaRadio::setCodingRate(int cr)
+{
+  if (!_radio)
+    return -1;
+  int r = _radio->setCodingRate(cr);
+  if (r == RADIOLIB_ERR_NONE)
+    _codingRate = cr;
+  return r;
+}
+
+int LoRaRadio::getSpreadingFactor() const
+{
+  return _spreadingFactor;
+}
+
+long LoRaRadio::getBandwidth() const
+{
+  return _bandwidth;
+}
+
+int LoRaRadio::getCodingRate() const
+{
+  return _codingRate;
+}
+
+int LoRaRadio::send(const uint8_t *buf, size_t len, unsigned long timeout)
+{
+  if (!_radio)
+    return -1;
+  // enforce hardware max payload
+  const size_t maxlen = (size_t)RADIOLIB_SX126X_MAX_PACKET_LENGTH;
+  if (len > maxlen)
+  {
+    return -2; // payload too large
+  }
+
+  // If PA pins exist, enable them before transmit (mimic factory test)
+  if (_paEnPin >= 0)
+    digitalWrite(_paEnPin, HIGH);
+  if (_paTxEnPin >= 0)
+    digitalWrite(_paTxEnPin, HIGH);
+  if ((_paEnPin >= 0) || (_paTxEnPin >= 0))
+  {
+    delay(2); // small settle time
+  }
+
+  // send packet (blocking)
+  int16_t result = _radio->transmit(buf, len);
+
+  // disable PA pins after transmit
+  if (_paEnPin >= 0)
+    digitalWrite(_paEnPin, LOW);
+  if (_paTxEnPin >= 0)
+    digitalWrite(_paTxEnPin, LOW);
+
+  // Restart receive mode after transmit (proven method)
+  _radio->startReceive();
+
+  return result;
+}
+
+// Static task function for FreeRTOS
+void LoRaRadio::rxTaskFunction(void *parameter)
+{
+  LoRaRadio *radio = static_cast<LoRaRadio *>(parameter);
+
+  while (radio->_rxTaskRunning)
+  {
+    radio->pollInternal();
+    // Small delay to yield to other tasks and prevent watchdog issues
+    vTaskDelay(pdMS_TO_TICKS(5));
+  }
+
+  // Task ending, delete itself
+  radio->_rxTaskHandle = nullptr;
+  vTaskDelete(nullptr);
+}
+
+void LoRaRadio::startRxTask()
+{
+  if (_rxTaskHandle != nullptr)
+    return; // Already running
+
+  _rxTaskRunning = true;
+
+  // Create task on core 0 (core 1 typically runs Arduino loop)
+  // Stack size: 4096 bytes, priority: 1 (low priority, won't block serial)
+  xTaskCreatePinnedToCore(
+      rxTaskFunction, // Task function
+      "LoRaRxTask",   // Task name
+      4096,           // Stack size (bytes)
+      this,           // Parameter passed to task
+      1,              // Priority (1 = low, lower than default loop priority)
+      &_rxTaskHandle, // Task handle
+      0               // Core 0 (Arduino loop runs on core 1)
+  );
+}
+
+void LoRaRadio::stopRxTask()
+{
+  if (_rxTaskHandle == nullptr)
+    return; // Not running
+
+  _rxTaskRunning = false;
+
+  // Wait for task to finish (max 1 second)
+  unsigned long start = millis();
+  while (_rxTaskHandle != nullptr && (millis() - start) < 1000)
+  {
+    delay(10);
+  }
+}
+
+void LoRaRadio::pollInternal()
+{
+  if (!_radio)
+    return;
+
+  uint8_t buf[256];
+  size_t buflen = sizeof(buf);
+
+  // Use receive() with 0 timeout instead of readData() in startReceive() mode
+  // This properly handles the RX complete flag and won't return the same packet repeatedly
+  String str;
+  int16_t res = _radio->receive(str, 0); // 0 = non-blocking, return immediately
+
+  // Check result
+  if (res == RADIOLIB_ERR_RX_TIMEOUT)
+  {
+    // No packet available, this is normal in non-blocking mode
+    return;
+  }
+
+  if (res != RADIOLIB_ERR_NONE)
+  {
+    // Actual error occurred
+    if (res != RADIOLIB_ERR_CRC_MISMATCH)
+    {
+      Serial.print("Receive error: ");
+      Serial.println(res);
+    }
+    return;
+  }
+
+  // Success! We have a packet
+  if (str.length() == 0)
+  {
+    // Got success but no data - shouldn't happen, but handle it
+    return;
+  }
+
+  // We have actual data - process it
+  size_t plen = min((size_t)str.length(), buflen);
+  memcpy(buf, str.c_str(), plen);
+
+  if (plen > 0 && plen <= buflen)
+  {
+    // Capture packet statistics
+    _lastRSSI = (int)_radio->getRSSI();
+    _lastSNR = _radio->getSNR();
+    _lastFreqError = (int)_radio->getFrequencyError();
+
+    int rssi = _lastRSSI;
+    String from = String("");
+    String payload = String("");
+
+    // Validate packet format and FCS
+    bool fcsValid = AX25::validateFCS(buf, plen);
+    bool packetValid = AX25::isValidPacket(buf, plen, true);
+
+    // try to parse AX.25 addresses to extract source callsign and payload
+    AX25::AddrInfo ai = AX25::parseAddresses(buf, plen);
+
+    if (ai.ok)
+    {
+      from = ai.src;
+      // Extract payload: skip AX.25 header, exclude trailing FCS (2 bytes)
+      if (ai.header_len < plen)
+      {
+        size_t payload_len = plen - ai.header_len;
+        // AX.25 frames have 2-byte FCS at the end, exclude it
+        if (payload_len > 2)
+        {
+          payload_len -= 2;
+        }
+        payload = String((const char *)(buf + ai.header_len), payload_len);
+      }
+    }
+    else
+    {
+      // If parsing failed, treat entire packet as payload (fallback for non-AX25 packets)
+      payload = String((const char *)buf, plen);
+    }
+
+    if (_rxHandler)
+    {
+      _rxHandler(buf, plen, ai, rssi);
+    }
+  }
+
+  // receive() with timeout automatically manages RX state, no need to call startReceive() here
 }

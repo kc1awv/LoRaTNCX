@@ -1,0 +1,109 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build LoRaTNCX V3",
+			"type": "shell",
+			"command": "C:\\Users\\smill\\.platformio\\penv\\Scripts\\platformio.exe",
+			"args": [
+				"run",
+				"--environment",
+				"heltec_wifi_lora_32_V3"
+			],
+			"problemMatcher": [
+				"$platformio"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Build LoRaTNCX V4",
+			"type": "shell",
+			"command": "C:\\Users\\smill\\.platformio\\penv\\Scripts\\platformio.exe",
+			"args": [
+				"run",
+				"--environment",
+				"heltec_wifi_lora_32_V4"
+			],
+			"problemMatcher": [
+				"$platformio"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Build All Environments",
+			"type": "shell",
+			"command": "C:\\Users\\smill\\.platformio\\penv\\Scripts\\platformio.exe",
+			"args": [
+				"run"
+			],
+			"problemMatcher": [
+				"$platformio"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Clean and Build V3",
+			"type": "shell",
+			"command": "C:\\Users\\smill\\.platformio\\penv\\Scripts\\platformio.exe",
+			"args": [
+				"run",
+				"--environment",
+				"heltec_wifi_lora_32_V3",
+				"--target",
+				"clean"
+			],
+			"problemMatcher": [
+				"$platformio"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Clean and Build V4",
+			"type": "shell",
+			"command": "C:\\Users\\smill\\.platformio\\penv\\Scripts\\platformio.exe",
+			"args": [
+				"run",
+				"--environment",
+				"heltec_wifi_lora_32_V4",
+				"--target",
+				"clean"
+			],
+			"problemMatcher": [
+				"$platformio"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Upload Filesystem (SPIFFS) V3",
+			"type": "shell",
+			"command": "C:\\Users\\smill\\.platformio\\penv\\Scripts\\platformio.exe",
+			"args": [
+				"run",
+				"--environment",
+				"heltec_wifi_lora_32_V3",
+				"--target",
+				"uploadfs"
+			],
+			"problemMatcher": [
+				"$platformio"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Upload Filesystem (SPIFFS) V4",
+			"type": "shell",
+			"command": "C:\\Users\\smill\\.platformio\\penv\\Scripts\\platformio.exe",
+			"args": [
+				"run",
+				"--environment",
+				"heltec_wifi_lora_32_V4",
+				"--target",
+				"uploadfs"
+			],
+			"problemMatcher": [
+				"$platformio"
+			],
+			"group": "build"
+		}
+	]
+}

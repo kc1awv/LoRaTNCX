@@ -1,162 +1,133 @@
-/**
- * @file KISSProtocol.h
- * @brief KISS protocol implementation for TNC communication
- * @author LoRaTNCX Project
- * @date October 28, 2025
- *
- * Implements the KISS (Keep It Simple Stupid) protocol for Terminal Node Controller
- * communication. This allows the TNC to interface with packet radio applications
- * like APRS, Winlink, and other amateur radio digital modes.
- *
- * KISS Protocol Reference:
- * - Frame start/end: 0xC0 (FEND)
- * - Frame escape: 0xDB (FESC)
- * - Transposed frame end: 0xDC (TFEND)
- * - Transposed frame escape: 0xDD (TFESC)
- */
-
-#ifndef KISS_PROTOCOL_H
-#define KISS_PROTOCOL_H
+// KISSProtocol.h
+// KISS (Keep It Simple Stupid) protocol implementation for TNC
+#pragma once
 
 #include <Arduino.h>
+#include <functional>
 
-// KISS protocol constants
-#define FEND 0xC0  // Frame End
-#define FESC 0xDB  // Frame Escape
-#define TFEND 0xDC // Transposed Frame End
-#define TFESC 0xDD // Transposed Frame Escape
-
-// KISS command codes
-#define CMD_DATA 0x00        // Data frame
-#define CMD_TXDELAY 0x01     // TX delay
-#define CMD_P 0x02           // Persistence parameter
-#define CMD_SLOTTIME 0x03    // Slot time
-#define CMD_TXTAIL 0x04      // TX tail
-#define CMD_FULLDUPLEX 0x05  // Full duplex
-#define CMD_SETHARDWARE 0x06 // Set hardware
-#define CMD_RETURN 0xFF      // Return
-
-// Buffer sizes
-#define KISS_RX_BUFFER_SIZE 512
-#define KISS_TX_BUFFER_SIZE 512
-
+/**
+ * @brief KISS Protocol handler for binary frame communication
+ * 
+ * Implements KISS protocol for interfacing with packet radio applications.
+ * Handles frame assembly/disassembly, byte escaping, and exit detection.
+ * 
+ * Protocol constants:
+ * - FEND (0xC0): Frame End marker
+ * - FESC (0xDB): Frame Escape
+ * - TFEND (0xDC): Transposed Frame End
+ * - TFESC (0xDD): Transposed Frame Escape
+ * 
+ * Commands:
+ * - CMD_DATA (0x00): Data frame
+ * - CMD_TXDELAY (0x01): TX delay parameter
+ * - CMD_P (0x02): Persistence parameter
+ * - CMD_SLOTTIME (0x03): Slot time
+ * - CMD_TXTAIL (0x04): TX tail
+ * - CMD_FULLDUPLEX (0x05): Full duplex mode
+ * - CMD_SETHARDWARE (0x06): Hardware-specific
+ * - CMD_RETURN (0xFF): Exit KISS mode
+ * 
+ * Exit mechanisms:
+ * - ESC character (0x1B): TAPR TNC2 standard
+ * - CMD_RETURN frame (0xFF): KISS protocol standard
+ */
 class KISSProtocol
 {
 public:
-    /**
-     * @brief Initialize KISS protocol handler
-     * @return true if initialization successful
-     */
-    bool begin();
+  /**
+   * @brief Construct a new KISS Protocol handler
+   * @param io Stream for serial communication
+   */
+  KISSProtocol(Stream &io);
 
-    /**
-     * @brief Process incoming serial data for KISS frames
-     * @return true if complete frame received
-     */
-    bool processIncoming();
+  /**
+   * @brief Process a single byte for KISS frame assembly
+   * @param byte Byte to process
+   * @return true if a complete frame was received
+   */
+  bool processByte(uint8_t byte);
 
-    /**
-     * @brief Process a single byte for KISS frame assembly
-     * @param byte Byte to process
-     * @return true if complete frame received
-     */
-    bool processByte(uint8_t byte);
+  /**
+   * @brief Check if a complete frame is available
+   * @return true if frame is ready to be retrieved
+   */
+  bool hasFrame() const;
 
-    /**
-     * @brief Check if a complete KISS frame is available
-     * @return true if frame available
-     */
-    bool available();
+  /**
+   * @brief Get the received frame data
+   * @param buffer Buffer to store frame data
+   * @param maxLen Maximum buffer length
+   * @return Number of bytes copied (0 if no frame available)
+   */
+  size_t getFrame(uint8_t *buffer, size_t maxLen);
 
-    /**
-     * @brief Get the last received KISS frame
-     * @param buffer Buffer to store frame data
-     * @param maxLength Maximum buffer length
-     * @return Number of bytes in frame, 0 if no frame
-     */
-    size_t getFrame(uint8_t *buffer, size_t maxLength);
+  /**
+   * @brief Send a data frame with proper KISS encoding
+   * @param data Data to send
+   * @param len Length of data
+   */
+  void sendFrame(const uint8_t *data, size_t len);
 
-    /**
-     * @brief Send data as KISS frame
-     * @param data Data to send
-     * @param length Length of data
-     * @return true if sent successfully
-     */
-    bool sendFrame(const uint8_t *data, size_t length);
+  /**
+   * @brief Check if exit from KISS mode was requested
+   * @return true if ESC or CMD_RETURN was received
+   */
+  bool isExitRequested() const;
 
-    /**
-     * @brief Send data frame (command 0x00)
-     * @param data Data to send
-     * @param length Length of data
-     * @return true if sent successfully
-     */
-    bool sendData(const uint8_t *data, size_t length);
+  /**
+   * @brief Clear the exit request flag
+   */
+  void clearExitRequest();
 
-    /**
-     * @brief Process KISS command
-     * @param command Command code
-     * @param parameter Command parameter
-     * @return true if command processed successfully
-     */
-    bool processCommand(uint8_t command, uint8_t parameter);
-
-    /**
-     * @brief Get KISS protocol statistics
-     * @return Status string
-     */
-    String getStatus();
-
-    /**
-     * @brief Check if exit from KISS mode has been requested
-     * @return true if exit requested
-     */
-    bool isExitRequested();
-
-    /**
-     * @brief Clear the exit request flag
-     */
-    void clearExitRequest();
+  /**
+   * @brief Set callback for received data frames
+   * @param handler Function to call when data frame is received
+   */
+  using FrameHandler = std::function<void(const uint8_t *data, size_t len)>;
+  void setFrameHandler(FrameHandler handler);
 
 private:
-    uint8_t rxBuffer[KISS_RX_BUFFER_SIZE]; // Receive buffer
-    size_t rxIndex;                        // Current receive index
-    bool frameInProgress;                  // Frame reception in progress
-    bool escapeNext;                       // Next byte is escaped
-
-    uint8_t lastFrame[KISS_RX_BUFFER_SIZE]; // Last complete frame
-    size_t lastFrameLength;                 // Length of last frame
-    bool frameAvailable;                    // Frame available flag
-
-    // Statistics
-    unsigned long framesReceived; // Total frames received
-    unsigned long framesSent;     // Total frames sent
-    unsigned long errors;         // Protocol errors
-
-    // TNC parameters (set via KISS commands)
-    uint8_t txDelay;     // TX delay parameter
-    uint8_t persistence; // Persistence parameter
-    uint8_t slotTime;    // Slot time parameter
-    uint8_t txTail;      // TX tail parameter
-    bool fullDuplex;     // Full duplex mode
-    bool exitRequested;  // Exit KISS mode requested
-
-    /**
-     * @brief Process a complete KISS frame
-     * @param frame Frame data
-     * @param length Frame length
-     */
-    void processFrame(const uint8_t *frame, size_t length);
-
-    /**
-     * @brief Send raw byte with KISS escaping
-     * @param byte Byte to send
-     */
-    void sendEscaped(uint8_t byte);
-
-    /**
-     * @brief Reset receive buffer
-     */
-    void resetRxBuffer();
+  Stream &_io;
+  
+  // Frame reception state
+  static const size_t RX_BUFFER_SIZE = 512;
+  uint8_t _rxBuffer[RX_BUFFER_SIZE];
+  size_t _rxIndex;
+  bool _frameInProgress;
+  bool _escapeNext;
+  
+  // Completed frame storage
+  uint8_t _lastFrame[RX_BUFFER_SIZE];
+  size_t _lastFrameLen;
+  bool _frameAvailable;
+  
+  // Exit detection
+  bool _exitRequested;
+  
+  // Optional callback for immediate frame handling
+  FrameHandler _frameHandler;
+  
+  // Internal methods
+  void processFrame(const uint8_t *frame, size_t len);
+  void sendEscaped(uint8_t byte);
+  void resetRxBuffer();
+  
+  // KISS protocol constants
+  static const uint8_t FEND = 0xC0;
+  static const uint8_t FESC = 0xDB;
+  static const uint8_t TFEND = 0xDC;
+  static const uint8_t TFESC = 0xDD;
+  
+  // KISS command codes
+  static const uint8_t CMD_DATA = 0x00;
+  static const uint8_t CMD_TXDELAY = 0x01;
+  static const uint8_t CMD_P = 0x02;
+  static const uint8_t CMD_SLOTTIME = 0x03;
+  static const uint8_t CMD_TXTAIL = 0x04;
+  static const uint8_t CMD_FULLDUPLEX = 0x05;
+  static const uint8_t CMD_SETHARDWARE = 0x06;
+  static const uint8_t CMD_RETURN = 0xFF;
+  
+  // ESC character for exit
+  static const uint8_t ESC = 0x1B;
 };
-
-#endif // KISS_PROTOCOL_H

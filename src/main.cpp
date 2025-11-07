@@ -1,59 +1,116 @@
-/**
- * @file main.cpp
- * @brief LoRaTNCX - LoRa Terminal Node Controller
- * @author LoRaTNCX Project
- * @date October 28, 2025
- *
- * A TNC implementation using the reliable LoRa communication foundation
- * established in our ping/pong testing.
- *
- * Features:
- * - KISS protocol support for packet radio applications
- * - Reliable LoRa PHY layer with proven PA control
- * - Hardware abstraction for Heltec WiFi LoRa 32 V4
- * - Serial interface for host computer connection
- */
+// LoRaTNCX - TNC implementation for Heltec WiFi LoRa 32 V3/V4
+// Main application file
 
 #include <Arduino.h>
-#include <SPI.h>
-#include <RadioLib.h>
-#include "HardwareConfig.h"
-#include "TNCManager.h"
-#include "KISSProtocol.h"
 #include "LoRaRadio.h"
+#include "LoRaTNCX.h"
 
-// Global instances
-TNCManager tnc;
+// Common LoRa pin mappings from variants
+#ifndef LORA_NSS
+#define LORA_NSS SS
+#endif
+
+#ifndef RST_LoRa
+// fall back to typical variant names
+#define RST_LoRa 12
+#endif
+
+#ifndef BUSY_LoRa
+#define BUSY_LoRa 13
+#endif
+
+#ifndef DIO0
+#define DIO0 14
+#endif
+
+#if defined(ARDUINO_heltec_wifi_lora_32_V4)
+// Use HelTec V4 PA pin mapping discovered in board/factory code
+// Some firmwares report different mappings; try these pins for V4 testing.
+#ifndef LORA_PA_EN
+#define LORA_PA_EN 2
+#endif
+#ifndef LORA_PA_TX_EN
+#define LORA_PA_TX_EN 46
+#endif
+#ifndef LORA_PA_POWER
+#define LORA_PA_POWER 7
+#endif
+#else
+// Non-V4: no PA pins
+#define LORA_PA_EN -1
+#define LORA_PA_TX_EN -1
+#define LORA_PA_POWER -1
+#endif
+
+LoRaRadio radio(LORA_NSS, BUSY_LoRa, DIO0, RST_LoRa, LORA_PA_EN, LORA_PA_TX_EN, LORA_PA_POWER);
+LoRaTNCX tnc(Serial, radio);
+
 void setup()
 {
-    Serial.begin(115200);
-    delay(2000);
+  Serial.begin(115200);
+  while (!Serial && millis() < 2000)
+    ;
+  Serial.println("LoRaTNCX: initializing radio...");
 
-    Serial.println("LoRaTNCX - LoRa Terminal Node Controller");
-    Serial.println("Based on proven ping/pong communication foundation");
-    Serial.println("Initializing...");
+  // Print configured pins for debugging (helps verify V3 vs V4 mapping)
+  Serial.print("LORA_NSS (CS): ");
+  Serial.println(LORA_NSS);
+  Serial.print("RST_LoRa: ");
+  Serial.println(RST_LoRa);
+  Serial.print("BUSY_LoRa: ");
+  Serial.println(BUSY_LoRa);
+  Serial.print("DIO0: ");
+  Serial.println(DIO0);
+#if (LORA_PA_EN >= 0)
+  Serial.print("LORA_PA_EN: ");
+  Serial.println(LORA_PA_EN);
+#else
+  Serial.println("LORA_PA_EN: <not defined>");
+#endif
+#if (LORA_PA_TX_EN >= 0)
+  Serial.print("LORA_PA_TX_EN: ");
+  Serial.println(LORA_PA_TX_EN);
+#else
+  Serial.println("LORA_PA_TX_EN: <not defined>");
+#endif
+#if (LORA_PA_POWER >= 0)
+  Serial.print("LORA_PA_POWER: ");
+  Serial.println(LORA_PA_POWER);
+#else
+  Serial.println("LORA_PA_POWER: <not defined>");
+#endif
 
-    // Initialize TNC - this will handle all subsystem initialization
-    if (tnc.begin())
-    {
-        Serial.println("TNC initialization successful!");
-        Serial.println("Ready for KISS protocol communication");
-    }
-    else
-    {
-        Serial.println("TNC initialization failed!");
-        while (true)
-        {
-            delay(10);
-        }
-    }
+  float freq = 868.0; // follow HelTec factory test (MHz)
+  if (!radio.begin(freq))
+  {
+    Serial.println("Radio init failed");
+    return;
+  }
+
+  Serial.print("Radio initialized at ");
+  Serial.print(freq);
+  Serial.println(" MHz");
+
+  const char *msg = "LoRaTNCX test";
+  int res = radio.send((const uint8_t *)msg, strlen(msg));
+  if (res == 0)
+  {
+    Serial.println("Transmit OK");
+  }
+  else
+  {
+    Serial.print("Transmit failed: ");
+    Serial.println(res);
+  }
+
+  // start TNC command processor (uses Serial)
+  tnc.begin();
 }
 
 void loop()
 {
-    // Let the TNC manager handle all operations
-    tnc.update();
-
-    // Small delay to prevent overwhelming the loop
-    delay(1);
+  // poll the TNC for serial commands and radio RX
+  // (radio RX actually runs in separate FreeRTOS task on core 0)
+  tnc.poll();
+  delay(10);
 }

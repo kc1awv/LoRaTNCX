@@ -1,227 +1,282 @@
-# LoRaTNCX: When AI Meets Amateur Radio 🤖📡
+# LoRaTNCX: An AI-Assisted Amateur Radio Experiment
 
-*"Because what could possibly go wrong when you let an AI write firmware for your radio?"*
+## Or: "I Asked ChatGPT to Build a TNC and You Won't Believe What Happened Next"
 
-## Preface: The Great AI Coding Experiment
+Welcome to LoRaTNCX, a totally-not-terrifying experiment in using AI tools to write Amateur Radio software. Because what could possibly go wrong when you let a large language model write your radio firmware? 
 
-Welcome to LoRaTNCX, where we decided to answer the age-old question: "Can AI actually write decent firmware, or will it just produce expensive electronic paperweights?" Spoiler alert: it's surprisingly competent, but we're keeping our debuggers close.
+Spoiler alert: It actually works. Most of the time. We're as surprised as you are.
 
-This project represents a fascinating experiment in human-AI collaboration for embedded systems development. Armed with a couple of shiny LoRa development boards (Heltec WiFi LoRa 32 V4, because we have standards), we set out to see just how far we could push modern AI coding assistants in the realm of amateur radio firmware development.
+## What Even Is This?
 
-### Why This Madness?
+LoRaTNCX is a **Terminal Node Controller (TNC)** firmware for cheap ESP32-based LoRa boards. It implements the AX.25 packet radio protocol and KISS mode, making it a drop-in replacement for those vintage TNCs you paid way too much for on eBay.
 
-Amateur radio has always been about experimentation, learning, and pushing boundaries. So naturally, when LLMs started getting scary good at writing code, we thought: "Hold my coffee, let's see if Claude can figure out power amplifier control circuits and KISS protocol implementations."
+**The Goal**: Create an inexpensive KISS modem for packet radio applications (and whatever new applications the Amateur Radio community dreams up in the future).
 
-The results? Surprisingly impressive. The AI:
-- ✅ Successfully reverse-engineered factory firmware behavior for PA control
-- ✅ Implemented a complete KISS protocol stack from scratch
-- ✅ Created proper hardware abstraction layers
-- ✅ Built a working TNC that actually talks to real applications
-- ❌ Still can't make coffee (yet)
-- It also wrote this README, mostly.
+**The Method**: Human provides requirements, AI writes code, hilarity and/or functionality ensues.
 
-### The Amateur Radio Angle
+**The Result**: 400KB of firmware that actually transmits packets. Your move, Skynet.
 
-This isn't just "another LoRa project." We're specifically targeting amateur radio applications with proper frequency planning, amateur-appropriate configurations, and integration with existing ham radio software ecosystem. Think APRS, Winlink, packet radio, and all the digital modes we've been using since before the internet was cool.
+## Hardware Requirements
 
-Plus, we're using the amateur radio bands above 420MHz where bandwidth restrictions don't apply (at least in the US), so we can really open up those LoRa radios and see what they can do. Time-on-air calculations, power management, antenna patterns - all the fun stuff that makes amateur radio more than just "send message, hope it arrives."
+- **Heltec WiFi LoRa 32 V3** or **V4** board (ESP32-S3 + SX1262 LoRa radio)
+- A USB cable (yes, really, we have to mention this)
+- An Amateur Radio license (because here, the FCC is not amused by unlicensed experimentation, despite politics)
+- Unrealistic optimism about AI-generated code
 
-### Want to Join the Experimental Fun?
+The boards cost about $25-35 USD shipped. That's less than a fancy coffee subscription, and this actually does something useful.
 
-Contributions welcome! Seriously, don't be shy. This is amateur radio, not life-saving medical equipment or nuclear reactor control systems. If it breaks, nobody dies - they just can't send APRS beacons for a while (the horror!).
+## Features (That Allegedly Work)
 
-### What We Want in Your Pull Requests:
+- ✅ **A Possibly Full TNC-2 Compatible Command Set** - We've got 57 commands implemented (AI counted them, we trust it)
+- ✅ **KISS Mode** - Binary frame protocol for terminal programs that gave up on human readability
+- ✅ **AX.25 Protocol** - Because packet radio wasn't complicated enough already
+- ✅ **Multiple Operating Modes** - Command, Converse, Transparent, and KISS (we're overachievers)
+- ✅ **LoRa Radio Support** - Long range, low power, high coolness factor
+- ✅ **Persistent Settings** - Your configs survive power cycles (unlike our sanity)
+- ✅ **Packet Monitoring** - Watch packets fly by like a very boring screensaver
+- ✅ **Digipeating** - Be part of the problem... er, solution
+- ✅ **Beaconing** - Announce your existence periodically, because humans need validation
+- ✅ **Help System** - Extended help text that's less verbose than most AI chatbots
 
-- Quality over "it works": We can tell the difference between thoughtful code and "I threw spaghetti at the wall until it compiled"
-- Explanations and rationale: Tell us why you did something, not just what you did
-- Clear AI disclosure: If you used Claude, ChatGPT, Gemini, or whatever digital assistant helped you, just say so! Include which tools/LLMs you used
-- Wetware acknowledgment: If your brain actually wrote the code without AI assistance, note that too (I promise we'll all be impressed)
-- Experimentation encouraged: Try new AI coding approaches, test different LLMs, see what works best
+## AI-Generated Caveats
 
-#### The Truth About AI Detection:
+⚠️ **Disclaimer**: Significant portions of this codebase were written by AI. The AI:
+- Has never held an Amateur Radio license
+- Doesn't understand RF propagation (but neither do we, really)
+- Has no concept of "good enough" and kept refactoring until told to stop
+- Writes documentation better than most humans (which is concerning)
+- Successfully implemented the requested commands without going full HAL 9000
 
-Yes, we can usually tell when code was AI-generated. But this isn't a "you don't know how to code" shaming session - it's all experimental! We're all learning how to work with AI tools, not pretend they don't exist. The goal is building cool stuff and learning along the way.
+⚠️ **The AI Insisted On**: Clean architecture, separation of concerns, comprehensive documentation, and proper error handling. This is either impressive or a sign of the impending robot uprising.
 
-#### Bottom Line:
+⚠️ **What Could Go Wrong**: Probably nothing? The worst that happens is it doesn't work and you wasted 30 minutes. The best case is you have a working KISS TNC for under $30. Risk/reward ratio seems reasonable.
 
-Whether your code came from your brain, Claude's neural networks, or a fever dream induced by too much coffee and RF exposure, we want to see it. Just be honest about your process, explain your thinking, and let's build something awesome together.
-
-## The Technical Challenge
-
-Building a Terminal Node Controller (TNC) for the targeted hardware we have sounds simple until you realize you need to:
-- Master the arcane art of power amplifier control (apparently analog writes matter, who knew?)
-- Implement KISS protocol without losing your sanity
-- Handle real-time packet routing between serial and RF
-- Deal with hardware documentation that ranges from "adequate" to "creative fiction"
-- Debug timing issues that only show up when you're demonstrating to someone important
-
-The AI handled most of this remarkably well, though it did insist on using `digitalWrite()` for the PA power pin until we had a serious conversation about analog vs digital control.
-
-## What We've Built
-
-### Hardware Platform
-- **Main Board:** Heltec WiFi LoRa 32 V4 (ESP32-S3 + SX1262)
-- **Frequency:** 915MHz (configurable for your region)
-- **Power:** Up to 22dBm output (because sometimes you need to talk to the ISS)
-- **Interface:** USB-C for power/data (welcome to the future)
-
-### Software Architecture
-
-#### Core Components
-
-**TNCManager** (`src/TNCManager.cpp`)
-The central nervous system that coordinates everything. It's like a traffic controller, but for packets, and with more coffee dependency.
-
-**LoRaRadio** (`src/LoRaRadio.cpp`)
-Our LoRa abstraction layer that handles the RF magic. Features proven PA control methods that actually work (after much suffering and factory firmware analysis).
-
-**KISSProtocol** (`src/KISSProtocol.cpp`)
-KISS protocol implementation that talks to your favorite amateur radio applications. Supports all the standard KISS commands, plus a few extra for good measure.
-
-**ConfigurationManager** (`src/ConfigurationManager.cpp`)
-Handles all the configuration because hardcoding frequencies is for amateurs. Wait, we ARE amateurs. Well, organized amateurs.
-
-**AmateurRadioLoRaConfigs** (`include/AmateurRadioLoRaConfigs.h`)
-Pre-calculated LoRa configurations optimized for amateur radio use. Time-on-air calculations included because we actually did the math (okay, the AI did the math, but we checked it).
-
-### Key Features
-
-- **KISS Protocol Support**: Full implementation for seamless integration with packet radio applications
-- **Amateur Radio Optimized**: Configurations designed for ham bands with proper time-on-air calculations
-- **Reliable LoRa PHY**: 100% packet reception achieved (we're as surprised as you are)
-- **Hardware Abstraction**: Clean separation between hardware and protocol layers
-- **Real-time Operation**: Low-latency packet routing for responsive communications
-
-## Getting Started
+## Quick Start (For the Impatient)
 
 ### Prerequisites
-- PlatformIO (because Arduino IDE is for masochists)
-- A Heltec WiFi LoRa 32 V4 board
-- Appropriate antenna for 915MHz (or your local amateur frequency)
-- Patience (debugging radio firmware builds character)
 
-### Build and Flash
+1. **PlatformIO** - Install the VS Code extension or CLI
+   - VS Code: Search for "PlatformIO IDE" in extensions
+   - CLI: `pip install platformio` (if you're into that sort of thing)
+
+2. **A Vague Understanding of Radio** - Not strictly required, but helpful
+
+3. **Patience** - For when the AI's code doesn't compile on first try (just kidding, it does. Well, at least it does here.)
+
+### Building & Flashing
 
 ```bash
-# Clone the repository
+# Clone this magnificent specimen
 git clone https://github.com/kc1awv/LoRaTNCX.git
 cd LoRaTNCX
 
-# Build the firmware
-platformio run -e heltec_wifi_lora_32_V4
+# Build for Heltec V3
+platformio run --environment heltec_wifi_lora_32_V3
 
-# Upload to your board (pray to the embedded gods)
-platformio run -e heltec_wifi_lora_32_V4 -t upload
+# Build for Heltec V4
+platformio run --environment heltec_wifi_lora_32_V4
+
+# Upload to V3 (adjust port as needed)
+platformio run --environment heltec_wifi_lora_32_V3 --target upload
+
+# Upload to V4 (adjust port as needed)
+platformio run --environment heltec_wifi_lora_32_V4 --target upload
 ```
 
-### Connect and Test
+**Or Just Use VS Code Tasks**: Because clicking is easier than typing
+- "Build LoRaTNCX V3" or "Build LoRaTNCX V4"
+- "Upload (heltec_wifi_lora_32_V3)" or similar
 
-1. **Hardware Setup**: Connect your board via USB-C
-2. **Serial Interface**: TNC appears as a serial device (e.g., `/dev/ttyACM0` on Linux)
-3. **Configuration**: Set your application to 115200 baud, 8-N-1, KISS mode
-4. **Testing**: Fire up your favorite packet radio application and see if packets flow
+### First Contact
 
-### Quick Test with Python
-```bash
-# Test basic KISS functionality (if you have the test script)
-python3 test_kiss_tnc.py
+1. Connect via serial at **115200 baud** (because it's not the 90s anymore)
+2. Type `HELP` to see available commands
+3. Marvel at the word-wrapped, alphabetically sorted output
+4. Type `HELP <command>` for detailed help (the AI was thorough)
+5. Configure your station:
+   ```
+   MYCALL N0CALL-1           # Your callsign (change this, obviously)
+   FREQUENCY 906.000         # LoRa frequency in MHz
+   POWER 14                  # TX power in dBm (2-20)
+   MONITOR ON                # Watch the packets flow
+   ```
+
+### Entering KISS Mode
+
+For use with packet radio applications (APRS, BPQ32, Direwolf, etc.):
+
+```
+KISS ON
+RESTART
 ```
 
-## Technical Deep Dive
+Exit KISS mode with ESC key or CMD_RETURN frame (0xFF). Your application probably handles this.
 
-### LoRa Configuration
-- **Frequency:** 915MHz (ISM band, license-free portion)
-- **Bandwidth:** Configurable (we have presets for amateur use)
-- **Spreading Factor:** 7-12 (depending on range vs speed requirements)
-- **Coding Rate:** 4/5 to 4/8 (error correction for when propagation gets weird)
-- **Output Power:** Up to 22dBm (adjust for your license class and local regulations)
+## Configuration Examples
 
-### KISS Protocol Implementation
-Full KISS command support including:
-- Data frames (the important stuff)
-- TX delay, persistence, slot time (timing is everything)
-- Full duplex control (because half-duplex is so last century)
-- Hardware configuration (for when you need to tweak things)
+### Basic Station Setup
+```
+MYCALL KI7EST-1             # Your call (use yours obviously, not this one)
+MYALIAS WIDE1-1             # Digipeater alias
+FREQUENCY 906.000           # ISM band frequency
+SPREADING 7                 # LoRa spreading factor (7-12)
+BANDWIDTH 125               # LoRa bandwidth in kHz
+POWER 14                    # Transmit power (14 dBm = 25mW)
+```
 
-### Performance Metrics
-- **Packet Reception:** 100% reliability in testing (your mileage may vary with RF)
-- **Throughput:** Depends on LoRa settings, up to ~20kbps with aggressive configurations
-- **Latency:** Sub-50ms typical (faster than most internet comments sections)
-- **Range:** 2-50km depending on configuration, terrain, and luck
+### Beacon Configuration
+```
+BTEXT LoRaTNCX Test Station
+EVERY 600                   # Beacon every 10 minutes
+BEACON EVERY 600            # Alternative syntax
+```
 
-## Configuration and Customization
+### Monitoring Setup
+```
+MONITOR ON                  # Enable packet monitoring
+MSTAMP ON                   # Add timestamps
+MALL OFF                    # Don't show packets not for us
+MRPT OFF                    # Don't show repeated packets
+```
 
-### Amateur Radio Frequency Configurations
-We've included pre-calculated configurations in `AmateurRadioLoRaConfigs.h` for various amateur radio scenarios:
-- **High Speed**: Short range, high throughput (because sometimes you need speed)
-- **Balanced**: Medium range, decent speed (the goldilocks option)
-- **Long Range**: Maximum distance, slower speed (for when you absolutely, positively need to reach that distant repeater)
+### Save & View Settings
+```
+DISPLAY                     # Show all current settings
+                            # Settings auto-save to NVS
+```
 
-### Hardware Customization
-The hardware abstraction makes it relatively easy to port to other LoRa boards. Just update the pin definitions in `HeltecV4Pins.h` and adjust the board configuration.
+## Architecture (AI's Masterpiece)
 
-## Troubleshooting
+The AI organized the code into clean, focused modules:
 
-### Common Issues
+- **LoRaTNCX**: Main TNC class, command handlers, settings management
+- **CommandProcessor**: Terminal I/O, mode switching, line editing
+- **KISSProtocol**: KISS binary protocol (cleanly separated, the AI insisted)
+- **LoRaRadio**: RadioLib wrapper for SX1262
+- **AX25**: Frame encoding/decoding, address parsing
 
-**"It doesn't compile!"**
-- Check your PlatformIO installation
-- Verify you have the RadioLib dependency
-- Make sure you're using the custom board definition
+**Design Principles** (according to the AI):
+- Single Responsibility Principle (the AI is big on SOLID)
+- Separation of Concerns (no mixing business with pleasure)
+- Struct-Based Organization (10 structs for 40+ settings)
+- Persistent Configuration (NVS-backed, because reboots happen)
 
-**"It compiles but doesn't work!"**
-- Check your PA control configuration (analog vs digital writes matter)
-- Verify antenna connections (SWR kills radios)
-- Confirm frequency settings match your license privileges
 
-**"Packets are being dropped!"**
-- Check timing parameters in KISS configuration
-- Verify LoRa settings match on both ends
-- Ensure adequate power supply (RF amplifiers are hungry)
+## Resource Usage (Surprisingly Reasonable)
 
-**"The AI told me to do it this way!"**
-- The AI is smart, but not infallible
-- When in doubt, check against working examples
-- RF engineering still requires human judgment (for now)
+- **Flash**: ~408KB (12.2% of 3.3MB) - Room for more AI features!
+- **RAM**: ~21KB (6.6% of 320KB) - Efficient, unlike most JavaScript
+- **Plenty of headroom** for future enhancements the AI will inevitably suggest
 
-## Future Plans
 
-Because every good project needs a roadmap to features that may never exist:
+## Development Status
 
-- [ ] **AX.25 Protocol Layer**: Full packet radio protocol stack
-- [ ] **APRS Integration**: Because everyone needs to know where your radio is
-- [ ] **Mesh Networking**: Turn your TNC into a mesh node
-- [ ] **Web Interface**: Configure via browser (because everything needs a web interface)
-- [ ] **AI-Powered Auto-Tuning**: Let the AI optimize your radio parameters
-- [ ] **Skynet Integration**: Just kidding (we hope)
+**Current**: Currently 57 TNC-2 commands implemented ✅  
+**KISS Mode**: Fully functional ✅  
+**AI Sentience Level**: Undetermined 🤖  
+
+### What Works
+- Command processing and terminal modes
+- LoRa transmission and reception
+- KISS protocol (tested with actual applications)
+- Packet monitoring and digipeating
+- Beacon transmission
+- Settings persistence
+- Help system (AI's pride and joy)
+
+### What's Planned
+- AX.25 Layer 2 connected mode (scaffolding exists)
+- KISS parameter persistence (TXDELAY, PERSISTENCE, etc.)
+- Display support (OLED sitting there unused)
+- WiFi/Bluetooth connectivity (because why not)
+- APRS encoding/decoding (when we feel ambitious)
+
+### What the AI Suggested We Add
+- Unit tests (adorable)
+- CI/CD pipeline (overachiever)
+- Formal verification (now it's just showing off)
 
 ## Contributing
 
-This is an experiment in AI-assisted development, so contributions are welcome! Whether you're fixing bugs the AI introduced, adding features the AI couldn't figure out, or just improving documentation the AI made too technical, we'd love your help.
+Contributions welcome! Whether you're:
+- A human who writes code
+- An AI that writes code
+- A human using AI to write code
+- A very intelligent parrot
 
-Please include details about which AI tools (if any) you used in your development process. We're curious about the workflow and want to document what works best.
+**Guidelines**:
+1. Follow existing code style (the AI has opinions)
+2. Create documentation (yes, really)
+3. Test on hardware if possible (virtual testing only goes so far)
+4. Include whether code was human, AI, or collaborative effort (for science)
 
-## The Legal Stuff (Please Don't Sue Me)
+## Technical Details for the Nerds
 
-If you discover any copyrighted IP, non-free code, or improperly attributed snippets lurking in this codebase, **please let me know immediately**. I'll make accommodations faster than you can say "DMCA takedown notice." This isn't malicious - it's just the inevitable result of learning from AI that learned from the entire internet.
+**Platform**: ESP32-S3 (Xtensa dual-core @ 240MHz)  
+**Framework**: Arduino (because it just works)  
+**Radio**: SX1262 LoRa (via RadioLib 7.4.0)  
+**Storage**: NVS (ESP32's answer to EEPROM)  
+**Build System**: PlatformIO (better than Arduino IDE, fight me)  
 
-Think of this as "Amateur Radio meets Amateur Programming" - emphasis on the amateur part.
+**Command Count**: 57 (the AI counted multiple times, it's accurate)  
+**Lines of Code**: Several thousand (the AI wrote most of them)  
+**Code Reviews**: Performed by humans who trust AI (probably)  
+**Test Coverage**: Not enough (the AI agrees)  
+
+## Troubleshooting
+
+**Q**: It doesn't compile!  
+**A**: Did you install PlatformIO? Is your internet working? Did you anger the AI?
+
+**Q**: Nothing happens when I type commands!  
+**A**: Check your baud rate (115200). Check your USB cable. Check your expectations.
+
+**Q**: How do I know if the AI wrote this part?  
+**A**: If it's well-documented, probably the AI. If it's a hack, probably human.
+
+**Q**: Is this safe to use?  
+**A**: Define "safe." It won't set your radio on fire. Probably won't summon Cthulhu. Works as well as most amateur radio software.
+
+**Q**: Can I trust AI-generated code?  
+**A**: You're reading a README written by AI. You've already made your choice.
 
 ## License
 
-See the LICENSE file for details. The AI didn't write the license (lawyers haven't been replaced yet).
+MIT License - Because sharing is caring, and the AI can't hold copyright anyway.
 
-## Acknowledgments
+See LICENSE file for boring legal details.
 
-- **The AI Overlords**: For not making this project sentient (yet)
-- **Heltec**: For making decent LoRa boards with adequate documentation
-- **The Amateur Radio Community**: For decades of digital experimentation that paved the way
-- **Coffee**: The real MVP of this project
+## Credits
+
+**AI Assistant**: Did most of the actual coding  
+**Human Operator**: Provided requirements, testing, and existential dread  
+**RadioLib**: For making LoRa not painful  
+**ESP32**: For being a surprisingly capable microcontroller  
+**Amateur Radio Community**: For keeping ancient protocols alive in the 21st century  
+
+## Final Thoughts
+
+This project demonstrates that AI can:
+- Write functional embedded code
+- Follow complex specifications
+- Refactor code without breaking it (usually)
+- Generate helpful documentation
+- Understand packet radio protocols (somehow)
+
+It cannot:
+- Test hardware (yet)
+- Hold an Amateur Radio license (yet)
+- Appreciate the beauty of a well-executed APRS beacon (yet)
+
+## Support
+
+- **Issues**: GitHub issues (be nice, the AI has feelings. Probably.)
+- **Questions**: GitHub discussions (humans and AIs welcome)
+- **Contributions**: Pull requests (from any sentient or semi-sentient being)
+
+73 de KI7EST (the human) and ChatGPT (the AI)
 
 ---
 
-*"73 de AI Assistant (and human collaborator) - May your packets be error-free and your RF clean."*
-
-**Status:** ✅ Actually Working (we're as surprised as you are)  
-**Last Updated:** October 29, 2025  
-**AI Confidence Level:** Surprisingly High
+*Built with questionable judgment and surprisingly functional AI assistance.*  
+*No AI were harmed in the making of this firmware. Some humans were mildly confused.*
