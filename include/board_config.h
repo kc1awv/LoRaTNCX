@@ -25,11 +25,17 @@ void setupPAControl();
     // V3 has no external PA - direct SX1262 control
     #define HAS_PA_CONTROL      0
     
-    // Battery voltage measurement (V3/V3.2 - try active HIGH as many V3 boards are actually V3.2)
+    // Battery voltage measurement (V3.2 uses same logic as V4)
+    // Note: V3 original uses inverted logic, but V3.2 is more common
+    // V3.2 added transistor to control circuit, inverting the logic
+    // Use -DV3_ORIGINAL_BATTERY_LOGIC build flag for original V3 boards
     #define PIN_ADC_BATTERY     1   // GPIO1 - ADC input
     #define PIN_ADC_CTRL        37  // GPIO37 - MOSFET/transistor control
-    #define BATTERY_DIVIDER     (100.0 / (100.0 + 390.0))  // 390k/100k divider (~0.2041)
-    #define ADC_CTRL_ACTIVE_HIGH 1  // V3.2 uses active HIGH (many V3 boards are actually V3.2)
+    #ifdef V3_ORIGINAL_BATTERY_LOGIC
+        #define ADC_CTRL_ACTIVE_HIGH 0  // Original V3: active LOW
+    #else
+        #define ADC_CTRL_ACTIVE_HIGH 1  // V3.2: active HIGH (same as V4)
+    #endif
 #endif
 
 // Heltec WiFi LoRa 32 V4 Pin Definitions  
@@ -54,7 +60,6 @@ void setupPAControl();
     // Battery voltage measurement (V4 uses NPN transistor, active HIGH)
     #define PIN_ADC_BATTERY     1   // GPIO1 - ADC input
     #define PIN_ADC_CTRL        37  // GPIO37 - Transistor control (active HIGH for V4)
-    #define BATTERY_DIVIDER     (100.0 / (100.0 + 390.0))  // 390k/100k divider (~0.2041)
     #define ADC_CTRL_ACTIVE_HIGH 1  // V4 uses active HIGH control (transistor inverts)
 #endif
 
