@@ -671,8 +671,11 @@
             try {
                 const data = await apiGet('status');
                 
-                // Update WiFi status
-                if (data.wifi.connected) {
+                // Update WiFi status - handle AP+STA mode
+                if (data.wifi.connected && data.wifi.ap_active) {
+                    document.getElementById('wifiStatus').textContent = 'AP + Station';
+                    document.getElementById('ipAddress').textContent = 'AP: ' + data.wifi.ap_ip + ' | STA: ' + data.wifi.sta_ip;
+                } else if (data.wifi.connected) {
                     document.getElementById('wifiStatus').textContent = 'Connected';
                     document.getElementById('ipAddress').textContent = data.wifi.sta_ip;
                 } else if (data.wifi.ap_active) {

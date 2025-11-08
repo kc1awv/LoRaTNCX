@@ -79,6 +79,9 @@ void DisplayManager::update() {
             case SCREEN_STATUS:
                 renderStatusScreen();
                 break;
+            case SCREEN_WIFI:
+                renderWiFiScreen();
+                break;
             case SCREEN_BATTERY:
                 renderBatteryScreen();
                 break;
@@ -105,9 +108,12 @@ void DisplayManager::nextScreen() {
         return;
     }
     
-    // Cycle through screens: STATUS -> BATTERY -> STATUS
+    // Cycle through screens: STATUS -> WIFI -> BATTERY -> STATUS
     switch (currentScreen) {
         case SCREEN_STATUS:
+            currentScreen = SCREEN_WIFI;
+            break;
+        case SCREEN_WIFI:
             currentScreen = SCREEN_BATTERY;
             break;
         case SCREEN_BATTERY:
@@ -188,6 +194,19 @@ void DisplayManager::setBatteryVoltage(float voltage) {
     
     // Trigger update if on battery screen
     if (currentScreen == SCREEN_BATTERY && !bootScreenActive) {
+        lastScreen = SCREEN_BOOT;  // Force re-render
+    }
+}
+
+void DisplayManager::setWiFiStatus(bool apActive, bool staConnected, String apIP, String staIP, int rssi) {
+    wifiAPActive = apActive;
+    wifiSTAConnected = staConnected;
+    wifiAPIP = apIP;
+    wifiSTAIP = staIP;
+    wifiRSSI = rssi;
+    
+    // Trigger update if on WiFi screen
+    if (currentScreen == SCREEN_WIFI && !bootScreenActive) {
         lastScreen = SCREEN_BOOT;  // Force re-render
     }
 }
@@ -273,6 +292,46 @@ void DisplayManager::renderBatteryScreen() {
     int fillWidth = (barWidth - 4) * percentage / 100;
     if (fillWidth > 0) {
         u8g2.drawBox(barX + 2, barY + 2, fillWidth, barHeight - 4);
+    }
+}
+
+void DisplayManager::renderWiFiScreen() {
+    u8g2.setFont(u8g2_font_6x10_tr);
+    
+    // Title
+    u8g2.drawStr(0, 10, "WiFi Status");
+    
+    // Determine WiFi mode
+    String mode = "Off";
+    if (wifiAPActive && wifiSTAConnected) {
+        mode = "AP + Station";
+    } else if (wifiAPActive) {
+        mode = "AP Mode";
+    } else if (wifiSTAConnected) {
+        mode = "Station";
+    }
+    
+    String modeStr = "Mode: " + mode;
+    u8g2.drawStr(0, 24, modeStr.c_str());
+    
+    // AP IP if active
+    if (wifiAPActive) {
+        String apStr = "AP: " + wifiAPIP;
+        u8g2.drawStr(0, 36, apStr.c_str());
+    }
+    
+    // Station IP if connected
+    if (wifiSTAConnected) {
+        String staStr = "STA: " + wifiSTAIP;
+        int y = wifiAPActive ? 48 : 36;  // Adjust Y position if showing both
+        u8g2.drawStr(0, y, staStr.c_str());
+        
+        // RSSI signal strength if connected
+        if (wifiRSSI != 0) {
+            String rssiStr = "Signal: " + String(wifiRSSI) + " dBm";
+            int rssiY = wifiAPActive ? 60 : 48;
+            u8g2.drawStr(0, rssiY, rssiStr.c_str());
+        }
     }
 }
 

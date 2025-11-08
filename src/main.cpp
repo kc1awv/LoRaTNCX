@@ -408,6 +408,18 @@ void loop() {
         lastBatteryUpdate = millis();
     }
     
+    // Update WiFi status periodically (every 5 seconds when not on boot screen)
+    static uint32_t lastWiFiUpdate = 0;
+    if (!displayManager.isBootScreenActive() && millis() - lastWiFiUpdate >= 5000) {
+        bool apActive = wifiManager.isAPActive();
+        bool staConnected = wifiManager.isConnected();
+        String apIP = wifiManager.getAPIPAddress();
+        String staIP = wifiManager.getIPAddress();
+        int rssi = wifiManager.getRSSI();
+        displayManager.setWiFiStatus(apActive, staConnected, apIP, staIP, rssi);
+        lastWiFiUpdate = millis();
+    }
+    
     // Process incoming serial data (KISS frames from host)
     while (Serial.available() > 0) {
         uint8_t byte = Serial.read();
