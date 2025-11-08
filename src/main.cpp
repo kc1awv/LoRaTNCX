@@ -8,6 +8,7 @@
 #include "display.h"
 #include "wifi_manager.h"
 #include "web_server.h"
+#include "tcp_kiss.h"
 
 // Temporary debug mode
 // #define DEBUG_MODE 1
@@ -26,6 +27,7 @@ LoRaRadio loraRadio;
 ConfigManager configManager;
 WiFiManager wifiManager;
 TNCWebServer webServer(&wifiManager, &loraRadio, &configManager);
+TCPKISSServer tcpKissServer;
 
 // Buffers
 uint8_t rxBuffer[LORA_BUFFER_SIZE];
@@ -133,6 +135,19 @@ void setup() {
                 DEBUG_PRINTLN("Web server started on port 80");
             } else {
                 DEBUG_PRINTLN("Failed to start web server");
+            }
+            
+            // Start TCP KISS server if enabled
+            WiFiConfig wifiConfig;
+            wifiManager.getCurrentConfig(wifiConfig);
+            if (wifiConfig.tcp_kiss_enabled) {
+                DEBUG_PRINT("Starting TCP KISS server on port ");
+                DEBUG_PRINTLN(wifiConfig.tcp_kiss_port);
+                if (tcpKissServer.begin(wifiConfig.tcp_kiss_port)) {
+                    DEBUG_PRINTLN("TCP KISS server started");
+                } else {
+                    DEBUG_PRINTLN("Failed to start TCP KISS server");
+                }
             }
         } else {
             DEBUG_PRINTLN("WiFi start failed or disabled");
@@ -391,6 +406,9 @@ void loop() {
     // Update web server
     webServer.update();
     
+    // Update TCP KISS server
+    tcpKissServer.update();
+    
     // Handle button press
     if (buttonPressed) {
         buttonPressed = false;
@@ -470,8 +488,39 @@ void loop() {
     size_t rxLen = 0;
     if (loraRadio.receive(rxBuffer, &rxLen)) {
         if (rxLen > 0) {
-            // Send received packet to host via KISS
+            // Send received packet to host via KISS (serial)
             kiss.sendFrame(rxBuffer, rxLen);
+            
+            // Also send to TCP KISS clients if any are connected
+            if (tcpKissServer.hasClients()) {
+                // Build KISS frame for TCP clients
+                uint8_t tcpFrame[LORA_BUFFER_SIZE + 10];  // Extra space for KISS framing
+                size_t tcpFrameLen = 0;
+                
+                // FEND
+                tcpFrame[tcpFrameLen++] = FEND;
+                // Command (port 0, data frame)
+                tcpFrame[tcpFrameLen++] = CMD_DATA;
+                
+                // Escape and add data
+                for (size_t i = 0; i < rxLen; i++) {
+                    if (rxBuffer[i] == FEND) {
+                        tcpFrame[tcpFrameLen++] = FESC;
+                        tcpFrame[tcpFrameLen++] = TFEND;
+                    } else if (rxBuffer[i] == FESC) {
+                        tcpFrame[tcpFrameLen++] = FESC;
+                        tcpFrame[tcpFrameLen++] = TFESC;
+                    } else {
+                        tcpFrame[tcpFrameLen++] = rxBuffer[i];
+                    }
+                }
+                
+                // FEND
+                tcpFrame[tcpFrameLen++] = FEND;
+                
+                // Send to all TCP clients
+                tcpKissServer.sendKISSFrame(tcpFrame, tcpFrameLen);
+            }
         }
     }
     

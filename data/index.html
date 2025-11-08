@@ -516,6 +516,21 @@
                 </div>
             </div>
             
+            <h3>TCP KISS Server</h3>
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="tcpKissEnabled" checked>
+                    <label for="tcpKissEnabled">Enable TCP KISS Server</label>
+                </div>
+                <small>Allow network clients to connect to the TNC via TCP/IP</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="tcpKissPort">TCP KISS Port</label>
+                <input type="number" id="tcpKissPort" min="1" max="65535" value="8001">
+                <small>Default: 8001</small>
+            </div>
+            
             <div class="button-group">
                 <button class="btn btn-primary" onclick="applyWiFiConfig()">Apply Configuration</button>
                 <button class="btn btn-primary" onclick="saveWiFiConfig()">Save to Flash</button>
@@ -768,6 +783,8 @@
                 document.getElementById('gateway').value = data.gateway;
                 document.getElementById('subnet').value = data.subnet;
                 document.getElementById('dns').value = data.dns;
+                document.getElementById('tcpKissEnabled').checked = data.tcp_kiss_enabled;
+                document.getElementById('tcpKissPort').value = data.tcp_kiss_port;
                 
                 updateWiFiModeUI();
                 updateDHCPUI();
@@ -798,7 +815,9 @@
                     ap_password: document.getElementById('apPassword').value,
                     ssid: document.getElementById('staSsid').value,
                     password: document.getElementById('staPassword').value,
-                    dhcp: document.getElementById('dhcp').checked
+                    dhcp: document.getElementById('dhcp').checked,
+                    tcp_kiss_enabled: document.getElementById('tcpKissEnabled').checked,
+                    tcp_kiss_port: parseInt(document.getElementById('tcpKissPort').value)
                 };
                 
                 const currentMode = parseInt(document.getElementById('wifiMode').value);

@@ -25,6 +25,8 @@ struct WiFiConfig {
     uint8_t gateway[4];    // Gateway IP
     uint8_t subnet[4];     // Subnet mask
     uint8_t dns[4];        // DNS server
+    bool tcp_kiss_enabled; // Enable TCP KISS server
+    uint16_t tcp_kiss_port;// TCP KISS server port
     uint32_t magic;        // Magic number for validation
 };
 

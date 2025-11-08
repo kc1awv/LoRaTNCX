@@ -158,6 +158,10 @@ void WiFiManager::resetToDefaults(WiFiConfig& config) {
     config.subnet[0] = 255; config.subnet[1] = 255; config.subnet[2] = 255; config.subnet[3] = 0;
     config.dns[0] = 8; config.dns[1] = 8; config.dns[2] = 8; config.dns[3] = 8;
     
+    // Default TCP KISS settings
+    config.tcp_kiss_enabled = true;
+    config.tcp_kiss_port = 8001;
+    
     config.magic = CONFIG_MAGIC;
 }
 

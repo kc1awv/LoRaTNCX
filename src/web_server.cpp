@@ -204,6 +204,14 @@ void TNCWebServer::setupRoutes() {
                 config.dhcp = doc["dhcp"].as<bool>();
             }
             
+            if (!doc["tcp_kiss_enabled"].isNull()) {
+                config.tcp_kiss_enabled = doc["tcp_kiss_enabled"].as<bool>();
+            }
+            
+            if (!doc["tcp_kiss_port"].isNull()) {
+                config.tcp_kiss_port = doc["tcp_kiss_port"].as<uint16_t>();
+            }
+            
             // Send response immediately
             AsyncWebServerResponse* response = request->beginResponse(200, "application/json", 
                 "{\"success\":true,\"message\":\"WiFi configuration will be applied\"}");
@@ -413,6 +421,8 @@ String TNCWebServer::getJSONWiFiConfig() {
                     String(config.subnet[2]) + "." + String(config.subnet[3]);
     doc["dns"] = String(config.dns[0]) + "." + String(config.dns[1]) + "." + 
                  String(config.dns[2]) + "." + String(config.dns[3]);
+    doc["tcp_kiss_enabled"] = config.tcp_kiss_enabled;
+    doc["tcp_kiss_port"] = config.tcp_kiss_port;
     
     // Don't send passwords in the response
     
