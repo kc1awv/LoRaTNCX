@@ -1,10 +1,13 @@
 #include <Arduino.h>
+#include <SPIFFS.h>
 #include "config.h"
 #include "board_config.h"
 #include "config_manager.h"
 #include "kiss.h"
 #include "radio.h"
 #include "display.h"
+#include "wifi_manager.h"
+#include "web_server.h"
 
 // Temporary debug mode
 // #define DEBUG_MODE 1
@@ -21,6 +24,8 @@
 KISSProtocol kiss;
 LoRaRadio loraRadio;
 ConfigManager configManager;
+WiFiManager wifiManager;
+TNCWebServer webServer(&wifiManager, &loraRadio, &configManager);
 
 // Buffers
 uint8_t rxBuffer[LORA_BUFFER_SIZE];
@@ -31,6 +36,14 @@ void setup() {
     delay(1000);
     
     DEBUG_PRINTLN("\n=== LoRaTNCX Debug Mode ===");
+    
+    // Initialize SPIFFS for web server
+    DEBUG_PRINTLN("Initializing SPIFFS...");
+    if (!SPIFFS.begin(true)) {
+        DEBUG_PRINTLN("SPIFFS mount failed!");
+    } else {
+        DEBUG_PRINTLN("SPIFFS mounted successfully");
+    }
     
     // Initialize board-specific pins
     DEBUG_PRINTLN("Initializing board pins...");
@@ -61,16 +74,7 @@ void setup() {
     DEBUG_PRINTLN("Initializing config manager...");
     configManager.begin();
     
-    // Try to load saved configuration
-    LoRaConfig savedConfig;
-    if (configManager.loadConfig(savedConfig)) {
-        DEBUG_PRINTLN("Applying saved config...");
-        loraRadio.applyConfig(savedConfig);
-    } else {
-        DEBUG_PRINTLN("Using default config");
-    }
-    
-    // Initialize LoRa radio - halt if failed
+    // Initialize LoRa radio first - halt if failed
     DEBUG_PRINTLN("Initializing radio...");
     int radioState = loraRadio.beginWithState();
     if (radioState != RADIOLIB_ERR_NONE) {
@@ -81,6 +85,16 @@ void setup() {
         }
     }
     DEBUG_PRINTLN("Radio initialized!");
+    
+    // Now try to load and apply saved configuration
+    LoRaConfig savedConfig;
+    if (configManager.loadConfig(savedConfig)) {
+        DEBUG_PRINTLN("Applying saved config...");
+        loraRadio.applyConfig(savedConfig);
+        loraRadio.reconfigure();  // Reconfigure radio with saved settings
+    } else {
+        DEBUG_PRINTLN("Using default config");
+    }
     
     // Update display with initial radio config
     LoRaConfig currentConfig;
@@ -93,6 +107,39 @@ void setup() {
         currentConfig.power,
         currentConfig.syncWord
     );
+    
+    // Initialize WiFi manager
+    DEBUG_PRINTLN("Initializing WiFi manager...");
+    if (wifiManager.begin()) {
+        DEBUG_PRINTLN("WiFi manager initialized");
+        
+        // Start WiFi with saved/default configuration
+        if (wifiManager.start()) {
+            DEBUG_PRINTLN("WiFi started");
+            
+            // Show WiFi info on display
+            if (wifiManager.isAPActive()) {
+                DEBUG_PRINT("AP IP: ");
+                DEBUG_PRINTLN(wifiManager.getAPIPAddress());
+            }
+            if (wifiManager.isConnected()) {
+                DEBUG_PRINT("STA IP: ");
+                DEBUG_PRINTLN(wifiManager.getIPAddress());
+            }
+            
+            // Start web server
+            DEBUG_PRINTLN("Starting web server...");
+            if (webServer.begin()) {
+                DEBUG_PRINTLN("Web server started on port 80");
+            } else {
+                DEBUG_PRINTLN("Failed to start web server");
+            }
+        } else {
+            DEBUG_PRINTLN("WiFi start failed or disabled");
+        }
+    } else {
+        DEBUG_PRINTLN("WiFi manager init failed");
+    }
     
     DEBUG_PRINTLN("Entering KISS mode (debug enabled)\n");
     // TNC is now ready and enters KISS mode (silent operation)
@@ -338,6 +385,12 @@ void handleHardwareConfig(uint8_t* frame, size_t frameLen) {
 }
 
 void loop() {
+    // Update WiFi manager
+    wifiManager.update();
+    
+    // Update web server
+    webServer.update();
+    
     // Handle button press
     if (buttonPressed) {
         buttonPressed = false;

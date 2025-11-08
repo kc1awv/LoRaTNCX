@@ -1,15 +1,16 @@
 #include "config_manager.h"
 #include "config.h"
 
-const char* ConfigManager::NVS_NAMESPACE = "loratncx";
-const char* ConfigManager::NVS_CONFIG_KEY = "lora_cfg";
+const char* ConfigManager::NVS_NAMESPACE = "lora";
+const char* ConfigManager::NVS_CONFIG_KEY = "config";
 
 ConfigManager::ConfigManager() {
 }
 
 bool ConfigManager::begin() {
-    // Initialize NVS
-    return preferences.begin(NVS_NAMESPACE, false);  // false = read/write mode
+    // NVS will be initialized on first use (save/load)
+    // No need to keep preferences open during entire runtime
+    return true;
 }
 
 bool ConfigManager::saveConfig(const LoRaConfig& config) {
