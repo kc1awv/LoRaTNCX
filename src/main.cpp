@@ -76,6 +76,115 @@ void setup() {
     // TNC is now ready and enters KISS mode (silent operation)
 }
 
+void handleHardwareQuery(uint8_t* frame, size_t frameLen) {
+    if (frameLen < 2) return;  // Need at least command and subcommand
+    
+    uint8_t subCmd = frame[1];
+    
+    switch (subCmd) {
+        case HW_QUERY_CONFIG:
+            // Send current radio config
+            // Format: HW_QUERY_CONFIG, freq(4 bytes float), bw(4 bytes float), 
+            //         sf(1 byte), cr(1 byte), pwr(1 byte signed), sync(2 bytes)
+            {
+                uint8_t config[14];
+                config[0] = HW_QUERY_CONFIG;
+                
+                // Frequency (4 bytes, little-endian float)
+                float freq = loraRadio.getFrequency();
+                memcpy(&config[1], &freq, sizeof(float));
+                
+                // Bandwidth (4 bytes, little-endian float)
+                float bw = loraRadio.getBandwidth();
+                memcpy(&config[5], &bw, sizeof(float));
+                
+                // Spreading factor (1 byte)
+                config[9] = loraRadio.getSpreadingFactor();
+                
+                // Coding rate (1 byte)
+                config[10] = loraRadio.getCodingRate();
+                
+                // Output power (1 byte, signed)
+                int8_t pwr = loraRadio.getOutputPower();
+                memcpy(&config[11], &pwr, sizeof(int8_t));
+                
+                // Sync word (2 bytes, little-endian)
+                uint16_t sw = loraRadio.getSyncWord();
+                memcpy(&config[12], &sw, sizeof(uint16_t));
+                
+                kiss.sendCommand(CMD_GETHARDWARE, config, 14);
+            }
+            break;
+            
+        case HW_QUERY_BATTERY:
+            // Send battery voltage
+            // Format: HW_QUERY_BATTERY, voltage(4 bytes float)
+            {
+                uint8_t battData[5];
+                battData[0] = HW_QUERY_BATTERY;
+                
+                float battVoltage = readBatteryVoltage();
+                memcpy(&battData[1], &battVoltage, sizeof(float));
+                
+                kiss.sendCommand(CMD_GETHARDWARE, battData, 5);
+            }
+            break;
+            
+        case HW_QUERY_BOARD:
+            // Send board information
+            // Format: HW_QUERY_BOARD, board_type(1 byte), board_name(string)
+            {
+                const char* boardName = BOARD_NAME;
+                size_t nameLen = strlen(boardName);
+                uint8_t boardData[32];  // Max 32 bytes for board info
+                
+                boardData[0] = HW_QUERY_BOARD;
+                boardData[1] = (uint8_t)BOARD_TYPE;
+                memcpy(&boardData[2], boardName, nameLen);
+                
+                kiss.sendCommand(CMD_GETHARDWARE, boardData, 2 + nameLen);
+            }
+            break;
+            
+        case HW_QUERY_ALL:
+            // Send all information: config, battery, and board
+            // We'll send them as separate responses for simplicity
+            {
+                // Radio config
+                uint8_t config[14];
+                config[0] = HW_QUERY_CONFIG;
+                float freq = loraRadio.getFrequency();
+                memcpy(&config[1], &freq, sizeof(float));
+                float bw = loraRadio.getBandwidth();
+                memcpy(&config[5], &bw, sizeof(float));
+                config[9] = loraRadio.getSpreadingFactor();
+                config[10] = loraRadio.getCodingRate();
+                int8_t pwr = loraRadio.getOutputPower();
+                memcpy(&config[11], &pwr, sizeof(int8_t));
+                uint16_t sw = loraRadio.getSyncWord();
+                memcpy(&config[12], &sw, sizeof(uint16_t));
+                kiss.sendCommand(CMD_GETHARDWARE, config, 14);
+                
+                // Battery voltage
+                uint8_t battData[5];
+                battData[0] = HW_QUERY_BATTERY;
+                float battVoltage = readBatteryVoltage();
+                memcpy(&battData[1], &battVoltage, sizeof(float));
+                kiss.sendCommand(CMD_GETHARDWARE, battData, 5);
+                
+                // Board info
+                const char* boardName = BOARD_NAME;
+                size_t nameLen = strlen(boardName);
+                uint8_t boardData[32];
+                boardData[0] = HW_QUERY_BOARD;
+                boardData[1] = (uint8_t)BOARD_TYPE;
+                memcpy(&boardData[2], boardName, nameLen);
+                kiss.sendCommand(CMD_GETHARDWARE, boardData, 2 + nameLen);
+            }
+            break;
+    }
+}
+
 void handleHardwareConfig(uint8_t* frame, size_t frameLen) {
     if (frameLen < 2) return;  // Need at least command and subcommand
     
@@ -225,7 +334,11 @@ void loop() {
             if (cmd == CMD_SETHARDWARE && frameLen > 1) {
                 // Handle hardware configuration
                 handleHardwareConfig(frame, frameLen);
-            } 
+            }
+            else if (cmd == CMD_GETHARDWARE && frameLen > 1) {
+                // Handle hardware query
+                handleHardwareQuery(frame, frameLen);
+            }
             else if (cmd == CMD_DATA && frameLen > 1) {
                 // Transmit data frame (skip command byte at frame[0])
                 if (frameLen - 1 <= LORA_BUFFER_SIZE) {

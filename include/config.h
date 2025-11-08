@@ -20,6 +20,7 @@
 #define CMD_TXTAIL      0x04  // Not used - No squelch tail in LoRa
 #define CMD_FULLDUPLEX  0x05  // Not used - SX1262 is half-duplex only
 #define CMD_SETHARDWARE 0x06  // Hardware-specific settings (LoRa parameters)
+#define CMD_GETHARDWARE 0x07  // Get hardware status (LoRa config, battery, etc.)
 #define CMD_RETURN      0xFF  // Exit KISS mode
 
 // SETHARDWARE Sub-commands for LoRa Configuration
@@ -30,8 +31,14 @@
 #define HW_SET_POWER        0x05  // Set TX power (1 byte: dBm)
 #define HW_GET_CONFIG       0x06  // Get current configuration
 #define HW_SAVE_CONFIG      0x07  // Save configuration to flash
-#define HW_RESET_CONFIG     0x08  // Reset to defaults
-#define HW_SET_SYNCWORD     0x09  // Set sync word (2 bytes for SX126x)
+#define HW_SET_SYNCWORD     0x08  // Set sync word (2 bytes for SX126x)
+#define HW_RESET_CONFIG     0xFF  // Reset to defaults
+
+// GETHARDWARE Sub-commands for reading hardware status
+#define HW_QUERY_CONFIG     0x01  // Query current radio configuration
+#define HW_QUERY_BATTERY    0x02  // Query battery voltage
+#define HW_QUERY_BOARD      0x03  // Query board information
+#define HW_QUERY_ALL        0xFF  // Query everything (config + battery + board)
 
 // LoRa Default Parameters (915 MHz ISM band for North America)
 #define LORA_FREQUENCY      915.0    // MHz - US ISM band (902-928 MHz)

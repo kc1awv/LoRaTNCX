@@ -54,7 +54,7 @@ void KISSProtocol::processSerialByte(uint8_t byte) {
     if (rxBufferIndex == 1) {
         uint8_t cmd = rxBuffer[0] & 0x0F;
         
-        if (cmd != CMD_DATA && cmd != CMD_SETHARDWARE) {
+        if (cmd != CMD_DATA && cmd != CMD_SETHARDWARE && cmd != CMD_GETHARDWARE) {
             // Simple command with single parameter
             handleCommand(cmd, byte);
             resetRxBuffer();
@@ -63,7 +63,7 @@ void KISSProtocol::processSerialByte(uint8_t byte) {
         }
     }
     
-    // Continue building frame for DATA and SETHARDWARE commands
+    // Continue building frame for DATA, SETHARDWARE, and GETHARDWARE commands
     rxBuffer[rxBufferIndex++] = byte;
 }
 
@@ -109,6 +109,16 @@ bool KISSProtocol::handleHardwareCommand(const uint8_t* data, size_t length) {
     // This will be called from main.cpp with access to the radio object
     // Return true if radio reconfiguration is needed
     return true;  // Handled in main loop
+}
+
+bool KISSProtocol::handleHardwareQuery(const uint8_t* data, size_t length) {
+    if (length < 2) {
+        return false;  // Need at least command byte and subcommand
+    }
+    
+    // data[0] is the KISS command (0x07), data[1] is the subcommand
+    // This will be fully handled in main.cpp with access to radio and board objects
+    return true;  // Command recognized
 }
 
 void KISSProtocol::sendFrame(const uint8_t* data, size_t length) {

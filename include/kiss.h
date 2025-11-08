@@ -30,6 +30,9 @@ public:
     // Hardware configuration handler (returns true if radio needs reconfiguration)
     bool handleHardwareCommand(const uint8_t* data, size_t length);
     
+    // Hardware query handler (returns true if command was recognized)
+    bool handleHardwareQuery(const uint8_t* data, size_t length);
+    
 private:
     uint8_t rxBuffer[SERIAL_BUFFER_SIZE];
     size_t rxBufferIndex;

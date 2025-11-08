@@ -31,6 +31,8 @@ Frequency Support: **433 MHz to 928 MHz** (tested: 433, 868, 902, 915, 928 MHz) 
 
 - ✅ **Full KISS Protocol** - Binary frame protocol for programs that gave up on human readability
 - ✅ **SETHARDWARE Commands** - LoRa-specific configuration via KISS extensions (because standards are more like guidelines)
+- ✅ **GETHARDWARE Commands** - Query radio config, battery voltage, and board info (new and shiny!)
+- ✅ **Battery Voltage Monitoring** - Keep tabs on your power situation (before it becomes critical)
 - ✅ **LoRa Radio Support** - Long range, low power, high coolness factor
 - ✅ **Persistent Settings** - Configuration survives power cycles (unlike our sanity during debugging)
 - ✅ **Configuration Tool** - Command-line utility for easy setup (the AI wrote this too)
@@ -53,10 +55,17 @@ Because the original KISS spec predates LoRa by a few decades, we added some mod
 - `0x03` - Set spreading factor (1 byte: 7-12)
 - `0x04` - Set coding rate (1 byte: 5-8 for CR 4/5 through 4/8)
 - `0x05` - Set output power (1 signed byte: 2-20 dBm)
-- `0x06` - Get current configuration (returns all settings)
+- `0x06` - Get current configuration (returns all settings via GETHARDWARE)
 - `0x07` - Save configuration to NVS (make it stick)
-- `0x08` - Load configuration from NVS (reload from memory)
-- `0x09` - Reset to factory defaults (when all else fails)
+- `0x08` - Set sync word (2 bytes for SX126x)
+- `0xFF` - Reset to factory defaults (when all else fails)
+
+**GETHARDWARE Queries (Command `0x07`):**
+New! Query hardware status without changing anything:
+- `0x01` - Query radio configuration (frequency, bandwidth, SF, CR, power, sync word)
+- `0x02` - Query battery voltage (4-byte float in volts - know before you go!)
+- `0x03` - Query board information (board type and name)
+- `0xFF` - Query everything (config + battery + board in one shot)
 
 See `tools/README.md` for detailed configuration examples and the AI's thorough documentation.
 
@@ -118,6 +127,12 @@ The TNC operates in KISS mode and produces no serial output except KISS frames. 
 ```bash
 # View current configuration (look at all those pretty numbers!)
 python3 tools/loratncx_config.py /dev/ttyUSB0 --get-config
+
+# Check battery voltage (so you know when to charge)
+python3 tools/loratncx_config.py /dev/ttyUSB0 --get-battery
+
+# Get all hardware info (config + battery + board)
+python3 tools/loratncx_config.py /dev/ttyUSB0 --get-all
 
 # Configure for US 33cm band (902-928 MHz)
 # This is the default, but hey, maybe you changed it
@@ -234,11 +249,11 @@ python3 tools/loratncx_config.py /dev/ttyUSB0 \
 
 The firmware is organized into clean, focused modules (because the AI read the SOLID principles and took them seriously):
 
-- **main.cpp**: Main loop, KISS frame processing, SETHARDWARE command handling (the brain)
+- **main.cpp**: Main loop, KISS frame processing, SETHARDWARE/GETHARDWARE command handling (the brain)
 - **kiss.cpp/h**: KISS protocol implementation - frame encoding/decoding, escaping (the diplomat)
 - **radio.cpp/h**: LoRa radio interface - RadioLib wrapper for SX1262 (the talker)
 - **config.cpp/h**: Configuration management - NVS persistence, defaults (the librarian)
-- **board_config.cpp/h**: Hardware-specific definitions for V3/V4 boards (the hardware whisperer)
+- **board_config.cpp/h**: Hardware-specific definitions, battery voltage reading for V3/V4 boards (the hardware whisperer)
 
 **Design Principles** (according to the AI):
 - Single Responsibility Principle (each module does one thing and does it well)
@@ -264,11 +279,13 @@ The firmware is organized into clean, focused modules (because the AI read the S
 
 ### What Works
 - Full KISS protocol implementation (tested with actual applications!)
-- SETHARDWARE configuration commands (all 9 subcommands working)
+- SETHARDWARE configuration commands (all subcommands working)
+- GETHARDWARE query commands (radio config, battery voltage, board info - NEW!)
+- Battery voltage monitoring (with proper V3.2/V4 support and ADC calibration)
 - LoRa transmission and reception (interrupt-driven, because we're fancy)
 - NVS configuration persistence (survives power cycles, unlike our debugging session memories)
-- Command-line configuration tool (Python script that actually works)
-- V3 and V4 board support (both versions love us equally)
+- Command-line configuration tool (Python script that actually works, now with battery monitoring!)
+- V3/V3.2 and V4 board support (both versions love us equally, with auto-detection)
 - Wide frequency range (433-928 MHz tested - it's like a frequency buffet)
 - Configurable deaf period (prevents echo loops and existential conversations with yourself)
 
@@ -344,6 +361,9 @@ Contributions welcome! Whether you're:
 
 **Q**: How do I know if the AI wrote this part?  
 **A**: If it's well-documented, probably the AI. If it's a clever hack, probably human. If it's this troubleshooting section's sarcasm, definitely human with AI assistance.
+
+**Q**: The battery voltage reading is way off!  
+**A**: Make sure you've uploaded the latest firmware. The V3 boards are often actually V3.2 revision (which Heltec still labels as "V3") and use inverted control logic. The latest firmware handles this automatically. If you're getting very low readings (like 0.2V), you might have an actual V3 board - open an issue and we'll add a config option.
 
 **Q**: Can I trust AI-generated code?  
 **A**: You're reading a README that was partially written by AI. You've already made your choice. (But yes, it's been tested on real hardware and actually works.)
