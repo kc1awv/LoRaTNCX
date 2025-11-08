@@ -4,6 +4,7 @@
 #include "config_manager.h"
 #include "kiss.h"
 #include "radio.h"
+#include "display.h"
 
 // Temporary debug mode
 // #define DEBUG_MODE 1
@@ -44,6 +45,15 @@ void setup() {
     }
     DEBUG_PRINTLN("Board initialized");
     
+    // Initialize display
+    DEBUG_PRINTLN("Initializing display...");
+    displayManager.begin();
+    DEBUG_PRINTLN("Display initialized");
+    
+    // Setup user button interrupt
+    pinMode(PIN_USER_BUTTON, INPUT_PULLUP);
+    attachInterrupt(digitalPinToInterrupt(PIN_USER_BUTTON), buttonInterruptHandler, FALLING);
+    
     // Setup PA control (V4 only)
     setupPAControl();
     
@@ -71,6 +81,18 @@ void setup() {
         }
     }
     DEBUG_PRINTLN("Radio initialized!");
+    
+    // Update display with initial radio config
+    LoRaConfig currentConfig;
+    loraRadio.getCurrentConfig(currentConfig);
+    displayManager.setRadioConfig(
+        currentConfig.frequency,
+        currentConfig.bandwidth,
+        currentConfig.spreading,
+        currentConfig.codingRate,
+        currentConfig.power,
+        currentConfig.syncWord
+    );
     
     DEBUG_PRINTLN("Entering KISS mode (debug enabled)\n");
     // TNC is now ready and enters KISS mode (silent operation)
@@ -316,6 +338,23 @@ void handleHardwareConfig(uint8_t* frame, size_t frameLen) {
 }
 
 void loop() {
+    // Handle button press
+    if (buttonPressed) {
+        buttonPressed = false;
+        displayManager.handleButtonPress();
+    }
+    
+    // Update display
+    displayManager.update();
+    
+    // Update battery voltage periodically (every 10 seconds when not on boot screen)
+    static uint32_t lastBatteryUpdate = 0;
+    if (!displayManager.isBootScreenActive() && millis() - lastBatteryUpdate >= 10000) {
+        float battVoltage = readBatteryVoltage();
+        displayManager.setBatteryVoltage(battVoltage);
+        lastBatteryUpdate = millis();
+    }
+    
     // Process incoming serial data (KISS frames from host)
     while (Serial.available() > 0) {
         uint8_t byte = Serial.read();
@@ -334,6 +373,18 @@ void loop() {
             if (cmd == CMD_SETHARDWARE && frameLen > 1) {
                 // Handle hardware configuration
                 handleHardwareConfig(frame, frameLen);
+                
+                // Update display with new config
+                LoRaConfig currentConfig;
+                loraRadio.getCurrentConfig(currentConfig);
+                displayManager.setRadioConfig(
+                    currentConfig.frequency,
+                    currentConfig.bandwidth,
+                    currentConfig.spreading,
+                    currentConfig.codingRate,
+                    currentConfig.power,
+                    currentConfig.syncWord
+                );
             }
             else if (cmd == CMD_GETHARDWARE && frameLen > 1) {
                 // Handle hardware query

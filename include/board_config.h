@@ -3,6 +3,9 @@
 
 #include "config.h"
 
+// Common pins for both V3 and V4
+#define PIN_USER_BUTTON  0   // GPIO0 - User button (boot button)
+
 // PA control function (V4 only)
 void setupPAControl();
 
