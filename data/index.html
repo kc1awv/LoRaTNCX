@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LoRaTNCX Configuration</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .status-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .status-item {
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-radius: 5px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .status-item label {
+            display: block;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .status-item .value {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .status-item.online {
+            border-left-color: #28a745;
+        }
+        
+        .status-item.offline {
+            border-left-color: #dc3545;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .tab {
+            background: white;
+            color: #667eea;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .tab:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+        
+        .tab.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .tab-content {
+            display: none;
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+        
+        .form-group input[type="text"],
+        .form-group input[type="number"],
+        .form-group input[type="password"],
+        .form-group select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .form-group small {
+            display: block;
+            margin-top: 5px;
+            color: #666;
+            font-size: 12px;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .checkbox-group input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 25px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        
+        .alert {
+            padding: 12px 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        
+        .alert.show {
+            display: block;
+        }
+        
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .info-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .info-card h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+        
+        .info-card .info-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .info-card .info-item span:first-child {
+            color: #666;
+        }
+        
+        .info-card .info-item span:last-child {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .network-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .network-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: #f8f9fa;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .network-item:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+        
+        .network-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .signal-strength {
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛰️ LoRaTNCX Configuration</h1>
+            <div class="status-bar" id="statusBar">
+                <div class="status-item">
+                    <label>Board</label>
+                    <div class="value" id="boardName">Loading...</div>
+                </div>
+                <div class="status-item">
+                    <label>WiFi Status</label>
+                    <div class="value" id="wifiStatus">Checking...</div>
+                </div>
+                <div class="status-item">
+                    <label>IP Address</label>
+                    <div class="value" id="ipAddress">-</div>
+                </div>
+                <div class="status-item">
+                    <label>Battery</label>
+                    <div class="value" id="battery">-</div>
+                </div>
+                <div class="status-item">
+                    <label>Uptime</label>
+                    <div class="value" id="uptime">-</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('lora')">LoRa Configuration</button>
+            <button class="tab" onclick="switchTab('wifi')">WiFi Configuration</button>
+            <button class="tab" onclick="switchTab('system')">System Info</button>
+        </div>
+        
+        <!-- LoRa Configuration Tab -->
+        <div class="tab-content active" id="lora-tab">
+            <h2>LoRa Radio Configuration</h2>
+            <div class="alert alert-success" id="lora-alert-success"></div>
+            <div class="alert alert-error" id="lora-alert-error"></div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="frequency">Frequency (MHz)</label>
+                    <input type="number" id="frequency" step="0.1" min="150" max="960">
+                    <small>Valid range: 150-960 MHz</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="bandwidth">Bandwidth (kHz)</label>
+                    <select id="bandwidth">
+                        <option value="125">125 kHz</option>
+                        <option value="250">250 kHz</option>
+                        <option value="500">500 kHz</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="spreading">Spreading Factor</label>
+                    <select id="spreading">
+                        <option value="7">SF7</option>
+                        <option value="8">SF8</option>
+                        <option value="9">SF9</option>
+                        <option value="10">SF10</option>
+                        <option value="11">SF11</option>
+                        <option value="12">SF12</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="codingRate">Coding Rate</label>
+                    <select id="codingRate">
+                        <option value="5">4/5</option>
+                        <option value="6">4/6</option>
+                        <option value="7">4/7</option>
+                        <option value="8">4/8</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="power">TX Power (dBm)</label>
+                    <input type="number" id="power" min="-9" max="22">
+                    <small>Valid range: -9 to 22 dBm</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="syncWord">Sync Word (Hex)</label>
+                    <input type="text" id="syncWord" placeholder="0x1424">
+                    <small>2-byte hex value (e.g., 0x1424)</small>
+                </div>
+            </div>
+            
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="applyLoRaConfig()">Apply Configuration</button>
+                <button class="btn btn-primary" onclick="saveLoRaConfig()">Save to Flash</button>
+                <button class="btn btn-secondary" onclick="loadLoRaConfig()">Reload</button>
+                <button class="btn btn-danger" onclick="resetLoRaConfig()">Reset to Defaults</button>
+            </div>
+        </div>
+        
+        <!-- WiFi Configuration Tab -->
+        <div class="tab-content" id="wifi-tab">
+            <h2>WiFi Configuration</h2>
+            <div class="alert alert-success" id="wifi-alert-success"></div>
+            <div class="alert alert-error" id="wifi-alert-error"></div>
+            
+            <div class="form-group">
+                <label for="wifiMode">WiFi Mode</label>
+                <select id="wifiMode" onchange="updateWiFiModeUI()">
+                    <option value="0">Off</option>
+                    <option value="1">Access Point Only</option>
+                    <option value="2">Station Only (Client)</option>
+                    <option value="3">AP + Station</option>
+                </select>
+            </div>
+            
+            <div id="ap-config">
+                <h3>Access Point Settings</h3>
+                <div class="form-group">
+                    <label for="apSsid">AP SSID</label>
+                    <input type="text" id="apSsid" maxlength="31">
+                </div>
+                
+                <div class="form-group">
+                    <label for="apPassword">AP Password</label>
+                    <input type="password" id="apPassword" maxlength="63">
+                    <small>Leave empty for open network (not recommended)</small>
+                </div>
+            </div>
+            
+            <div id="sta-config">
+                <h3>Station Settings</h3>
+                <div class="form-group">
+                    <label for="staSsid">Network SSID</label>
+                    <input type="text" id="staSsid" maxlength="31">
+                    <button class="btn btn-secondary" onclick="scanWiFi()" style="margin-top: 10px;">Scan Networks</button>
+                </div>
+                
+                <div id="networkList" class="network-list" style="display: none;">
+                    <h4>Available Networks</h4>
+                    <div id="networkListContent"></div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="staPassword">Network Password</label>
+                    <input type="password" id="staPassword" maxlength="63">
+                </div>
+                
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="dhcp" checked onchange="updateDHCPUI()">
+                        <label for="dhcp">Use DHCP</label>
+                    </div>
+                </div>
+                
+                <div id="static-ip-config" style="display: none;">
+                    <h4>Static IP Configuration</h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="staticIp">IP Address</label>
+                            <input type="text" id="staticIp" placeholder="192.168.1.100">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="gateway">Gateway</label>
+                            <input type="text" id="gateway" placeholder="192.168.1.1">
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="subnet">Subnet Mask</label>
+                            <input type="text" id="subnet" placeholder="255.255.255.0">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="dns">DNS Server</label>
+                            <input type="text" id="dns" placeholder="8.8.8.8">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <h3>TCP KISS Server</h3>
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="tcpKissEnabled" checked>
+                    <label for="tcpKissEnabled">Enable TCP KISS Server</label>
+                </div>
+                <small>Allow network clients to connect to the TNC via TCP/IP</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="tcpKissPort">TCP KISS Port</label>
+                <input type="number" id="tcpKissPort" min="1" max="65535" value="8001">
+                <small>Default: 8001</small>
+            </div>
+            
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="applyWiFiConfig()">Apply Configuration</button>
+                <button class="btn btn-primary" onclick="saveWiFiConfig()">Save to Flash</button>
+                <button class="btn btn-secondary" onclick="loadWiFiConfig()">Reload</button>
+            </div>
+        </div>
+        
+        <!-- System Info Tab -->
+        <div class="tab-content" id="system-tab">
+            <h2>System Information</h2>
+            
+            <div class="info-grid">
+                <div class="info-card">
+                    <h4>Board Information</h4>
+                    <div class="info-item">
+                        <span>Board Name:</span>
+                        <span id="sys-board-name">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span>Board Type:</span>
+                        <span id="sys-board-type">-</span>
+                    </div>
+                </div>
+                
+                <div class="info-card">
+                    <h4>Chip Information</h4>
+                    <div class="info-item">
+                        <span>Model:</span>
+                        <span id="sys-chip-model">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span>Revision:</span>
+                        <span id="sys-chip-revision">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span>Cores:</span>
+                        <span id="sys-chip-cores">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span>Frequency:</span>
+                        <span id="sys-chip-freq">-</span>
+                    </div>
+                </div>
+                
+                <div class="info-card">
+                    <h4>Memory Information</h4>
+                    <div class="info-item">
+                        <span>Flash Size:</span>
+                        <span id="sys-flash-size">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span>Free Heap:</span>
+                        <span id="sys-free-heap">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span>Heap Size:</span>
+                        <span id="sys-heap-size">-</span>
+                    </div>
+                </div>
+                
+                <div class="info-card">
+                    <h4>Current LoRa Config</h4>
+                    <div class="info-item">
+                        <span>Frequency:</span>
+                        <span id="sys-lora-freq">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span>Bandwidth:</span>
+                        <span id="sys-lora-bw">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span>Spreading:</span>
+                        <span id="sys-lora-sf">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span>Power:</span>
+                        <span id="sys-lora-pwr">-</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="button-group">
+                <button class="btn btn-secondary" onclick="loadSystemInfo()">Refresh</button>
+                <button class="btn btn-danger" onclick="rebootDevice()">Reboot Device</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentTab = 'lora';
+        
+        // Switch between tabs
+        function switchTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(tabName + '-tab').classList.add('active');
+            
+            currentTab = tabName;
+            
+            // Load data for the tab
+            if (tabName === 'lora') {
+                loadLoRaConfig();
+            } else if (tabName === 'wifi') {
+                loadWiFiConfig();
+            } else if (tabName === 'system') {
+                loadSystemInfo();
+            }
+        }
+        
+        // Show alert message
+        function showAlert(type, message, prefix = currentTab) {
+            const alertId = prefix + '-alert-' + type;
+            const alert = document.getElementById(alertId);
+            if (alert) {
+                alert.textContent = message;
+                alert.classList.add('show');
+                setTimeout(() => alert.classList.remove('show'), 5000);
+            }
+        }
+        
+        // API calls
+        async function apiGet(endpoint) {
+            const response = await fetch('/api/' + endpoint);
+            if (!response.ok) throw new Error('API request failed');
+            return await response.json();
+        }
+        
+        async function apiPost(endpoint, data = null) {
+            const options = {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            };
+            if (data) options.body = JSON.stringify(data);
+            
+            const response = await fetch('/api/' + endpoint, options);
+            if (!response.ok) throw new Error('API request failed');
+            const result = await response.json();
+            
+            // Check if the response indicates success
+            if (result.success === false) {
+                throw new Error(result.error || 'Operation failed');
+            }
+            
+            return result;
+        }
+        
+        // Load status
+        async function loadStatus() {
+            try {
+                const data = await apiGet('status');
+                
+                // Update WiFi status - handle AP+STA mode
+                if (data.wifi.connected && data.wifi.ap_active) {
+                    document.getElementById('wifiStatus').textContent = 'AP + Station';
+                    document.getElementById('ipAddress').textContent = 'AP: ' + data.wifi.ap_ip + ' | STA: ' + data.wifi.sta_ip;
+                } else if (data.wifi.connected) {
+                    document.getElementById('wifiStatus').textContent = 'Connected';
+                    document.getElementById('ipAddress').textContent = data.wifi.sta_ip;
+                } else if (data.wifi.ap_active) {
+                    document.getElementById('wifiStatus').textContent = 'AP Mode';
+                    document.getElementById('ipAddress').textContent = data.wifi.ap_ip;
+                } else {
+                    document.getElementById('wifiStatus').textContent = 'Offline';
+                    document.getElementById('ipAddress').textContent = '-';
+                }
+                
+                // Update battery
+                document.getElementById('battery').textContent = data.battery.voltage.toFixed(2) + ' V';
+                
+                // Update uptime
+                const uptime = data.system.uptime;
+                const hours = Math.floor(uptime / 3600);
+                const minutes = Math.floor((uptime % 3600) / 60);
+                document.getElementById('uptime').textContent = hours + 'h ' + minutes + 'm';
+                
+            } catch (error) {
+                console.error('Failed to load status:', error);
+            }
+        }
+        
+        // LoRa Configuration
+        async function loadLoRaConfig() {
+            try {
+                const data = await apiGet('lora/config');
+                document.getElementById('frequency').value = data.frequency;
+                document.getElementById('bandwidth').value = data.bandwidth;
+                document.getElementById('spreading').value = data.spreading;
+                document.getElementById('codingRate').value = data.codingRate;
+                document.getElementById('power').value = data.power;
+                document.getElementById('syncWord').value = '0x' + data.syncWord.toString(16).toUpperCase();
+            } catch (error) {
+                showAlert('error', 'Failed to load LoRa configuration');
+            }
+        }
+        
+        async function applyLoRaConfig() {
+            try {
+                const syncWord = parseInt(document.getElementById('syncWord').value, 16);
+                
+                const config = {
+                    frequency: parseFloat(document.getElementById('frequency').value),
+                    bandwidth: parseFloat(document.getElementById('bandwidth').value),
+                    spreading: parseInt(document.getElementById('spreading').value),
+                    codingRate: parseInt(document.getElementById('codingRate').value),
+                    power: parseInt(document.getElementById('power').value),
+                    syncWord: syncWord
+                };
+                
+                await apiPost('lora/config', config);
+                showAlert('success', 'LoRa configuration applied successfully');
+            } catch (error) {
+                showAlert('error', 'Failed to apply LoRa configuration');
+            }
+        }
+        
+        async function saveLoRaConfig() {
+            try {
+                await apiPost('lora/save');
+                showAlert('success', 'LoRa configuration saved to flash');
+            } catch (error) {
+                showAlert('error', 'Failed to save LoRa configuration');
+            }
+        }
+        
+        async function resetLoRaConfig() {
+            if (confirm('Are you sure you want to reset LoRa configuration to defaults?')) {
+                try {
+                    await apiPost('lora/reset');
+                    showAlert('success', 'LoRa configuration reset to defaults');
+                    await loadLoRaConfig();
+                } catch (error) {
+                    showAlert('error', 'Failed to reset LoRa configuration');
+                }
+            }
+        }
+        
+        // WiFi Configuration
+        async function loadWiFiConfig() {
+            try {
+                const data = await apiGet('wifi/config');
+                document.getElementById('wifiMode').value = data.mode;
+                document.getElementById('apSsid').value = data.ap_ssid;
+                document.getElementById('staSsid').value = data.ssid;
+                document.getElementById('dhcp').checked = data.dhcp;
+                document.getElementById('staticIp').value = data.ip;
+                document.getElementById('gateway').value = data.gateway;
+                document.getElementById('subnet').value = data.subnet;
+                document.getElementById('dns').value = data.dns;
+                document.getElementById('tcpKissEnabled').checked = data.tcp_kiss_enabled;
+                document.getElementById('tcpKissPort').value = data.tcp_kiss_port;
+                
+                updateWiFiModeUI();
+                updateDHCPUI();
+            } catch (error) {
+                showAlert('error', 'Failed to load WiFi configuration', 'wifi');
+            }
+        }
+        
+        function updateWiFiModeUI() {
+            const mode = parseInt(document.getElementById('wifiMode').value);
+            const apConfig = document.getElementById('ap-config');
+            const staConfig = document.getElementById('sta-config');
+            
+            apConfig.style.display = (mode === 1 || mode === 3) ? 'block' : 'none';
+            staConfig.style.display = (mode === 2 || mode === 3) ? 'block' : 'none';
+        }
+        
+        function updateDHCPUI() {
+            const dhcp = document.getElementById('dhcp').checked;
+            document.getElementById('static-ip-config').style.display = dhcp ? 'none' : 'block';
+        }
+        
+        async function applyWiFiConfig() {
+            try {
+                const config = {
+                    mode: parseInt(document.getElementById('wifiMode').value),
+                    ap_ssid: document.getElementById('apSsid').value,
+                    ap_password: document.getElementById('apPassword').value,
+                    ssid: document.getElementById('staSsid').value,
+                    password: document.getElementById('staPassword').value,
+                    dhcp: document.getElementById('dhcp').checked,
+                    tcp_kiss_enabled: document.getElementById('tcpKissEnabled').checked,
+                    tcp_kiss_port: parseInt(document.getElementById('tcpKissPort').value)
+                };
+                
+                const currentMode = parseInt(document.getElementById('wifiMode').value);
+                
+                await apiPost('wifi/config', config);
+                
+                // If changing WiFi mode, warn user about connection loss
+                if (currentMode === 0 || currentMode === 2) {
+                    showAlert('success', 'WiFi configuration applied. Note: Connection may be lost if changing modes. You may need to reconnect to the new network.', 'wifi');
+                } else {
+                    showAlert('success', 'WiFi configuration applied successfully', 'wifi');
+                }
+            } catch (error) {
+                showAlert('error', 'Failed to apply WiFi configuration', 'wifi');
+            }
+        }
+        
+        async function saveWiFiConfig() {
+            try {
+                await apiPost('wifi/save');
+                showAlert('success', 'WiFi configuration saved to flash', 'wifi');
+            } catch (error) {
+                showAlert('error', 'Failed to save WiFi configuration', 'wifi');
+            }
+        }
+        
+        async function scanWiFi() {
+            try {
+                document.getElementById('networkListContent').innerHTML = '<div class="loading">Scanning...</div>';
+                document.getElementById('networkList').style.display = 'block';
+                
+                const data = await apiGet('wifi/scan');
+                const listContent = document.getElementById('networkListContent');
+                listContent.innerHTML = '';
+                
+                if (data.networks && data.networks.length > 0) {
+                    data.networks.forEach(network => {
+                        const item = document.createElement('div');
+                        item.className = 'network-item';
+                        item.onclick = () => {
+                            document.getElementById('staSsid').value = network.ssid;
+                        };
+                        
+                        let signalIcon = '📶';
+                        if (network.rssi > -50) signalIcon = '📶📶📶';
+                        else if (network.rssi > -70) signalIcon = '📶📶';
+                        
+                        item.innerHTML = `
+                            <div class="network-info">
+                                <div class="signal-strength">${signalIcon}</div>
+                                <div>
+                                    <strong>${network.ssid}</strong><br>
+                                    <small>${network.rssi} dBm ${network.encrypted ? '🔒' : '🔓'}</small>
+                                </div>
+                            </div>
+                        `;
+                        
+                        listContent.appendChild(item);
+                    });
+                } else {
+                    listContent.innerHTML = '<div class="loading">No networks found</div>';
+                }
+            } catch (error) {
+                showAlert('error', 'Failed to scan WiFi networks', 'wifi');
+            }
+        }
+        
+        // System Information
+        async function loadSystemInfo() {
+            try {
+                const sysData = await apiGet('system');
+                const loraData = await apiGet('lora/config');
+                
+                // Board info
+                document.getElementById('sys-board-name').textContent = sysData.board.name;
+                document.getElementById('sys-board-type').textContent = 'V' + sysData.board.type;
+                
+                // Chip info
+                document.getElementById('sys-chip-model').textContent = sysData.chip.model;
+                document.getElementById('sys-chip-revision').textContent = sysData.chip.revision;
+                document.getElementById('sys-chip-cores').textContent = sysData.chip.cores;
+                document.getElementById('sys-chip-freq').textContent = sysData.chip.frequency + ' MHz';
+                
+                // Memory info
+                document.getElementById('sys-flash-size').textContent = (sysData.memory.flash_size / 1024 / 1024).toFixed(0) + ' MB';
+                document.getElementById('sys-free-heap').textContent = (sysData.memory.free_heap / 1024).toFixed(1) + ' KB';
+                document.getElementById('sys-heap-size').textContent = (sysData.memory.heap_size / 1024).toFixed(1) + ' KB';
+                
+                // LoRa config
+                document.getElementById('sys-lora-freq').textContent = loraData.frequency + ' MHz';
+                document.getElementById('sys-lora-bw').textContent = loraData.bandwidth + ' kHz';
+                document.getElementById('sys-lora-sf').textContent = 'SF' + loraData.spreading;
+                document.getElementById('sys-lora-pwr').textContent = loraData.power + ' dBm';
+                
+            } catch (error) {
+                console.error('Failed to load system info:', error);
+            }
+        }
+        
+        async function rebootDevice() {
+            if (confirm('Are you sure you want to reboot the device?')) {
+                try {
+                    await apiPost('reboot');
+                    alert('Device is rebooting. Please wait 10 seconds and refresh the page.');
+                } catch (error) {
+                    // Expected - device is rebooting
+                }
+            }
+        }
+        
+        // Initialize
+        async function init() {
+            // Load initial data
+            await loadStatus();
+            const sysData = await apiGet('system');
+            document.getElementById('boardName').textContent = sysData.board.name;
+            
+            // Load current tab data
+            await loadLoRaConfig();
+            
+            // Update status every 5 seconds
+            setInterval(loadStatus, 5000);
+        }
+        
+        // Start when page loads
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>

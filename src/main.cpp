@@ -1,10 +1,14 @@
 #include <Arduino.h>
+#include <SPIFFS.h>
 #include "config.h"
 #include "board_config.h"
 #include "config_manager.h"
 #include "kiss.h"
 #include "radio.h"
 #include "display.h"
+#include "wifi_manager.h"
+#include "web_server.h"
+#include "tcp_kiss.h"
 
 // Temporary debug mode
 // #define DEBUG_MODE 1
@@ -21,6 +25,9 @@
 KISSProtocol kiss;
 LoRaRadio loraRadio;
 ConfigManager configManager;
+WiFiManager wifiManager;
+TNCWebServer webServer(&wifiManager, &loraRadio, &configManager);
+TCPKISSServer tcpKissServer;
 
 // Buffers
 uint8_t rxBuffer[LORA_BUFFER_SIZE];
@@ -31,6 +38,14 @@ void setup() {
     delay(1000);
     
     DEBUG_PRINTLN("\n=== LoRaTNCX Debug Mode ===");
+    
+    // Initialize SPIFFS for web server
+    DEBUG_PRINTLN("Initializing SPIFFS...");
+    if (!SPIFFS.begin(true)) {
+        DEBUG_PRINTLN("SPIFFS mount failed!");
+    } else {
+        DEBUG_PRINTLN("SPIFFS mounted successfully");
+    }
     
     // Initialize board-specific pins
     DEBUG_PRINTLN("Initializing board pins...");
@@ -61,16 +76,7 @@ void setup() {
     DEBUG_PRINTLN("Initializing config manager...");
     configManager.begin();
     
-    // Try to load saved configuration
-    LoRaConfig savedConfig;
-    if (configManager.loadConfig(savedConfig)) {
-        DEBUG_PRINTLN("Applying saved config...");
-        loraRadio.applyConfig(savedConfig);
-    } else {
-        DEBUG_PRINTLN("Using default config");
-    }
-    
-    // Initialize LoRa radio - halt if failed
+    // Initialize LoRa radio first - halt if failed
     DEBUG_PRINTLN("Initializing radio...");
     int radioState = loraRadio.beginWithState();
     if (radioState != RADIOLIB_ERR_NONE) {
@@ -81,6 +87,16 @@ void setup() {
         }
     }
     DEBUG_PRINTLN("Radio initialized!");
+    
+    // Now try to load and apply saved configuration
+    LoRaConfig savedConfig;
+    if (configManager.loadConfig(savedConfig)) {
+        DEBUG_PRINTLN("Applying saved config...");
+        loraRadio.applyConfig(savedConfig);
+        loraRadio.reconfigure();  // Reconfigure radio with saved settings
+    } else {
+        DEBUG_PRINTLN("Using default config");
+    }
     
     // Update display with initial radio config
     LoRaConfig currentConfig;
@@ -93,6 +109,86 @@ void setup() {
         currentConfig.power,
         currentConfig.syncWord
     );
+    
+    // Initialize WiFi manager
+    DEBUG_PRINTLN("Initializing WiFi manager...");
+    if (wifiManager.begin()) {
+        DEBUG_PRINTLN("WiFi manager initialized");
+        
+        // Switch to WiFi startup screen
+        displayManager.setScreen(SCREEN_WIFI_STARTUP);
+        displayManager.setWiFiStartupMessage("Starting WiFi...");
+        displayManager.update();
+        
+        // Start WiFi with saved/default configuration
+        if (wifiManager.start()) {
+            DEBUG_PRINTLN("WiFi started");
+            
+            // Wait for WiFi to be ready (either AP started or STA connected)
+            // with a timeout of 30 seconds
+            unsigned long wifiStartTime = millis();
+            const unsigned long WIFI_TIMEOUT = 30000;  // 30 seconds
+            
+            while (!wifiManager.isReady() && (millis() - wifiStartTime < WIFI_TIMEOUT)) {
+                wifiManager.update();
+                displayManager.setWiFiStartupMessage(wifiManager.getStatusMessage());
+                displayManager.update();
+                delay(100);
+            }
+            
+            if (wifiManager.isReady()) {
+                DEBUG_PRINTLN("WiFi ready!");
+                
+                // Show WiFi info on display
+                if (wifiManager.isAPActive()) {
+                    DEBUG_PRINT("AP IP: ");
+                    DEBUG_PRINTLN(wifiManager.getAPIPAddress());
+                    displayManager.setWiFiStartupMessage("AP: " + wifiManager.getAPIPAddress());
+                }
+                if (wifiManager.isConnected()) {
+                    DEBUG_PRINT("STA IP: ");
+                    DEBUG_PRINTLN(wifiManager.getIPAddress());
+                    displayManager.setWiFiStartupMessage("Connected: " + wifiManager.getIPAddress());
+                }
+                displayManager.update();
+                delay(2000);  // Show WiFi status for 2 seconds
+                
+                // Start web server
+                DEBUG_PRINTLN("Starting web server...");
+                if (webServer.begin()) {
+                    DEBUG_PRINTLN("Web server started on port 80");
+                    DEBUG_PRINTLN("Access via: http://loratncx.local");
+                } else {
+                    DEBUG_PRINTLN("Failed to start web server");
+                }
+                
+                // Start TCP KISS server if enabled
+                WiFiConfig wifiConfig;
+                wifiManager.getCurrentConfig(wifiConfig);
+                if (wifiConfig.tcp_kiss_enabled) {
+                    DEBUG_PRINT("Starting TCP KISS server on port ");
+                    DEBUG_PRINTLN(wifiConfig.tcp_kiss_port);
+                    if (tcpKissServer.begin(wifiConfig.tcp_kiss_port)) {
+                        DEBUG_PRINTLN("TCP KISS server started");
+                    } else {
+                        DEBUG_PRINTLN("Failed to start TCP KISS server");
+                    }
+                }
+            } else {
+                DEBUG_PRINTLN("WiFi timeout - continuing anyway");
+                displayManager.setWiFiStartupMessage("WiFi Timeout");
+                displayManager.update();
+                delay(2000);
+            }
+        } else {
+            DEBUG_PRINTLN("WiFi start failed or disabled");
+            displayManager.setWiFiStartupMessage("WiFi Disabled");
+            displayManager.update();
+            delay(2000);
+        }
+    } else {
+        DEBUG_PRINTLN("WiFi manager init failed");
+    }
     
     DEBUG_PRINTLN("Entering KISS mode (debug enabled)\n");
     // TNC is now ready and enters KISS mode (silent operation)
@@ -338,6 +434,15 @@ void handleHardwareConfig(uint8_t* frame, size_t frameLen) {
 }
 
 void loop() {
+    // Update WiFi manager
+    wifiManager.update();
+    
+    // Update web server
+    webServer.update();
+    
+    // Update TCP KISS server
+    tcpKissServer.update();
+    
     // Handle button press
     if (buttonPressed) {
         buttonPressed = false;
@@ -353,6 +458,18 @@ void loop() {
         float battVoltage = readBatteryVoltage();
         displayManager.setBatteryVoltage(battVoltage);
         lastBatteryUpdate = millis();
+    }
+    
+    // Update WiFi status periodically (every 5 seconds when not on boot screen)
+    static uint32_t lastWiFiUpdate = 0;
+    if (!displayManager.isBootScreenActive() && millis() - lastWiFiUpdate >= 5000) {
+        bool apActive = wifiManager.isAPActive();
+        bool staConnected = wifiManager.isConnected();
+        String apIP = wifiManager.getAPIPAddress();
+        String staIP = wifiManager.getIPAddress();
+        int rssi = wifiManager.getRSSI();
+        displayManager.setWiFiStatus(apActive, staConnected, apIP, staIP, rssi);
+        lastWiFiUpdate = millis();
     }
     
     // Process incoming serial data (KISS frames from host)
@@ -405,8 +522,39 @@ void loop() {
     size_t rxLen = 0;
     if (loraRadio.receive(rxBuffer, &rxLen)) {
         if (rxLen > 0) {
-            // Send received packet to host via KISS
+            // Send received packet to host via KISS (serial)
             kiss.sendFrame(rxBuffer, rxLen);
+            
+            // Also send to TCP KISS clients if any are connected
+            if (tcpKissServer.hasClients()) {
+                // Build KISS frame for TCP clients
+                uint8_t tcpFrame[LORA_BUFFER_SIZE + 10];  // Extra space for KISS framing
+                size_t tcpFrameLen = 0;
+                
+                // FEND
+                tcpFrame[tcpFrameLen++] = FEND;
+                // Command (port 0, data frame)
+                tcpFrame[tcpFrameLen++] = CMD_DATA;
+                
+                // Escape and add data
+                for (size_t i = 0; i < rxLen; i++) {
+                    if (rxBuffer[i] == FEND) {
+                        tcpFrame[tcpFrameLen++] = FESC;
+                        tcpFrame[tcpFrameLen++] = TFEND;
+                    } else if (rxBuffer[i] == FESC) {
+                        tcpFrame[tcpFrameLen++] = FESC;
+                        tcpFrame[tcpFrameLen++] = TFESC;
+                    } else {
+                        tcpFrame[tcpFrameLen++] = rxBuffer[i];
+                    }
+                }
+                
+                // FEND
+                tcpFrame[tcpFrameLen++] = FEND;
+                
+                // Send to all TCP clients
+                tcpKissServer.sendKISSFrame(tcpFrame, tcpFrameLen);
+            }
         }
     }
     
