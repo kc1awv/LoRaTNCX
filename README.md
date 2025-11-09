@@ -36,6 +36,9 @@ Frequency Support: **433 MHz to 928 MHz** (tested: 433, 868, 902, 915, 928 MHz) 
 - ✅ **LoRa Radio Support** - Long range, low power, high coolness factor
 - ✅ **Persistent Settings** - Configuration survives power cycles (unlike our sanity during debugging)
 - ✅ **Configuration Tool** - Command-line utility for easy setup (the AI wrote this too)
+- ✅ **WiFi Web Interface** - Configure from any device with a browser (because it's 2025, not 1995)
+- ✅ **Multiple WiFi Modes** - Access Point, Station, both, or neither (flexibility is key)
+- ✅ **RESTful API** - Full JSON API for automation enthusiasts (curl your way to victory)
 - ✅ **Interrupt-Driven Reception** - Efficient packet handling with no echo loops (took a few tries to get this right)
 - ✅ **Configurable Deaf Period** - Prevents receiving own transmissions (because talking to yourself is awkward)
 - ✅ **Wide Frequency Range** - Supports 433-928 MHz ISM bands (way more versatile than we expected)
@@ -68,6 +71,55 @@ New! Query hardware status without changing anything:
 - `0xFF` - Query everything (config + battery + board in one shot)
 
 See `tools/README.md` for detailed configuration examples and the AI's thorough documentation.
+
+### WiFi Web Interface (New!)
+
+Because typing KISS commands and hex values is so 1990s, the TNC now includes a web interface accessible from any browser. Finally, configuration that doesn't require a PhD in hexadecimal.
+
+**Quick Start:**
+1. Upload the SPIFFS filesystem (contains the web interface):
+   ```bash
+   # For V3
+   platformio run --environment heltec_wifi_lora_32_V3 --target uploadfs
+   
+   # For V4
+   platformio run --environment heltec_wifi_lora_32_V4 --target uploadfs
+   ```
+   Or use the VS Code tasks: "Upload Filesystem (SPIFFS) V3/V4"
+
+2. The TNC creates a WiFi access point by default:
+   - **SSID**: `LoRaTNCX-XXXX` (XXXX = unique device ID)
+   - **Password**: `loratncx` (yes, you should change this immediately)
+   - **IP**: `192.168.4.1`
+
+3. Connect to the WiFi network and open `http://192.168.4.1` in your browser
+
+**Web Interface Features:**
+- 📊 Real-time status display (WiFi, battery, uptime - all the important stuff)
+- 🎛️ Configure all LoRa parameters (frequency, bandwidth, spreading factor, etc.)
+- 📡 WiFi configuration (AP mode, Station mode, or both simultaneously)
+- 🔍 WiFi network scanner (finds networks so you don't have to type SSIDs)
+- 💾 Save/load configuration from flash (make it stick or start fresh)
+- 🔄 Remote reboot (because finding the reset button is hard)
+- 📱 Responsive design (works on phones, tablets, and those ancient desktops)
+
+**WiFi Modes:**
+- **Off (0)**: WiFi disabled - saves power, increases battery life
+- **AP Only (1)**: Creates access point - good for field use, no existing network needed
+- **STA Only (2)**: Connects to existing WiFi - lower power than AP mode
+- **AP+STA (3)**: Both modes simultaneously - maximum flexibility, maximum power consumption
+
+**REST API** (because some of you love `curl`):
+- `GET /api/status` - Current status and battery voltage
+- `GET /api/lora/config` - Current LoRa configuration
+- `POST /api/lora/config` - Update LoRa settings (JSON body)
+- `POST /api/lora/save` - Save LoRa config to flash
+- `GET /api/wifi/config` - Current WiFi configuration
+- `POST /api/wifi/config` - Update WiFi settings (JSON body)
+- `GET /api/wifi/scan` - Scan for available networks
+- `POST /api/reboot` - Reboot the device
+
+**Power Consumption Note**: WiFi is power-hungry (150-200 mA in AP mode). For battery operation, configure your settings via WiFi, then switch WiFi mode to Off. Your battery will thank you.
 
 ## AI-Generated Caveats
 
@@ -122,7 +174,36 @@ platformio run --environment heltec_wifi_lora_32_V4 --target upload --upload-por
 
 ### Configuration
 
-The TNC operates in KISS mode and produces no serial output except KISS frames. It's the strong, silent type - no chatty debug messages, no verbose logging, just pure binary communication. To configure it, use the included command-line tool (which the AI also wrote):
+**Option 1: Web Interface (The Easy Way)**
+
+The TNC includes a web interface that makes configuration point-and-click simple:
+
+1. **Upload the filesystem** (first time only):
+   ```bash
+   # For V3
+   platformio run --environment heltec_wifi_lora_32_V3 --target uploadfs
+   
+   # For V4  
+   platformio run --environment heltec_wifi_lora_32_V4 --target uploadfs
+   ```
+
+2. **Connect to the TNC's WiFi network**:
+   - Default SSID: `LoRaTNCX-XXXX` (XXXX = unique ID)
+   - Default password: `loratncx`
+
+3. **Open your browser** to `http://192.168.4.1`
+
+4. **Configure everything** through the friendly web interface:
+   - LoRa settings (frequency, bandwidth, spreading factor, etc.)
+   - WiFi settings (change that password, please)
+   - View system status and battery voltage
+   - Save configuration to flash
+
+No hex values, no command-line tools, no Python required. Just click buttons like a civilized human. See `docs/WiFi_WebInterface.md` for detailed web interface documentation.
+
+**Option 2: Command-Line Tool (The Traditional Way)**
+
+The TNC operates in KISS mode and produces no serial output except KISS frames. It's the strong, silent type - no chatty debug messages, no verbose logging, just pure binary communication. To configure it via the serial port, use the included command-line tool (which the AI also wrote):
 
 ```bash
 # View current configuration (look at all those pretty numbers!)
@@ -252,22 +333,28 @@ The firmware is organized into clean, focused modules (because the AI read the S
 - **main.cpp**: Main loop, KISS frame processing, SETHARDWARE/GETHARDWARE command handling (the brain)
 - **kiss.cpp/h**: KISS protocol implementation - frame encoding/decoding, escaping (the diplomat)
 - **radio.cpp/h**: LoRa radio interface - RadioLib wrapper for SX1262 (the talker)
-- **config.cpp/h**: Configuration management - NVS persistence, defaults (the librarian)
+- **config_manager.cpp/h**: Configuration management - NVS persistence, defaults (the librarian)
 - **board_config.cpp/h**: Hardware-specific definitions, battery voltage reading for V3/V4 boards (the hardware whisperer)
+- **wifi_manager.cpp/h**: WiFi management - AP/STA modes, connection handling (the network administrator)
+- **web_server.cpp/h**: Web interface and REST API - because browsers are universal (the friendly face)
+- **tcp_kiss.cpp/h**: TCP KISS server - network access to TNC (coming soon™)
+- **display.cpp/h**: OLED display support - currently dormant, awaiting activation (the silent observer)
 
 **Design Principles** (according to the AI):
 - Single Responsibility Principle (each module does one thing and does it well)
 - Separation of Concerns (no mixing business with pleasure)
 - Interrupt-driven packet reception (because polling is so 1980s)
 - NVS-backed persistent configuration (because reboots happen)
+- Async web server (because blocking is for traffic jams, not code)
 
 
 ## Resource Usage (Surprisingly Reasonable)
 
-- **Flash**: ~305-317 KB (varies by board version) - Room for more features the AI will inevitably suggest!
-- **RAM**: ~21 KB - Efficient, unlike most JavaScript frameworks
-- **Build Time**: ~10-12 seconds - Enough time to contemplate the nature of AI assistance
-- **Upload Time**: ~10-12 seconds - Faster than ordering coffee
+- **Flash**: ~450-470 KB (varies by board version) - WiFi and web interface take up space, who knew?
+- **RAM**: ~50-80 KB (varies with WiFi activity) - Async web server is memory-efficient
+- **SPIFFS**: ~30 KB (web interface files) - HTML/CSS/JS for your browsing pleasure
+- **Build Time**: ~15-20 seconds - Enough time to contemplate WiFi password choices
+- **Upload Time**: ~10-12 seconds - Faster than troubleshooting serial KISS commands
 
 
 ## Development Status
@@ -285,15 +372,20 @@ The firmware is organized into clean, focused modules (because the AI read the S
 - LoRa transmission and reception (interrupt-driven, because we're fancy)
 - NVS configuration persistence (survives power cycles, unlike our debugging session memories)
 - Command-line configuration tool (Python script that actually works, now with battery monitoring!)
+- WiFi web interface (modern HTML/CSS/JS that works on phones and desktops - NEW!)
+- Multiple WiFi modes (AP, STA, both, or off - choose your own adventure - NEW!)
+- RESTful API (JSON-based configuration for automation enthusiasts - NEW!)
+- WiFi network scanner (finds networks so you don't have to type SSIDs - NEW!)
 - V3/V3.2 and V4 board support (both versions love us equally, with auto-detection)
 - Wide frequency range (433-928 MHz tested - it's like a frequency buffet)
 - Configurable deaf period (prevents echo loops and existential conversations with yourself)
 
 ### What's Planned (When We Feel Ambitious)
+- TCP KISS server (access TNC over network - because WiFi without network KISS is just LED blinky)
 - AX.25 frame parsing/generation (for digipeating, APRS, and making this even more useful)
-- Display support (OLED currently unused and feeling neglected)
-- WiFi/Bluetooth configuration interface (because command-line is so retro)
+- Display support (OLED currently unused and feeling very neglected)
 - Over-the-air firmware updates (for when you're too lazy to find a USB cable)
+- Web interface authentication (because security should be more than optional)
 - Additional KISS extensions (because we can never have enough features)
 
 ### What the AI Suggested We Add
@@ -321,6 +413,8 @@ Contributions welcome! Whether you're:
 **Framework**: Arduino ESP32 3.20017.241212 - Because it just works™  
 **Radio**: SX1262 LoRa (via RadioLib 7.4.0) - Making LoRa not painful since... well, recently  
 **Storage**: NVS (ESP32 non-volatile storage) - ESP32's fancy answer to EEPROM  
+**Filesystem**: SPIFFS - For web interface files and future expansion  
+**Web Server**: ESPAsyncWebServer - Non-blocking, efficient, modern  
 **Build System**: PlatformIO - Better than Arduino IDE, fight me  
 **Protocol**: KISS with SETHARDWARE extensions - Old school meets new school  
 **Frequency Range**: 433-928 MHz (hardware verified) - Surprisingly versatile little radios
@@ -331,9 +425,13 @@ Contributions welcome! Whether you're:
 - FEND/FESC character escaping (proper KISS etiquette)
 - Binary KISS frame format (because text is overrated)
 - Float-packed configuration data (compact and efficient)
+- Async web server (non-blocking, handles multiple connections gracefully)
+- JSON REST API (ArduinoJson for serialization/deserialization)
+- WiFi mode persistence (survives reboots, unlike your patience during debugging)
 
 **Lines of Code**: Several thousand (the AI wrote most of them and only needed a few debugging hints)  
 **Code Reviews**: Performed by humans who trust AI (and tested on real hardware, because we're not completely reckless)  
+**WiFi Reliability**: Surprisingly good (the ESP32 knows its networking)  
 **Test Coverage**: Improving (we actually test on hardware, which counts for something)  
 
 ## Troubleshooting (Because Things Always Go Wrong)
@@ -368,6 +466,21 @@ Contributions welcome! Whether you're:
 **Q**: Can I trust AI-generated code?  
 **A**: You're reading a README that was partially written by AI. You've already made your choice. (But yes, it's been tested on real hardware and actually works.)
 
+**Q**: Can't access the web interface!  
+**A**: First, make sure you uploaded the SPIFFS filesystem (`pio run --target uploadfs`). Then verify you're connected to the TNC's WiFi network (default: `LoRaTNCX-XXXX`). Open `http://192.168.4.1` in your browser. If still nothing, check WiFi mode isn't set to Off. When all else fails: unplug it, count to 10, plug it back in.
+
+**Q**: The WiFi network doesn't appear!  
+**A**: Check that WiFi mode is set to AP (1) or AP+STA (3). Default is AP mode, so if you can't see it, someone probably changed it via serial KISS commands or the config tool. You'll need to reconfigure via serial, or do a factory reset.
+
+**Q**: WiFi is killing my battery!  
+**A**: Yes, it does that. WiFi draws 150-200 mA in AP mode, which is 3-4x more than LoRa-only operation. For battery use: configure via WiFi, then switch WiFi mode to Off (0). Your battery life will improve dramatically.
+
+**Q**: Changed the WiFi password and now I'm locked out!  
+**A**: This is why we have serial ports. Connect via USB and use the Python configuration tool to reset WiFi settings. Or do a full factory reset. Consider this a valuable lesson in password management.
+
+**Q**: Station mode won't connect to my network!  
+**A**: Use the network scanner in the web interface to verify the network is visible. Double-check your SSID and password (special characters can be tricky). Make sure you're in range. If your network is 5 GHz only, bad news: ESP32 only does 2.4 GHz. Time to enable that legacy band on your router.
+
 ## License
 
 MIT License - Because sharing is caring, and the AI can't hold copyright anyway.
@@ -379,25 +492,32 @@ See LICENSE file for the boring legal details.
 **Human Operator**: Requirements, testing, hardware verification, and existential questions (KC1AWV)  
 **AI Assistant**: Code generation, debugging, documentation, and surprising competence (GitHub Copilot)  
 **RadioLib**: For making LoRa not painful (seriously, this library is great)  
-**ESP32**: For being a capable and affordable platform (and not bursting into flames)  
+**ESPAsyncWebServer**: For async web serving that doesn't block everything (thank you, me-no-dev/mathieucarbou)  
+**ESP32**: For being a capable and affordable platform with WiFi built-in (and not bursting into flames)  
 **Amateur Radio Community**: For keeping experimental radio alive in the 21st century  
 
 ## Final Thoughts
 
 This project demonstrates that AI-assisted development can produce functional, well-documented embedded systems code. The collaborative approach between human expertise and AI capabilities resulted in a working KISS TNC implementation in a remarkably short development time.
 
+The addition of WiFi and web interface capabilities shows that iterative development with AI assistance can continuously expand project scope without sacrificing code quality. From a simple serial KISS TNC to a full-featured web-enabled device - all through conversation and collaboration.
+
 Key takeaways:
 - AI can write functional embedded code when given clear requirements (and frequent debugging hints)
 - Iterative debugging with AI assistance is highly effective (and occasionally hilarious)
 - Human hardware knowledge + AI coding skills = productive combination
 - Proper testing on real hardware is still essential (virtual LoRa doesn't exist yet)
+- Web interfaces make embedded devices accessible to non-command-line folks (revolutionary concept!)
 - The future of coding might involve more conversation with AI than Stack Overflow
 
 Things we learned:
 - AI is really good at documentation (better than most humans, tbh)
 - AI needs help understanding hardware quirks (like "why is this frequency failing?")
 - The combination of human domain knowledge and AI implementation skills is powerful
+- Adding WiFi to things makes them infinitely more user-friendly
+- AsyncWebServer is actually pretty great for embedded web interfaces
 - We're not quite at "Skynet" levels yet (probably)
+- JSON APIs make everyone happy (except those who prefer XML, but who are we kidding?)
 
 ## Support
 
