@@ -26,6 +26,12 @@ DisplayManager::DisplayManager()
       radioPower(LORA_POWER),
       radioSyncWord(LORA_SYNCWORD),
       batteryVoltage(0.0),
+      gnssEnabled(false),
+      gnssHasFix(false),
+      gnssLatitude(0.0),
+      gnssLongitude(0.0),
+      gnssSatellites(0),
+      gnssClients(0),
       lastButtonPress(0)
 {
 }
@@ -68,6 +74,11 @@ void DisplayManager::update() {
         }
     }
     
+    // Don't update if display is off
+    if (currentScreen == SCREEN_OFF) {
+        return;
+    }
+    
     // Only update display if screen changed
     if (currentScreen != lastScreen) {
         u8g2.clearBuffer();
@@ -87,6 +98,12 @@ void DisplayManager::update() {
                 break;
             case SCREEN_BATTERY:
                 renderBatteryScreen();
+                break;
+            case SCREEN_GNSS:
+                renderGNSSScreen();
+                break;
+            case SCREEN_OFF:
+                renderOffScreen();
                 break;
             default:
                 break;
@@ -111,7 +128,14 @@ void DisplayManager::nextScreen() {
         return;
     }
     
-    // Cycle through screens: STATUS -> WIFI -> BATTERY -> STATUS
+    // If display is off, turn it back on
+    if (currentScreen == SCREEN_OFF) {
+        displayOn();
+        currentScreen = SCREEN_STATUS;
+        return;
+    }
+    
+    // Cycle through screens: STATUS -> WIFI -> BATTERY -> GNSS -> OFF -> STATUS
     switch (currentScreen) {
         case SCREEN_STATUS:
             currentScreen = SCREEN_WIFI;
@@ -120,6 +144,12 @@ void DisplayManager::nextScreen() {
             currentScreen = SCREEN_BATTERY;
             break;
         case SCREEN_BATTERY:
+            currentScreen = SCREEN_GNSS;
+            break;
+        case SCREEN_GNSS:
+            currentScreen = SCREEN_OFF;
+            break;
+        case SCREEN_OFF:
             currentScreen = SCREEN_STATUS;
             break;
         default:
@@ -221,6 +251,37 @@ void DisplayManager::setWiFiStartupMessage(String message) {
     if (currentScreen == SCREEN_WIFI_STARTUP) {
         lastScreen = SCREEN_BOOT;  // Force re-render
     }
+}
+
+void DisplayManager::setGNSSStatus(bool enabled, bool hasFix, double lat, double lon, uint8_t sats, uint8_t clients) {
+    gnssEnabled = enabled;
+    gnssHasFix = hasFix;
+    gnssLatitude = lat;
+    gnssLongitude = lon;
+    gnssSatellites = sats;
+    gnssClients = clients;
+    
+    // Trigger update if on GNSS screen
+    if (currentScreen == SCREEN_GNSS && !bootScreenActive) {
+        lastScreen = SCREEN_BOOT;  // Force re-render
+    }
+}
+
+void DisplayManager::displayOff() {
+    currentScreen = SCREEN_OFF;
+    u8g2.clearBuffer();
+    u8g2.sendBuffer();
+    // Turn off Vext power to OLED
+    digitalWrite(Vext, HIGH);
+}
+
+void DisplayManager::displayOn() {
+    // Turn on Vext power to OLED
+    digitalWrite(Vext, LOW);
+    delay(100);
+    // Reinitialize display
+    u8g2.begin();
+    lastScreen = SCREEN_BOOT;  // Force re-render
 }
 
 bool DisplayManager::isBootScreenActive() {
@@ -407,4 +468,57 @@ uint8_t DisplayManager::getBatteryPercentage(float voltage) {
     
     // Linear approximation between 3.3V and 4.2V
     return (uint8_t)((voltage - 3.3) / (4.2 - 3.3) * 100);
+}
+
+void DisplayManager::renderGNSSScreen() {
+    u8g2.setFont(u8g2_font_6x10_tr);
+    
+    // Title
+    u8g2.drawStr(0, 10, "GNSS Status");
+    
+    if (!gnssEnabled) {
+        // GNSS disabled
+        u8g2.setFont(u8g2_font_ncenB08_tr);
+        const char* msg = "GNSS Disabled";
+        int msgWidth = u8g2.getStrWidth(msg);
+        u8g2.drawStr((128 - msgWidth) / 2, 35, msg);
+        return;
+    }
+    
+    u8g2.setFont(u8g2_font_6x10_tr);
+    
+    // Fix status
+    String fixStr = "Fix: ";
+    if (gnssHasFix) {
+        fixStr += "YES";
+    } else {
+        fixStr += "NO";
+    }
+    fixStr += "  Sats: " + String(gnssSatellites);
+    u8g2.drawStr(0, 24, fixStr.c_str());
+    
+    if (gnssHasFix) {
+        // Latitude
+        String latStr = "Lat: " + String(gnssLatitude, 6);
+        u8g2.drawStr(0, 36, latStr.c_str());
+        
+        // Longitude
+        String lonStr = "Lon: " + String(gnssLongitude, 6);
+        u8g2.drawStr(0, 48, lonStr.c_str());
+    } else {
+        // Waiting for fix
+        u8g2.setFont(u8g2_font_6x10_tr);
+        const char* msg = "Waiting for GPS fix...";
+        int msgWidth = u8g2.getStrWidth(msg);
+        u8g2.drawStr((128 - msgWidth) / 2, 40, msg);
+    }
+    
+    // NMEA TCP clients
+    String clientStr = "NMEA Clients: " + String(gnssClients);
+    u8g2.drawStr(0, 60, clientStr.c_str());
+}
+
+void DisplayManager::renderOffScreen() {
+    // Clear the display - this will be called once when switching to OFF mode
+    u8g2.clearDisplay();
 }

@@ -3,6 +3,7 @@
 
 TNCWebServer::TNCWebServer(WiFiManager* wifiMgr, LoRaRadio* radio, ConfigManager* configMgr)
     : wifiManager(wifiMgr), loraRadio(radio), configManager(configMgr), 
+      gnssModule(nullptr), nmeaServer(nullptr),
       server(nullptr), running(false), pendingWiFiChange(false), wifiChangeTime(0) {
 }
 
@@ -232,6 +233,37 @@ void TNCWebServer::setupRoutes() {
         handleScanWiFi(request);
     });
     
+    // API routes - GNSS configuration
+    server->on("/api/gnss/config", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        handleGetGNSSConfig(request);
+    });
+    
+    server->on("/api/gnss/config", HTTP_POST,
+        [](AsyncWebServerRequest* request) {
+            // Handler will be called in body handler
+        },
+        NULL,
+        [this](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total) {
+            if (index == 0) {
+                // First chunk
+                request->_tempObject = malloc(total + 1);
+            }
+            if (request->_tempObject != NULL) {
+                memcpy((uint8_t*)request->_tempObject + index, data, len);
+                if (index + len == total) {
+                    // Last chunk, null terminate and handle
+                    ((uint8_t*)request->_tempObject)[total] = '\0';
+                    handleSetGNSSConfig(request, (char*)request->_tempObject, total);
+                    free(request->_tempObject);
+                    request->_tempObject = NULL;
+                }
+            }
+        });
+    
+    server->on("/api/gnss/status", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        handleGetGNSSStatus(request);
+    });
+    
     // API routes - Control
     server->on("/api/reboot", HTTP_POST, [this](AsyncWebServerRequest* request) {
         handleReboot(request);
@@ -435,4 +467,210 @@ void TNCWebServer::addCORSHeaders(AsyncWebServerResponse* response) {
     response->addHeader("Access-Control-Allow-Origin", "*");
     response->addHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
     response->addHeader("Access-Control-Allow-Headers", "Content-Type");
+}
+
+// ===== GNSS Configuration Handlers =====
+
+void TNCWebServer::handleGetGNSSConfig(AsyncWebServerRequest* request) {
+    AsyncWebServerResponse* response = request->beginResponse(200, "application/json", getJSONGNSSConfig());
+    addCORSHeaders(response);
+    request->send(response);
+}
+
+void TNCWebServer::handleSetGNSSConfig(AsyncWebServerRequest* request, const char* jsonData, size_t len) {
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, jsonData, len);
+    
+    if (error) {
+        request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+        return;
+    }
+    
+    // Load current config
+    GNSSConfig config;
+    if (!configManager->loadGNSSConfig(config)) {
+        configManager->resetGNSSToDefaults(config);
+    }
+    
+    // Update configuration from JSON
+    bool configChanged = false;
+    
+    if (doc.containsKey("enabled")) {
+        bool newEnabled = doc["enabled"].as<bool>();
+        if (config.enabled != newEnabled) {
+            config.enabled = newEnabled;
+            configChanged = true;
+        }
+    }
+    
+    if (doc.containsKey("serialPassthrough")) {
+        bool newPassthrough = doc["serialPassthrough"].as<bool>();
+        if (config.serialPassthrough != newPassthrough) {
+            config.serialPassthrough = newPassthrough;
+            configChanged = true;
+        }
+    }
+    
+    if (doc.containsKey("tcpPort")) {
+        uint16_t newPort = doc["tcpPort"].as<uint16_t>();
+        if (newPort > 0 && newPort != config.tcpPort) {
+            config.tcpPort = newPort;
+            configChanged = true;
+        }
+    }
+    
+    if (doc.containsKey("baudRate")) {
+        uint32_t newBaud = doc["baudRate"].as<uint32_t>();
+        // Validate common GNSS baud rates
+        if ((newBaud == 4800 || newBaud == 9600 || newBaud == 19200 || 
+             newBaud == 38400 || newBaud == 57600 || newBaud == 115200) &&
+            newBaud != config.baudRate) {
+            config.baudRate = newBaud;
+            configChanged = true;
+        }
+    }
+    
+    // Pin configuration (only if not using built-in port)
+    #ifndef HAS_GNSS_PORT
+        if (doc.containsKey("pinRX")) config.pinRX = doc["pinRX"].as<int8_t>();
+        if (doc.containsKey("pinTX")) config.pinTX = doc["pinTX"].as<int8_t>();
+        if (doc.containsKey("pinCtrl")) config.pinCtrl = doc["pinCtrl"].as<int8_t>();
+        if (doc.containsKey("pinWake")) config.pinWake = doc["pinWake"].as<int8_t>();
+        if (doc.containsKey("pinPPS")) config.pinPPS = doc["pinPPS"].as<int8_t>();
+        if (doc.containsKey("pinRST")) config.pinRST = doc["pinRST"].as<int8_t>();
+        configChanged = true;
+    #endif
+    
+    // Save configuration
+    bool saved = configManager->saveGNSSConfig(config);
+    
+    if (!saved) {
+        request->send(500, "application/json", "{\"error\":\"Failed to save configuration\"}");
+        return;
+    }
+    
+    // Apply configuration if GNSS module is available
+    if (gnssModule && configChanged) {
+        if (config.enabled) {
+            gnssModule->powerOn();
+            // Note: Baud rate change would require restart
+        } else {
+            gnssModule->powerOff();
+        }
+    }
+    
+    // Update NMEA server if available
+    if (nmeaServer && doc.containsKey("tcpPort")) {
+        // NMEA server port change would require restart
+    }
+    
+    String response = "{\"success\":true,\"message\":\"GNSS configuration saved\",\"rebootRequired\":";
+    response += (configChanged && (doc.containsKey("tcpPort") || doc.containsKey("baudRate"))) ? "true" : "false";
+    response += "}";
+    
+    AsyncWebServerResponse* resp = request->beginResponse(200, "application/json", response);
+    addCORSHeaders(resp);
+    request->send(resp);
+}
+
+void TNCWebServer::handleGetGNSSStatus(AsyncWebServerRequest* request) {
+    AsyncWebServerResponse* response = request->beginResponse(200, "application/json", getJSONGNSSStatus());
+    addCORSHeaders(response);
+    request->send(response);
+}
+
+String TNCWebServer::getJSONGNSSConfig() {
+    JsonDocument doc;
+    
+    GNSSConfig config;
+    if (configManager->loadGNSSConfig(config)) {
+        doc["enabled"] = config.enabled;
+        doc["serialPassthrough"] = config.serialPassthrough;
+        doc["pinRX"] = config.pinRX;
+        doc["pinTX"] = config.pinTX;
+        doc["pinCtrl"] = config.pinCtrl;
+        doc["pinWake"] = config.pinWake;
+        doc["pinPPS"] = config.pinPPS;
+        doc["pinRST"] = config.pinRST;
+        doc["baudRate"] = config.baudRate;
+        doc["tcpPort"] = config.tcpPort;
+    } else {
+        // Return defaults
+        configManager->resetGNSSToDefaults(config);
+        doc["enabled"] = config.enabled;
+        doc["serialPassthrough"] = config.serialPassthrough;
+        doc["pinRX"] = config.pinRX;
+        doc["pinTX"] = config.pinTX;
+        doc["pinCtrl"] = config.pinCtrl;
+        doc["pinWake"] = config.pinWake;
+        doc["pinPPS"] = config.pinPPS;
+        doc["pinRST"] = config.pinRST;
+        doc["baudRate"] = config.baudRate;
+        doc["tcpPort"] = config.tcpPort;
+    }
+    
+    // Add board capabilities
+    #ifdef HAS_GNSS_PORT
+        doc["hasBuiltInPort"] = (HAS_GNSS_PORT == 1);
+    #else
+        doc["hasBuiltInPort"] = false;
+    #endif
+    
+    String output;
+    serializeJson(doc, output);
+    return output;
+}
+
+String TNCWebServer::getJSONGNSSStatus() {
+    JsonDocument doc;
+    
+    if (gnssModule && gnssModule->isRunning()) {
+        doc["running"] = true;
+        doc["hasFix"] = gnssModule->hasValidFix();
+        
+        if (gnssModule->hasValidFix()) {
+            doc["latitude"] = gnssModule->getLatitude();
+            doc["longitude"] = gnssModule->getLongitude();
+            doc["altitude"] = gnssModule->getAltitude();
+            doc["speed"] = gnssModule->getSpeed();
+            doc["course"] = gnssModule->getCourse();
+            doc["satellites"] = gnssModule->getSatellites();
+            doc["hdop"] = gnssModule->getHDOP();
+        }
+        
+        if (gnssModule->hasValidTime()) {
+            char timeStr[16];
+            snprintf(timeStr, sizeof(timeStr), "%02d:%02d:%02d", 
+                    gnssModule->getHour(), 
+                    gnssModule->getMinute(), 
+                    gnssModule->getSecond());
+            doc["time"] = String(timeStr);
+        }
+        
+        if (gnssModule->hasValidDate()) {
+            char dateStr[16];
+            snprintf(dateStr, sizeof(dateStr), "%04d-%02d-%02d", 
+                    gnssModule->getYear(), 
+                    gnssModule->getMonth(), 
+                    gnssModule->getDay());
+            doc["date"] = String(dateStr);
+        }
+        
+        doc["charsProcessed"] = gnssModule->getCharsProcessed();
+        doc["passedChecksums"] = gnssModule->getPassedChecksums();
+        doc["failedChecksums"] = gnssModule->getFailedChecksums();
+    } else {
+        doc["running"] = false;
+        doc["hasFix"] = false;
+    }
+    
+    if (nmeaServer) {
+        doc["nmeaServer"]["running"] = nmeaServer->isRunning();
+        doc["nmeaServer"]["clients"] = nmeaServer->getClientCount();
+        doc["nmeaServer"]["port"] = nmeaServer->getPort();
+    }
+    
+    String output;
+    serializeJson(doc, output);
+    return output;
 }

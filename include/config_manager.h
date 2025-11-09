@@ -16,6 +16,21 @@ struct LoRaConfig {
     uint32_t magic;         // Magic number to verify valid config
 };
 
+// Configuration structure for GNSS parameters
+struct GNSSConfig {
+    bool enabled;           // Enable/disable GNSS
+    bool serialPassthrough; // Forward NMEA to USB serial
+    int8_t pinRX;           // RX pin (GNSS TX -> MCU RX)
+    int8_t pinTX;           // TX pin (MCU TX -> GNSS RX)
+    int8_t pinCtrl;         // Power control pin (optional)
+    int8_t pinWake;         // Wake pin (optional)
+    int8_t pinPPS;          // PPS pin (optional)
+    int8_t pinRST;          // Reset pin (optional)
+    uint32_t baudRate;      // GNSS baud rate
+    uint16_t tcpPort;       // TCP port for NMEA streaming
+    uint32_t magic;         // Magic number to verify valid config
+};
+
 class ConfigManager {
 public:
     ConfigManager();
@@ -38,11 +53,20 @@ public:
     // Clear stored configuration
     bool clearConfig();
     
+    // GNSS configuration methods
+    bool saveGNSSConfig(const GNSSConfig& config);
+    bool loadGNSSConfig(GNSSConfig& config);
+    bool hasValidGNSSConfig();
+    void resetGNSSToDefaults(GNSSConfig& config);
+    bool clearGNSSConfig();
+    
 private:
     Preferences preferences;
     static const uint32_t CONFIG_MAGIC = 0xCAFEBABE;  // Magic number for validation
+    static const uint32_t GNSS_MAGIC = 0xDEADBEEF;    // Magic number for GNSS config
     static const char* NVS_NAMESPACE;
     static const char* NVS_CONFIG_KEY;
+    static const char* NVS_GNSS_KEY;
 };
 
 #endif // CONFIG_MANAGER_H

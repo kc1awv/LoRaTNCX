@@ -44,6 +44,9 @@ Frequency Support: **433 MHz to 928 MHz** (tested: 433, 868, 902, 915, 928 MHz) 
 - ✅ **Interrupt-Driven Reception** - Efficient packet handling with no echo loops (took a few tries to get this right)
 - ✅ **Configurable Deaf Period** - Prevents receiving own transmissions (because talking to yourself is awkward)
 - ✅ **Wide Frequency Range** - Supports 433-928 MHz ISM bands (way more versatile than we expected)
+- ✅ **GNSS Support** - Optional GPS module for location tracking and NMEA data (V4 only, because V3 doesn't have the fancy connector)
+- ✅ **NMEA over TCP** - Stream GPS data to network clients (because serial ports are so last decade)
+- ✅ **GNSS Serial Passthrough** - Forward NMEA sentences to USB serial for debugging (see where you are without opening a web page)
 
 ### KISS Protocol Implementation
 
@@ -122,6 +125,88 @@ Because typing KISS commands and hex values is so 1990s, the TNC now includes a 
 - `POST /api/reboot` - Reboot the device
 
 **Power Consumption Note**: WiFi is power-hungry (150-200 mA in AP mode). For battery operation, configure your settings via WiFi, then switch WiFi mode to Off. Your battery will thank you.
+
+### GNSS Support (V4 Only - Because Location Matters)
+
+The V4 board has a connector for Heltec's optional GPS/GNSS module. If you've bolted one on, the TNC can now make use of it. Because knowing where you are is occasionally useful in radio communications.
+
+**What It Does:**
+- Receives and parses NMEA sentences from GPS module
+- Extracts location, altitude, speed, heading, satellite info
+- Forwards NMEA data over TCP to network clients (default port 10110)
+- Optional USB serial passthrough for debugging and monitoring
+- Web interface for configuration and real-time status
+- Supports multiple simultaneous TCP connections (share the GPS love)
+
+**Why You Care:**
+- APRS integration - add position to your packets (future feature, but the groundwork is laid)
+- Field operations - know exactly where your portable station is
+- Mobile operations - track position while driving around
+- Maritime/Aviation - NMEA is the universal language of navigation
+- Debugging - watch NMEA sentences scroll by to verify GPS is working
+- Remote monitoring - stream GPS data to multiple applications simultaneously
+
+**Web Interface Features:**
+- Enable/disable GNSS module (save power when you don't need it)
+- Configure TCP port for NMEA streaming (default 10110, but be different if you want)
+- Enable/disable serial passthrough to USB (watch NMEA sentences in real-time)
+- Real-time status display (satellites visible, fix quality, position)
+- All settings persist across reboots (set it and forget it)
+
+**NMEA over TCP:**
+- Standard NMEA-0183 format over TCP socket
+- Default port 10110 (the standard NMEA-over-TCP port)
+- Supports up to 4 simultaneous clients
+- Works with navigation software, mapping apps, APRS tools
+- Raw NMEA sentences, no processing or filtering
+
+**Serial Passthrough:**
+- Forwards NMEA sentences to USB serial at 115200 baud
+- Useful for debugging and verification
+- See real-time position updates without web interface
+- Works with any serial terminal (PuTTY, screen, minicom, etc.)
+- Includes CR+LF line endings (because terminals are picky)
+
+**Hardware Requirements:**
+- Heltec WiFi LoRa 32 V4 board (V3 doesn't have the GNSS connector - sorry!)
+- Heltec GNSS module (part #6931, attaches to V4's GNSS port)
+- GPS antenna (preferably one that can see the sky)
+- Clear view of the sky (GPS doesn't work indoors or in Faraday cages)
+- Patience (GPS cold start can take 30-60 seconds)
+
+**Pin Configuration** (handled automatically, but for the curious):
+- GPIO 37: GNSS Vext (power supply, active LOW)
+- GPIO 34: VGNSS_CTRL (module control, active LOW)
+- GPIO 40: Wake signal (keeps module awake)
+- GPIO 42: Reset signal (not used, kept HIGH)
+- GPIO 39: GNSS RX (Serial1)
+- GPIO 38: GNSS TX (Serial1)
+- Baud rate: 9600 (GNSS module default, not configurable)
+
+**Example NMEA Client Usage:**
+```bash
+# Connect with netcat and watch NMEA sentences
+nc 192.168.4.1 10110
+
+# Or use telnet
+telnet 192.168.4.1 10110
+
+# Feed to gpsd (if you're into that sort of thing)
+gpsd -N -n tcp://192.168.4.1:10110
+
+# OpenCPN or other navigation software
+# Add network NMEA connection to 192.168.4.1:10110
+```
+
+**Caveats:**
+- V3 boards: No GNSS support (no hardware connector)
+- V4 boards without GNSS module: Enable it anyway if you want, nothing bad happens
+- Indoor operation: GPS doesn't work indoors (satellites can't see through buildings)
+- Cold start: Takes 30-60 seconds to acquire satellites (hot start is faster)
+- Power consumption: GNSS adds ~30-40 mA when active (disable when not needed)
+- Passthrough spam: NMEA outputs multiple sentences per second (your serial terminal will scroll fast)
+
+See `docs/GNSS_Support.md` for detailed GNSS configuration and `docs/Web_Interface_GNSS.md` for web interface details. Or just click around the web interface - it's pretty self-explanatory.
 
 ### TCP KISS Server (Network-Enabled TNC!)
 
@@ -435,6 +520,8 @@ The firmware is organized into clean, focused modules (because the AI read the S
 - **web_server.cpp/h**: Web interface and REST API - because browsers are universal (the friendly face)
 - **tcp_kiss.cpp/h**: TCP KISS server - network access to TNC, supports multiple clients (the wireless bridge)
 - **display.cpp/h**: OLED display support - boot screen, status display, radio info (the informative one)
+- **gnss.cpp/h**: GNSS module interface - GPS data acquisition, NMEA parsing (the navigator)
+- **nmea_server.cpp/h**: NMEA-over-TCP server - streams GPS data to network clients (the GPS broadcaster)
 
 **Design Principles** (according to the AI):
 - Single Responsibility Principle (each module does one thing and does it well)
@@ -474,12 +561,16 @@ The firmware is organized into clean, focused modules (because the AI read the S
 - WiFi network scanner (finds networks so you don't have to type SSIDs - NEW!)
 - TCP KISS server (network access to TNC over WiFi, supports up to 4 simultaneous clients - NEW!)
 - OLED display support (boot screen, status display, radio info on V3 and V4 boards - NEW!)
+- GNSS support (GPS module for V4 boards with optional hardware - NEWEST!)
+- NMEA over TCP (stream GPS data to network clients on port 10110 - NEWEST!)
+- GNSS serial passthrough (forward NMEA to USB serial for debugging - NEWEST!)
 - V3/V3.2 and V4 board support (both versions love us equally, with auto-detection)
 - Wide frequency range (433-928 MHz tested - it's like a frequency buffet)
 - Configurable deaf period (prevents echo loops and existential conversations with yourself)
 
 ### What's Planned (When We Feel Ambitious)
 - AX.25 frame parsing/generation (for digipeating, APRS, and making this even more useful)
+- APRS position beaconing with GNSS integration (because what's GPS without APRS?)
 - Over-the-air firmware updates (for when you're too lazy to find a USB cable)
 - Web interface authentication (because security should be more than optional)
 - Additional KISS extensions (because we can never have enough features)
@@ -508,6 +599,7 @@ Contributions welcome! Whether you're:
 **Platform**: ESP32-S3 (Xtensa dual-core @ 240MHz) - Because dual-core is twice as nice  
 **Framework**: Arduino ESP32 3.20017.241212 - Because it just works™  
 **Radio**: SX1262 LoRa (via RadioLib 7.4.0) - Making LoRa not painful since... well, recently  
+**GNSS**: TinyGPSPlus 1.1.0 - NMEA parsing without the headache (V4 with optional GPS module)  
 **Storage**: NVS (ESP32 non-volatile storage) - ESP32's fancy answer to EEPROM  
 **Filesystem**: SPIFFS - For web interface files and future expansion  
 **Web Server**: ESPAsyncWebServer - Non-blocking, efficient, modern  
@@ -584,6 +676,21 @@ Contributions welcome! Whether you're:
 
 **Q**: TCP KISS disconnects randomly!  
 **A**: WiFi can be temperamental. Check signal strength - weak WiFi = unstable connections. If using STA mode, make sure your router isn't kicking the TNC off for inactivity. Power-saving features on the router can be problematic. Also check if you have multiple clients trying to transmit simultaneously - the TNC handles this, but applications might not handle collisions gracefully.
+
+**Q**: GNSS not working on my V3 board!  
+**A**: V3 boards don't have a GNSS connector. Only V4 boards support the optional GPS module. Check the label on your board - if it says "WiFi LoRa 32 V3", you're out of luck. Consider upgrading to V4 for GPS goodness.
+
+**Q**: GNSS enabled but no position data!  
+**A**: First, make sure you actually have the GNSS module installed (it's optional hardware). Second, GPS needs to see the sky - it doesn't work indoors or under heavy cover. Third, cold start takes 30-60 seconds to acquire satellites. Check the web interface for satellite count - if you see 0 satellites after a minute outdoors, check your antenna connection.
+
+**Q**: NMEA data looks like gibberish!  
+**A**: NMEA sentences are text-based but cryptic. `$GPRMC` and `$GPGGA` are the main ones you care about. If you're seeing random characters instead of `$GP...`, your serial port settings might be wrong (should be 115200 baud for USB passthrough). If you want human-readable data, use the web interface instead.
+
+**Q**: Can I use GNSS for APRS position reporting?  
+**A**: Not yet, but it's on the roadmap. Right now the GNSS data is available via TCP and serial passthrough. Future versions will integrate position into APRS packets. For now, you can write your own integration using the NMEA TCP stream or serial passthrough.
+
+**Q**: GNSS draining my battery!  
+**A**: GPS modules use 30-40 mA when active. If you don't need position tracking, disable GNSS via the web interface. The module will be powered off completely, saving that precious battery life for more LoRa packets.
 
 ## License
 

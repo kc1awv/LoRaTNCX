@@ -361,6 +361,7 @@
         <div class="tabs">
             <button class="tab active" onclick="switchTab('lora')">LoRa Configuration</button>
             <button class="tab" onclick="switchTab('wifi')">WiFi Configuration</button>
+            <button class="tab" onclick="switchTab('gnss')">GNSS Configuration</button>
             <button class="tab" onclick="switchTab('system')">System Info</button>
         </div>
         
@@ -538,6 +539,155 @@
             </div>
         </div>
         
+        <!-- GNSS Configuration Tab -->
+        <div class="tab-content" id="gnss-tab">
+            <h2>GNSS Configuration</h2>
+            <div class="alert alert-success" id="gnss-alert-success"></div>
+            <div class="alert alert-error" id="gnss-alert-error"></div>
+            
+            <div id="gnss-unavailable" style="display: none;">
+                <div class="info-card">
+                    <p><strong>ℹ️ GNSS Not Available</strong></p>
+                    <p>This board does not have a built-in GNSS port. For V3 boards, you can connect an external GNSS module and configure the pins below.</p>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="gnssEnabled">
+                    <label for="gnssEnabled">Enable GNSS</label>
+                </div>
+                <small>Turn GNSS module on/off</small>
+            </div>
+            
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="gnssSerialPassthrough">
+                    <label for="gnssSerialPassthrough">Serial Passthrough</label>
+                </div>
+                <small>Forward NMEA sentences to USB serial port</small>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="gnssTcpPort">NMEA TCP Port</label>
+                    <input type="number" id="gnssTcpPort" min="1" max="65535" value="10110">
+                    <small>Standard NMEA-over-TCP port: 10110</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="gnssBaudRate">Baud Rate</label>
+                    <select id="gnssBaudRate">
+                        <option value="4800">4800</option>
+                        <option value="9600">9600</option>
+                        <option value="19200">19200</option>
+                        <option value="38400">38400</option>
+                        <option value="57600">57600</option>
+                        <option value="115200">115200</option>
+                    </select>
+                    <small>Most GNSS modules use 9600</small>
+                </div>
+            </div>
+            
+            <div id="gnss-pin-config" style="display: none;">
+                <h3>Pin Configuration (External Module)</h3>
+                <p><small>Configure GPIO pins for external GNSS module. Set to -1 to disable unused pins.</small></p>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="gnssPinRX">RX Pin (MCU ← GNSS)</label>
+                        <input type="number" id="gnssPinRX" min="-1" max="48" value="-1">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="gnssPinTX">TX Pin (MCU → GNSS)</label>
+                        <input type="number" id="gnssPinTX" min="-1" max="48" value="-1">
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="gnssPinCtrl">Control Pin (Power)</label>
+                        <input type="number" id="gnssPinCtrl" min="-1" max="48" value="-1">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="gnssPinWake">Wake Pin</label>
+                        <input type="number" id="gnssPinWake" min="-1" max="48" value="-1">
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="gnssPinPPS">PPS Pin (Pulse Per Second)</label>
+                        <input type="number" id="gnssPinPPS" min="-1" max="48" value="-1">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="gnssPinRST">Reset Pin</label>
+                        <input type="number" id="gnssPinRST" min="-1" max="48" value="-1">
+                    </div>
+                </div>
+            </div>
+            
+            <h3>GNSS Status</h3>
+            <div class="info-grid" id="gnss-status-grid">
+                <div class="info-card">
+                    <h4>GPS Fix</h4>
+                    <div class="info-item">
+                        <span>Status:</span>
+                        <span id="gnss-fix-status">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span>Satellites:</span>
+                        <span id="gnss-satellites">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span>HDOP:</span>
+                        <span id="gnss-hdop">-</span>
+                    </div>
+                </div>
+                
+                <div class="info-card">
+                    <h4>Position</h4>
+                    <div class="info-item">
+                        <span>Latitude:</span>
+                        <span id="gnss-lat">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span>Longitude:</span>
+                        <span id="gnss-lon">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span>Altitude:</span>
+                        <span id="gnss-alt">-</span>
+                    </div>
+                </div>
+                
+                <div class="info-card">
+                    <h4>NMEA Server</h4>
+                    <div class="info-item">
+                        <span>Status:</span>
+                        <span id="gnss-nmea-status">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span>Port:</span>
+                        <span id="gnss-nmea-port">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span>Clients:</span>
+                        <span id="gnss-nmea-clients">-</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="applyGNSSConfig()">Apply Configuration</button>
+                <button class="btn btn-primary" onclick="saveGNSSConfig()">Save to Flash</button>
+                <button class="btn btn-secondary" onclick="loadGNSSConfig()">Reload</button>
+            </div>
+        </div>
+        
         <!-- System Info Tab -->
         <div class="tab-content" id="system-tab">
             <h2>System Information</h2>
@@ -638,6 +788,11 @@
             if (tabName === 'lora') {
                 loadLoRaConfig();
             } else if (tabName === 'wifi') {
+                loadWiFiConfig();
+            } else if (tabName === 'gnss') {
+                loadGNSSConfig();
+                loadGNSSStatus();
+            } else if (tabName === 'system') {
                 loadWiFiConfig();
             } else if (tabName === 'system') {
                 loadSystemInfo();
@@ -885,6 +1040,116 @@
             }
         }
         
+        // GNSS Configuration
+        async function loadGNSSConfig() {
+            try {
+                const data = await apiGet('gnss/config');
+                document.getElementById('gnssEnabled').checked = data.enabled;
+                document.getElementById('gnssSerialPassthrough').checked = data.serialPassthrough || false;
+                document.getElementById('gnssTcpPort').value = data.tcpPort;
+                document.getElementById('gnssBaudRate').value = data.baudRate;
+                
+                // Show/hide pin configuration based on board type
+                if (data.hasBuiltInPort) {
+                    document.getElementById('gnss-pin-config').style.display = 'none';
+                    document.getElementById('gnss-unavailable').style.display = 'none';
+                } else {
+                    document.getElementById('gnss-pin-config').style.display = 'block';
+                    document.getElementById('gnss-unavailable').style.display = 'block';
+                    
+                    // Load pin configuration
+                    document.getElementById('gnssPinRX').value = data.pinRX;
+                    document.getElementById('gnssPinTX').value = data.pinTX;
+                    document.getElementById('gnssPinCtrl').value = data.pinCtrl;
+                    document.getElementById('gnssPinWake').value = data.pinWake;
+                    document.getElementById('gnssPinPPS').value = data.pinPPS;
+                    document.getElementById('gnssPinRST').value = data.pinRST;
+                }
+            } catch (error) {
+                showAlert('error', 'Failed to load GNSS configuration', 'gnss');
+            }
+        }
+        
+        async function loadGNSSStatus() {
+            try {
+                const data = await apiGet('gnss/status');
+                
+                if (data.running) {
+                    document.getElementById('gnss-fix-status').textContent = data.hasFix ? '✅ Fixed' : '⏳ Searching';
+                    document.getElementById('gnss-satellites').textContent = data.satellites || 0;
+                    document.getElementById('gnss-hdop').textContent = data.hdop ? data.hdop.toFixed(1) : '-';
+                    
+                    if (data.hasFix) {
+                        document.getElementById('gnss-lat').textContent = data.latitude ? data.latitude.toFixed(6) + '°' : '-';
+                        document.getElementById('gnss-lon').textContent = data.longitude ? data.longitude.toFixed(6) + '°' : '-';
+                        document.getElementById('gnss-alt').textContent = data.altitude ? data.altitude.toFixed(1) + ' m' : '-';
+                    } else {
+                        document.getElementById('gnss-lat').textContent = '-';
+                        document.getElementById('gnss-lon').textContent = '-';
+                        document.getElementById('gnss-alt').textContent = '-';
+                    }
+                } else {
+                    document.getElementById('gnss-fix-status').textContent = '⭕ Disabled';
+                    document.getElementById('gnss-satellites').textContent = '-';
+                    document.getElementById('gnss-hdop').textContent = '-';
+                    document.getElementById('gnss-lat').textContent = '-';
+                    document.getElementById('gnss-lon').textContent = '-';
+                    document.getElementById('gnss-alt').textContent = '-';
+                }
+                
+                if (data.nmeaServer) {
+                    document.getElementById('gnss-nmea-status').textContent = data.nmeaServer.running ? '✅ Running' : '⭕ Stopped';
+                    document.getElementById('gnss-nmea-port').textContent = data.nmeaServer.port;
+                    document.getElementById('gnss-nmea-clients').textContent = data.nmeaServer.clients;
+                } else {
+                    document.getElementById('gnss-nmea-status').textContent = '-';
+                    document.getElementById('gnss-nmea-port').textContent = '-';
+                    document.getElementById('gnss-nmea-clients').textContent = '-';
+                }
+            } catch (error) {
+                console.error('Failed to load GNSS status:', error);
+            }
+        }
+        
+        async function applyGNSSConfig() {
+            try {
+                const config = {
+                    enabled: document.getElementById('gnssEnabled').checked,
+                    serialPassthrough: document.getElementById('gnssSerialPassthrough').checked,
+                    tcpPort: parseInt(document.getElementById('gnssTcpPort').value),
+                    baudRate: parseInt(document.getElementById('gnssBaudRate').value)
+                };
+                
+                // Add pin config if visible (V3 boards)
+                if (document.getElementById('gnss-pin-config').style.display !== 'none') {
+                    config.pinRX = parseInt(document.getElementById('gnssPinRX').value);
+                    config.pinTX = parseInt(document.getElementById('gnssPinTX').value);
+                    config.pinCtrl = parseInt(document.getElementById('gnssPinCtrl').value);
+                    config.pinWake = parseInt(document.getElementById('gnssPinWake').value);
+                    config.pinPPS = parseInt(document.getElementById('gnssPinPPS').value);
+                    config.pinRST = parseInt(document.getElementById('gnssPinRST').value);
+                }
+                
+                const result = await apiPost('gnss/config', config);
+                
+                if (result.rebootRequired) {
+                    showAlert('success', 'GNSS configuration applied. Reboot required for TCP port or baud rate changes.', 'gnss');
+                } else {
+                    showAlert('success', 'GNSS configuration applied successfully', 'gnss');
+                }
+                
+                // Reload status after a moment
+                setTimeout(loadGNSSStatus, 1000);
+            } catch (error) {
+                showAlert('error', 'Failed to apply GNSS configuration', 'gnss');
+            }
+        }
+        
+        async function saveGNSSConfig() {
+            // Apply first, which saves to NVS
+            await applyGNSSConfig();
+        }
+        
         // System Information
         async function loadSystemInfo() {
             try {
@@ -940,6 +1205,13 @@
             
             // Update status every 5 seconds
             setInterval(loadStatus, 5000);
+            
+            // Update GNSS status every 3 seconds if on GNSS tab
+            setInterval(() => {
+                if (currentTab === 'gnss') {
+                    loadGNSSStatus();
+                }
+            }, 3000);
         }
         
         // Start when page loads

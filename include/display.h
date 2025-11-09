@@ -12,6 +12,8 @@ enum DisplayScreen {
     SCREEN_STATUS,       // Main status screen showing radio config
     SCREEN_WIFI,         // WiFi status screen
     SCREEN_BATTERY,      // Battery status screen
+    SCREEN_GNSS,         // GNSS status screen
+    SCREEN_OFF,          // Display off (power saving)
     NUM_SCREENS
 };
 
@@ -46,6 +48,14 @@ public:
     
     // Update WiFi status display
     void setWiFiStatus(bool apActive, bool staConnected, String apIP, String staIP, int rssi);
+    
+    // Update GNSS status display
+    void setGNSSStatus(bool enabled, bool hasFix, double lat, double lon, uint8_t sats, uint8_t clients);
+    
+    // Power management
+    void displayOff();
+    void displayOn();
+    bool isDisplayOff() { return currentScreen == SCREEN_OFF; }
     
     // Check if boot screen is still showing
     bool isBootScreenActive();
@@ -87,6 +97,14 @@ private:
     // WiFi startup status
     String wifiStartupMessage;
     
+    // GNSS data
+    bool gnssEnabled;
+    bool gnssHasFix;
+    double gnssLatitude;
+    double gnssLongitude;
+    uint8_t gnssSatellites;
+    uint8_t gnssClients;
+    
     // Button handling
     uint32_t lastButtonPress;
     static const uint32_t BUTTON_DEBOUNCE_MS = 200;
@@ -98,6 +116,8 @@ private:
     void renderStatusScreen();
     void renderWiFiScreen();
     void renderBatteryScreen();
+    void renderGNSSScreen();
+    void renderOffScreen();
     
     // Helper functions
     String formatFrequency(float freq);
