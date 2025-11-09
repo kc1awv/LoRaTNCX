@@ -57,6 +57,11 @@
 #define SERIAL_BUFFER_SIZE  512
 #define LORA_BUFFER_SIZE    256
 
+// GNSS Configuration
+#define GNSS_ENABLED        true     // Enable/disable GNSS by default
+#define GNSS_BAUD_RATE      9600     // Standard GNSS baud rate
+#define GNSS_TCP_PORT       10110    // TCP port for NMEA data streaming (standard NMEA-over-TCP port)
+
 // Board Pin Definitions (will be set at runtime)
 extern int8_t RADIO_SCLK_PIN;
 extern int8_t RADIO_MISO_PIN;

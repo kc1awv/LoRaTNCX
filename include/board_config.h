@@ -36,6 +36,16 @@ void setupPAControl();
     #else
         #define ADC_CTRL_ACTIVE_HIGH 1  // V3.2: active HIGH (same as V4)
     #endif
+    
+    // V3 does not have built-in GNSS port, but users can attach external module
+    // Default pins are suggestions - users should configure via web interface
+    #define HAS_GNSS_PORT       0
+    #define PIN_GNSS_RX         -1  // User-configurable
+    #define PIN_GNSS_TX         -1  // User-configurable
+    #define PIN_GNSS_CTRL       -1  // Optional power control
+    #define PIN_GNSS_WAKE       -1  // Optional wake pin
+    #define PIN_GNSS_PPS        -1  // Optional PPS pin
+    #define PIN_GNSS_RST        -1  // Optional reset pin
 #endif
 
 // Heltec WiFi LoRa 32 V4 Pin Definitions  
@@ -61,6 +71,15 @@ void setupPAControl();
     #define PIN_ADC_BATTERY     1   // GPIO1 - ADC input
     #define PIN_ADC_CTRL        37  // GPIO37 - Transistor control (active HIGH for V4)
     #define ADC_CTRL_ACTIVE_HIGH 1  // V4 uses active HIGH control (transistor inverts)
+    
+    // V4 has built-in GNSS port with dedicated pins
+    #define HAS_GNSS_PORT       1
+    #define PIN_GNSS_RX         39  // GPIO39 - GNSS TX -> MCU RX
+    #define PIN_GNSS_TX         38  // GPIO38 - MCU TX -> GNSS RX
+    #define PIN_GNSS_CTRL       34  // GPIO34 - VGNSS_CTRL (power control - LOW to enable)
+    #define PIN_GNSS_WAKE       40  // GPIO40 - GNSS Wake
+    #define PIN_GNSS_PPS        41  // GPIO41 - GNSS PPS (pulse per second)
+    #define PIN_GNSS_RST        42  // GPIO42 - GNSS Reset
 #endif
 
 // Battery voltage reading

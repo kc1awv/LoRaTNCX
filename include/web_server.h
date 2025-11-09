@@ -8,10 +8,18 @@
 #include "radio.h"
 #include "config_manager.h"
 #include "board_config.h"
+#include "gnss.h"
+#include "nmea_server.h"
 
 class TNCWebServer {
 public:
     TNCWebServer(WiFiManager* wifiMgr, LoRaRadio* radio, ConfigManager* configMgr);
+    
+    // Set GNSS module and server (optional - can be set after construction)
+    void setGNSS(GNSSModule* gnss, NMEAServer* nmea) {
+        gnssModule = gnss;
+        nmeaServer = nmea;
+    }
     
     // Initialize web server
     bool begin();
@@ -30,6 +38,8 @@ private:
     WiFiManager* wifiManager;
     LoRaRadio* loraRadio;
     ConfigManager* configManager;
+    GNSSModule* gnssModule;
+    NMEAServer* nmeaServer;
     bool running;
     
     // Pending WiFi config change
@@ -54,6 +64,11 @@ private:
     void handleSaveWiFiConfig(AsyncWebServerRequest* request);
     void handleScanWiFi(AsyncWebServerRequest* request);
     
+    // API handlers - GNSS configuration
+    void handleGetGNSSConfig(AsyncWebServerRequest* request);
+    void handleSetGNSSConfig(AsyncWebServerRequest* request, const char* jsonData, size_t len);
+    void handleGetGNSSStatus(AsyncWebServerRequest* request);
+    
     // API handlers - Control
     void handleReboot(AsyncWebServerRequest* request);
     
@@ -62,6 +77,8 @@ private:
     String getJSONSystemInfo();
     String getJSONLoRaConfig();
     String getJSONWiFiConfig();
+    String getJSONGNSSConfig();
+    String getJSONGNSSStatus();
     
     // CORS headers
     void addCORSHeaders(AsyncWebServerResponse* response);

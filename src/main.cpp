@@ -9,6 +9,8 @@
 #include "wifi_manager.h"
 #include "web_server.h"
 #include "tcp_kiss.h"
+#include "gnss.h"
+#include "nmea_server.h"
 
 // Temporary debug mode
 // #define DEBUG_MODE 1
@@ -28,6 +30,8 @@ ConfigManager configManager;
 WiFiManager wifiManager;
 TNCWebServer webServer(&wifiManager, &loraRadio, &configManager);
 TCPKISSServer tcpKissServer;
+GNSSModule gnssModule;
+NMEAServer nmeaServer;
 
 // Buffers
 uint8_t rxBuffer[LORA_BUFFER_SIZE];
@@ -155,6 +159,7 @@ void setup() {
                 
                 // Start web server
                 DEBUG_PRINTLN("Starting web server...");
+                webServer.setGNSS(&gnssModule, &nmeaServer);  // Set GNSS references
                 if (webServer.begin()) {
                     DEBUG_PRINTLN("Web server started on port 80");
                     DEBUG_PRINTLN("Access via: http://loratncx.local");
@@ -173,6 +178,38 @@ void setup() {
                     } else {
                         DEBUG_PRINTLN("Failed to start TCP KISS server");
                     }
+                }
+                
+                // Initialize GNSS if enabled
+                GNSSConfig gnssConfig;
+                if (configManager.loadGNSSConfig(gnssConfig)) {
+                    DEBUG_PRINTLN("Loaded GNSS config from NVS");
+                } else {
+                    DEBUG_PRINTLN("No saved GNSS config, using defaults");
+                    configManager.resetGNSSToDefaults(gnssConfig);
+                }
+                
+                if (gnssConfig.enabled && gnssConfig.pinRX >= 0 && gnssConfig.pinTX >= 0) {
+                    DEBUG_PRINTLN("Initializing GNSS module...");
+                    if (gnssModule.begin(gnssConfig.pinRX, gnssConfig.pinTX, 
+                                        gnssConfig.pinCtrl, gnssConfig.pinWake,
+                                        gnssConfig.pinPPS, gnssConfig.pinRST,
+                                        gnssConfig.baudRate)) {
+                        DEBUG_PRINTLN("GNSS module initialized");
+                        
+                        // Start NMEA TCP server
+                        DEBUG_PRINT("Starting NMEA server on port ");
+                        DEBUG_PRINTLN(gnssConfig.tcpPort);
+                        if (nmeaServer.begin(gnssConfig.tcpPort)) {
+                            DEBUG_PRINTLN("NMEA server started");
+                        } else {
+                            DEBUG_PRINTLN("Failed to start NMEA server");
+                        }
+                    } else {
+                        DEBUG_PRINTLN("Failed to initialize GNSS module");
+                    }
+                } else {
+                    DEBUG_PRINTLN("GNSS disabled or not configured");
                 }
             } else {
                 DEBUG_PRINTLN("WiFi timeout - continuing anyway");
@@ -443,6 +480,46 @@ void loop() {
     // Update TCP KISS server
     tcpKissServer.update();
     
+    // Update GNSS module
+    static bool gnssSerialPassthroughEnabled = false;
+    static uint32_t lastPassthroughConfigCheck = 0;
+    static uint32_t lastGNSSDebug = 0;
+    
+    // Check passthrough config every 5 seconds instead of every sentence
+    if (millis() - lastPassthroughConfigCheck >= 5000) {
+        GNSSConfig gnssConfig;
+        if (configManager.loadGNSSConfig(gnssConfig)) {
+            gnssSerialPassthroughEnabled = gnssConfig.serialPassthrough;
+        }
+        lastPassthroughConfigCheck = millis();
+    }
+    
+    if (gnssModule.isRunning()) {
+        gnssModule.update();
+        
+        // Check if we have an NMEA sentence ready
+        if (gnssModule.hasNMEASentence()) {
+            const char* sentence = gnssModule.getNMEASentence();
+            if (sentence) {
+                // Forward to TCP clients if available
+                if (nmeaServer.hasClients()) {
+                    nmeaServer.sendNMEA(sentence);
+                }
+                
+                // Forward to USB serial if passthrough is enabled
+                // NMEA sentences need CR+LF line ending
+                if (gnssSerialPassthroughEnabled) {
+                    Serial.print(sentence);
+                    Serial.print("\r\n");
+                }
+            }
+            gnssModule.clearNMEASentence();
+        }
+        
+        // Update NMEA server
+        nmeaServer.update();
+    }
+    
     // Handle button press
     if (buttonPressed) {
         buttonPressed = false;
@@ -470,6 +547,22 @@ void loop() {
         int rssi = wifiManager.getRSSI();
         displayManager.setWiFiStatus(apActive, staConnected, apIP, staIP, rssi);
         lastWiFiUpdate = millis();
+    }
+    
+    // Update GNSS status periodically (every 2 seconds when not on boot screen)
+    static uint32_t lastGNSSUpdate = 0;
+    if (!displayManager.isBootScreenActive() && millis() - lastGNSSUpdate >= 2000) {
+        if (gnssModule.isRunning()) {
+            bool hasFix = gnssModule.hasValidFix();
+            double lat = hasFix ? gnssModule.getLatitude() : 0.0;
+            double lon = hasFix ? gnssModule.getLongitude() : 0.0;
+            uint8_t sats = gnssModule.getSatellites();
+            uint8_t clients = nmeaServer.getClientCount();
+            displayManager.setGNSSStatus(true, hasFix, lat, lon, sats, clients);
+        } else {
+            displayManager.setGNSSStatus(false, false, 0.0, 0.0, 0, 0);
+        }
+        lastGNSSUpdate = millis();
     }
     
     // Process incoming serial data (KISS frames from host)
