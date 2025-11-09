@@ -39,6 +39,8 @@ Frequency Support: **433 MHz to 928 MHz** (tested: 433, 868, 902, 915, 928 MHz) 
 - ✅ **WiFi Web Interface** - Configure from any device with a browser (because it's 2025, not 1995)
 - ✅ **Multiple WiFi Modes** - Access Point, Station, both, or neither (flexibility is key)
 - ✅ **RESTful API** - Full JSON API for automation enthusiasts (curl your way to victory)
+- ✅ **TCP KISS Server** - Network access to TNC over WiFi (because cables are so last decade)
+- ✅ **OLED Display** - Real-time status on built-in screen (finally, something visible!)
 - ✅ **Interrupt-Driven Reception** - Efficient packet handling with no echo loops (took a few tries to get this right)
 - ✅ **Configurable Deaf Period** - Prevents receiving own transmissions (because talking to yourself is awkward)
 - ✅ **Wide Frequency Range** - Supports 433-928 MHz ISM bands (way more versatile than we expected)
@@ -120,6 +122,82 @@ Because typing KISS commands and hex values is so 1990s, the TNC now includes a 
 - `POST /api/reboot` - Reboot the device
 
 **Power Consumption Note**: WiFi is power-hungry (150-200 mA in AP mode). For battery operation, configure your settings via WiFi, then switch WiFi mode to Off. Your battery will thank you.
+
+### TCP KISS Server (Network-Enabled TNC!)
+
+Why limit yourself to USB serial when you have WiFi? The TNC includes a TCP KISS server that lets KISS applications connect over the network. It's like having a network-attached TNC without buying expensive Ethernet modules.
+
+**How It Works:**
+- When WiFi is enabled, optionally enable the TCP KISS server (default port 8001)
+- KISS applications connect via TCP instead of serial port
+- Full bidirectional KISS protocol over TCP - same as serial, but wireless
+- Supports multiple simultaneous TCP clients (up to 4)
+- Works with any KISS application that supports TCP/IP connections
+
+**Why This Is Useful:**
+- Run your KISS application on a different computer than the TNC
+- Place the TNC near a window for better RF, control it from your desk
+- Multiple programs can access the TNC simultaneously
+- No USB cable clutter (minimalism approved)
+- Integrate into network-based monitoring or control systems
+
+**Example Usage:**
+```bash
+# Dire Wolf with TCP KISS (instead of serial port)
+# Connect to TNC's IP address and TCP KISS port
+direwolf -t 0 -k 192.168.4.1:8001
+
+# BPQ32 TCP KISS configuration
+# Add to bpq32.cfg:
+# PORT
+#   PORTNUM=1
+#   ID=LoRa TNC
+#   TYPE=ASYNC
+#   PROTOCOL=KISS
+#   TCPPORT=8001
+#   IPADDRESS=192.168.4.1
+```
+
+**Configuration:**
+- Enable/disable TCP KISS server via web interface
+- Change port number (default 8001) if you want to be different
+- Works in AP mode (connect to TNC's network) or STA mode (TNC on your network)
+- Settings persist across reboots
+
+**Caveats:**
+- TCP adds a tiny bit of latency compared to direct serial (negligible for packet radio)
+- Make sure your firewall allows the port if using STA mode
+- If multiple clients send simultaneously, chaos ensues (just like with shared serial ports)
+
+See `docs/WiFi_WebInterface.md` for web interface configuration details.
+
+### OLED Display (Because Blinking LEDs Are So 1980s)
+
+Both V3 and V4 boards have built-in OLED displays, and yes, they actually work now. The display shows real-time status without needing to open a web browser or connect a serial terminal.
+
+**What's On The Screen:**
+- **Boot Screen**: Shows LoRaTNCX logo and version during startup (2 seconds of glory)
+- **Status Screen**: Current LoRa configuration, WiFi status, battery voltage, uptime
+- **Radio Info**: Frequency, bandwidth, spreading factor, TX power - all the important numbers
+- **Packet Activity**: Visual indication when transmitting or receiving (so you know it's alive)
+
+**Screen Rotation:**
+The display automatically cycles through different views, or you can configure it via the web interface. It's like having a tiny oscilloscope, but for packet radio.
+
+**Why This Matters:**
+- Quick field checks without pulling out your phone
+- Verify configuration at a glance
+- Battery monitoring (before it's too late)
+- Looks more professional than just blinking LEDs
+- Impress your ham radio friends with actual status information
+
+**Display Management:**
+- Automatically manages power to the OLED (Vext control)
+- Tested on both V3 and V4 hardware (different pin configurations, same awesome display)
+- Low power impact when not actively updating
+- Can be disabled via configuration if you prefer the mysterious black rectangle aesthetic
+
+No configuration needed - the display just works™ out of the box. One less thing to worry about.
 
 ## AI-Generated Caveats
 
@@ -257,8 +335,9 @@ Out of the box, the TNC is configured for maximum range (because who doesn't wan
 
 ### Using with KISS Applications
 
-Once configured, the TNC works with any KISS-compatible application. It doesn't care what you use it with:
+Once configured, the TNC works with any KISS-compatible application via serial port or TCP network connection. It doesn't care what you use it with:
 
+**Serial Port (Traditional Method):**
 ```bash
 # Dire Wolf (APRS digipeater/iGate) - because everyone loves APRS
 direwolf -t 0 -p /dev/ttyUSB0 -b 115200
@@ -275,6 +354,23 @@ direwolf -t 0 -p /dev/ttyUSB0 -b 115200
 
 # Or use with any packet terminal that supports KISS mode
 # (Your favorite ancient DOS program might even work!)
+```
+
+**TCP Network Connection (When WiFi is Enabled):**
+```bash
+# Dire Wolf with TCP KISS - no USB cable required!
+direwolf -t 0 -k 192.168.4.1:8001
+
+# BPQ32 with TCP KISS
+# Add to bpq32.cfg:
+# PORT
+#   PORTNUM=1
+#   ID=LoRa TNC
+#   TYPE=ASYNC
+#   PROTOCOL=KISS
+#   TCPPORT=8001
+#   IPADDRESS=192.168.4.1
+#   # (Use TNC's actual IP address in STA mode)
 ```
 
 **Important Note**: Most KISS applications don't support LoRa-specific parameters (because they were written in the 1990s), which is why you should pre-configure the TNC using the configuration tool before launching your KISS application. Set it and forget it!
@@ -337,8 +433,8 @@ The firmware is organized into clean, focused modules (because the AI read the S
 - **board_config.cpp/h**: Hardware-specific definitions, battery voltage reading for V3/V4 boards (the hardware whisperer)
 - **wifi_manager.cpp/h**: WiFi management - AP/STA modes, connection handling (the network administrator)
 - **web_server.cpp/h**: Web interface and REST API - because browsers are universal (the friendly face)
-- **tcp_kiss.cpp/h**: TCP KISS server - network access to TNC (coming soon™)
-- **display.cpp/h**: OLED display support - currently dormant, awaiting activation (the silent observer)
+- **tcp_kiss.cpp/h**: TCP KISS server - network access to TNC, supports multiple clients (the wireless bridge)
+- **display.cpp/h**: OLED display support - boot screen, status display, radio info (the informative one)
 
 **Design Principles** (according to the AI):
 - Single Responsibility Principle (each module does one thing and does it well)
@@ -376,14 +472,14 @@ The firmware is organized into clean, focused modules (because the AI read the S
 - Multiple WiFi modes (AP, STA, both, or off - choose your own adventure - NEW!)
 - RESTful API (JSON-based configuration for automation enthusiasts - NEW!)
 - WiFi network scanner (finds networks so you don't have to type SSIDs - NEW!)
+- TCP KISS server (network access to TNC over WiFi, supports up to 4 simultaneous clients - NEW!)
+- OLED display support (boot screen, status display, radio info on V3 and V4 boards - NEW!)
 - V3/V3.2 and V4 board support (both versions love us equally, with auto-detection)
 - Wide frequency range (433-928 MHz tested - it's like a frequency buffet)
 - Configurable deaf period (prevents echo loops and existential conversations with yourself)
 
 ### What's Planned (When We Feel Ambitious)
-- TCP KISS server (access TNC over network - because WiFi without network KISS is just LED blinky)
 - AX.25 frame parsing/generation (for digipeating, APRS, and making this even more useful)
-- Display support (OLED currently unused and feeling very neglected)
 - Over-the-air firmware updates (for when you're too lazy to find a USB cable)
 - Web interface authentication (because security should be more than optional)
 - Additional KISS extensions (because we can never have enough features)
@@ -415,6 +511,7 @@ Contributions welcome! Whether you're:
 **Storage**: NVS (ESP32 non-volatile storage) - ESP32's fancy answer to EEPROM  
 **Filesystem**: SPIFFS - For web interface files and future expansion  
 **Web Server**: ESPAsyncWebServer - Non-blocking, efficient, modern  
+**Display**: U8g2 library with SSD1306 OLED (128x64) - Tiny screen, big impact  
 **Build System**: PlatformIO - Better than Arduino IDE, fight me  
 **Protocol**: KISS with SETHARDWARE extensions - Old school meets new school  
 **Frequency Range**: 433-928 MHz (hardware verified) - Surprisingly versatile little radios
@@ -428,6 +525,7 @@ Contributions welcome! Whether you're:
 - Async web server (non-blocking, handles multiple connections gracefully)
 - JSON REST API (ArduinoJson for serialization/deserialization)
 - WiFi mode persistence (survives reboots, unlike your patience during debugging)
+- TCP KISS server (supports up to 4 simultaneous clients, default port 8001)
 
 **Lines of Code**: Several thousand (the AI wrote most of them and only needed a few debugging hints)  
 **Code Reviews**: Performed by humans who trust AI (and tested on real hardware, because we're not completely reckless)  
@@ -481,6 +579,12 @@ Contributions welcome! Whether you're:
 **Q**: Station mode won't connect to my network!  
 **A**: Use the network scanner in the web interface to verify the network is visible. Double-check your SSID and password (special characters can be tricky). Make sure you're in range. If your network is 5 GHz only, bad news: ESP32 only does 2.4 GHz. Time to enable that legacy band on your router.
 
+**Q**: Can't connect to the TCP KISS server!  
+**A**: First, verify TCP KISS is enabled in the WiFi settings (check via web interface). Make sure you're using the correct port (default 8001). If in AP mode, connect to the TNC's WiFi first. If in STA mode, verify the TNC actually connected to your network (check the web interface for its IP). Firewalls can block connections - check both your computer's firewall and router settings. And yes, you need WiFi enabled for TCP KISS to work (obvious but worth stating).
+
+**Q**: TCP KISS disconnects randomly!  
+**A**: WiFi can be temperamental. Check signal strength - weak WiFi = unstable connections. If using STA mode, make sure your router isn't kicking the TNC off for inactivity. Power-saving features on the router can be problematic. Also check if you have multiple clients trying to transmit simultaneously - the TNC handles this, but applications might not handle collisions gracefully.
+
 ## License
 
 MIT License - Because sharing is caring, and the AI can't hold copyright anyway.
@@ -516,6 +620,8 @@ Things we learned:
 - The combination of human domain knowledge and AI implementation skills is powerful
 - Adding WiFi to things makes them infinitely more user-friendly
 - AsyncWebServer is actually pretty great for embedded web interfaces
+- OLED displays make projects feel complete (and look way cooler)
+- U8g2 library handles different hardware revisions gracefully
 - We're not quite at "Skynet" levels yet (probably)
 - JSON APIs make everyone happy (except those who prefer XML, but who are we kidding?)
 
