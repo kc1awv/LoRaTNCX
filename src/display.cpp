@@ -76,6 +76,9 @@ void DisplayManager::update() {
             case SCREEN_BOOT:
                 renderBootScreen();
                 break;
+            case SCREEN_WIFI_STARTUP:
+                renderWiFiStartupScreen();
+                break;
             case SCREEN_STATUS:
                 renderStatusScreen();
                 break;
@@ -211,6 +214,15 @@ void DisplayManager::setWiFiStatus(bool apActive, bool staConnected, String apIP
     }
 }
 
+void DisplayManager::setWiFiStartupMessage(String message) {
+    wifiStartupMessage = message;
+    
+    // Trigger update if on WiFi startup screen
+    if (currentScreen == SCREEN_WIFI_STARTUP) {
+        lastScreen = SCREEN_BOOT;  // Force re-render
+    }
+}
+
 bool DisplayManager::isBootScreenActive() {
     return bootScreenActive;
 }
@@ -234,6 +246,46 @@ void DisplayManager::renderBootScreen() {
     const char* status = "Initializing...";
     int statusWidth = u8g2.getStrWidth(status);
     u8g2.drawStr((128 - statusWidth) / 2, 55, status);
+}
+
+void DisplayManager::renderWiFiStartupScreen() {
+    u8g2.setFont(u8g2_font_ncenB10_tr);
+    
+    // Title
+    const char* title = "WiFi Setup";
+    int titleWidth = u8g2.getStrWidth(title);
+    u8g2.drawStr((128 - titleWidth) / 2, 15, title);
+    
+    // Status message
+    u8g2.setFont(u8g2_font_6x10_tr);
+    
+    // Word wrap the status message
+    String msg = wifiStartupMessage;
+    if (msg.length() > 0) {
+        // Line 1
+        if (msg.length() > 21) {
+            String line1 = msg.substring(0, 21);
+            u8g2.drawStr(0, 35, line1.c_str());
+            
+            // Line 2
+            if (msg.length() > 42) {
+                String line2 = msg.substring(21, 42);
+                u8g2.drawStr(0, 47, line2.c_str());
+                
+                // Line 3
+                String line3 = msg.substring(42);
+                if (line3.length() > 21) line3 = line3.substring(0, 21);
+                u8g2.drawStr(0, 59, line3.c_str());
+            } else {
+                String line2 = msg.substring(21);
+                u8g2.drawStr(0, 47, line2.c_str());
+            }
+        } else {
+            // Center single line
+            int msgWidth = u8g2.getStrWidth(msg.c_str());
+            u8g2.drawStr((128 - msgWidth) / 2, 40, msg.c_str());
+        }
+    }
 }
 
 void DisplayManager::renderStatusScreen() {

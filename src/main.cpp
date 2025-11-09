@@ -115,42 +115,76 @@ void setup() {
     if (wifiManager.begin()) {
         DEBUG_PRINTLN("WiFi manager initialized");
         
+        // Switch to WiFi startup screen
+        displayManager.setScreen(SCREEN_WIFI_STARTUP);
+        displayManager.setWiFiStartupMessage("Starting WiFi...");
+        displayManager.update();
+        
         // Start WiFi with saved/default configuration
         if (wifiManager.start()) {
             DEBUG_PRINTLN("WiFi started");
             
-            // Show WiFi info on display
-            if (wifiManager.isAPActive()) {
-                DEBUG_PRINT("AP IP: ");
-                DEBUG_PRINTLN(wifiManager.getAPIPAddress());
-            }
-            if (wifiManager.isConnected()) {
-                DEBUG_PRINT("STA IP: ");
-                DEBUG_PRINTLN(wifiManager.getIPAddress());
+            // Wait for WiFi to be ready (either AP started or STA connected)
+            // with a timeout of 30 seconds
+            unsigned long wifiStartTime = millis();
+            const unsigned long WIFI_TIMEOUT = 30000;  // 30 seconds
+            
+            while (!wifiManager.isReady() && (millis() - wifiStartTime < WIFI_TIMEOUT)) {
+                wifiManager.update();
+                displayManager.setWiFiStartupMessage(wifiManager.getStatusMessage());
+                displayManager.update();
+                delay(100);
             }
             
-            // Start web server
-            DEBUG_PRINTLN("Starting web server...");
-            if (webServer.begin()) {
-                DEBUG_PRINTLN("Web server started on port 80");
-            } else {
-                DEBUG_PRINTLN("Failed to start web server");
-            }
-            
-            // Start TCP KISS server if enabled
-            WiFiConfig wifiConfig;
-            wifiManager.getCurrentConfig(wifiConfig);
-            if (wifiConfig.tcp_kiss_enabled) {
-                DEBUG_PRINT("Starting TCP KISS server on port ");
-                DEBUG_PRINTLN(wifiConfig.tcp_kiss_port);
-                if (tcpKissServer.begin(wifiConfig.tcp_kiss_port)) {
-                    DEBUG_PRINTLN("TCP KISS server started");
-                } else {
-                    DEBUG_PRINTLN("Failed to start TCP KISS server");
+            if (wifiManager.isReady()) {
+                DEBUG_PRINTLN("WiFi ready!");
+                
+                // Show WiFi info on display
+                if (wifiManager.isAPActive()) {
+                    DEBUG_PRINT("AP IP: ");
+                    DEBUG_PRINTLN(wifiManager.getAPIPAddress());
+                    displayManager.setWiFiStartupMessage("AP: " + wifiManager.getAPIPAddress());
                 }
+                if (wifiManager.isConnected()) {
+                    DEBUG_PRINT("STA IP: ");
+                    DEBUG_PRINTLN(wifiManager.getIPAddress());
+                    displayManager.setWiFiStartupMessage("Connected: " + wifiManager.getIPAddress());
+                }
+                displayManager.update();
+                delay(2000);  // Show WiFi status for 2 seconds
+                
+                // Start web server
+                DEBUG_PRINTLN("Starting web server...");
+                if (webServer.begin()) {
+                    DEBUG_PRINTLN("Web server started on port 80");
+                    DEBUG_PRINTLN("Access via: http://loratncx.local");
+                } else {
+                    DEBUG_PRINTLN("Failed to start web server");
+                }
+                
+                // Start TCP KISS server if enabled
+                WiFiConfig wifiConfig;
+                wifiManager.getCurrentConfig(wifiConfig);
+                if (wifiConfig.tcp_kiss_enabled) {
+                    DEBUG_PRINT("Starting TCP KISS server on port ");
+                    DEBUG_PRINTLN(wifiConfig.tcp_kiss_port);
+                    if (tcpKissServer.begin(wifiConfig.tcp_kiss_port)) {
+                        DEBUG_PRINTLN("TCP KISS server started");
+                    } else {
+                        DEBUG_PRINTLN("Failed to start TCP KISS server");
+                    }
+                }
+            } else {
+                DEBUG_PRINTLN("WiFi timeout - continuing anyway");
+                displayManager.setWiFiStartupMessage("WiFi Timeout");
+                displayManager.update();
+                delay(2000);
             }
         } else {
             DEBUG_PRINTLN("WiFi start failed or disabled");
+            displayManager.setWiFiStartupMessage("WiFi Disabled");
+            displayManager.update();
+            delay(2000);
         }
     } else {
         DEBUG_PRINTLN("WiFi manager init failed");

@@ -7,10 +7,11 @@
 
 // Screen types
 enum DisplayScreen {
-    SCREEN_BOOT,        // Boot/splash screen
-    SCREEN_STATUS,      // Main status screen showing radio config
-    SCREEN_WIFI,        // WiFi status screen
-    SCREEN_BATTERY,     // Battery status screen
+    SCREEN_BOOT,         // Boot/splash screen
+    SCREEN_WIFI_STARTUP, // WiFi initialization screen
+    SCREEN_STATUS,       // Main status screen showing radio config
+    SCREEN_WIFI,         // WiFi status screen
+    SCREEN_BATTERY,      // Battery status screen
     NUM_SCREENS
 };
 
@@ -39,6 +40,9 @@ public:
     
     // Update battery voltage display
     void setBatteryVoltage(float voltage);
+    
+    // Set WiFi startup message
+    void setWiFiStartupMessage(String message);
     
     // Update WiFi status display
     void setWiFiStatus(bool apActive, bool staConnected, String apIP, String staIP, int rssi);
@@ -80,6 +84,9 @@ private:
     String wifiSTAIP;
     int wifiRSSI;
     
+    // WiFi startup status
+    String wifiStartupMessage;
+    
     // Button handling
     uint32_t lastButtonPress;
     static const uint32_t BUTTON_DEBOUNCE_MS = 200;
@@ -87,6 +94,7 @@ private:
     
     // Screen rendering functions
     void renderBootScreen();
+    void renderWiFiStartupScreen();
     void renderStatusScreen();
     void renderWiFiScreen();
     void renderBatteryScreen();

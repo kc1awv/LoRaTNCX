@@ -4,6 +4,16 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <Preferences.h>
+#include <ESPmDNS.h>
+#include <DNSServer.h>
+
+// WiFi connection states
+enum WiFiConnectionState {
+    WIFI_STATE_DISCONNECTED,
+    WIFI_STATE_CONNECTING,
+    WIFI_STATE_CONNECTED,
+    WIFI_STATE_FAILED
+};
 
 // WiFi modes (using TNC prefix to avoid conflicts with ESP32 WiFi library)
 enum TNCWiFiMode {
@@ -52,6 +62,13 @@ public:
     String getIPAddress();
     String getAPIPAddress();
     int getRSSI();
+    WiFiConnectionState getConnectionState();
+    
+    // Check if WiFi is ready (connected or AP active)
+    bool isReady();
+    
+    // Get status message for display
+    String getStatusMessage();
     
     // Configuration management
     bool saveConfig(const WiFiConfig& config);
@@ -75,21 +92,33 @@ public:
 private:
     Preferences preferences;
     WiFiConfig currentConfig;
+    DNSServer* dnsServer;
     bool initialized;
     bool apStarted;
     bool staConnected;
+    bool mdnsStarted;
+    WiFiConnectionState connectionState;
     unsigned long lastReconnectAttempt;
+    unsigned long reconnectDelay;
+    int reconnectAttempts;
     int scanResults;
+    String statusMessage;
     
     static const uint32_t CONFIG_MAGIC = 0xFEEDBEEF;
     static const char* NVS_NAMESPACE;
     static const char* NVS_WIFI_KEY;
-    static const unsigned long RECONNECT_INTERVAL = 30000; // 30 seconds
+    static const unsigned long RECONNECT_BASE_INTERVAL = 5000;   // 5 seconds
+    static const unsigned long RECONNECT_MAX_INTERVAL = 60000;   // 60 seconds
+    static const unsigned long CONNECTION_TIMEOUT = 15000;       // 15 seconds
     
     // Internal methods
     bool startAP();
     bool startSTA();
     void checkConnection();
+    void setupWiFiEvents();
+    void startCaptivePortal();
+    void stopCaptivePortal();
+    bool setupMDNS();
 };
 
 #endif // WIFI_MANAGER_H

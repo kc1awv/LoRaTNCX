@@ -1,15 +1,21 @@
 #include "wifi_manager.h"
+#include "debug.h"
 
 const char* WiFiManager::NVS_NAMESPACE = "wifi";
 const char* WiFiManager::NVS_WIFI_KEY = "config";
 
 WiFiManager::WiFiManager() 
-    : initialized(false), apStarted(false), staConnected(false), 
-      lastReconnectAttempt(0), scanResults(0) {
+    : initialized(false), apStarted(false), staConnected(false), mdnsStarted(false),
+      connectionState(WIFI_STATE_DISCONNECTED), lastReconnectAttempt(0), 
+      reconnectDelay(RECONNECT_BASE_INTERVAL), reconnectAttempts(0), 
+      scanResults(0), dnsServer(nullptr) {
 }
 
 bool WiFiManager::begin() {
     initialized = true;
+    
+    // Setup WiFi event handlers
+    setupWiFiEvents();
     
     // Try to load saved configuration
     if (!loadConfig(currentConfig)) {
@@ -31,6 +37,16 @@ bool WiFiManager::start() {
 }
 
 void WiFiManager::stop() {
+    // Stop captive portal
+    stopCaptivePortal();
+    
+    // Stop mDNS
+    if (mdnsStarted) {
+        MDNS.end();
+        mdnsStarted = false;
+        DEBUG_PRINTLN("mDNS stopped");
+    }
+    
     if (apStarted) {
         WiFi.softAPdisconnect(true);
         apStarted = false;
@@ -42,11 +58,18 @@ void WiFiManager::stop() {
     }
     
     WiFi.mode(WIFI_OFF);
+    connectionState = WIFI_STATE_DISCONNECTED;
+    statusMessage = "WiFi Off";
 }
 
 void WiFiManager::update() {
     if (!initialized) {
         return;
+    }
+    
+    // Process DNS requests for captive portal
+    if (dnsServer) {
+        dnsServer->processNextRequest();
     }
     
     // Check STA connection status
@@ -256,6 +279,9 @@ bool WiFiManager::startAP() {
         
         WiFi.softAPConfig(ip, gateway, subnet);
         apStarted = true;
+        statusMessage = "AP: " + String(currentConfig.ap_ssid);
+    } else {
+        statusMessage = "AP Start Failed";
     }
     
     return success;
@@ -285,19 +311,159 @@ bool WiFiManager::startSTA() {
     // Don't block waiting for connection - let it connect in the background
     // The update() method will check connection status
     staConnected = false;
+    connectionState = WIFI_STATE_CONNECTING;
+    statusMessage = "Connecting to " + String(currentConfig.ssid);
     lastReconnectAttempt = millis();
     
     return true;  // Return true if we started the connection attempt
 }
 
 void WiFiManager::checkConnection() {
-    // If not connected and enough time has passed, try to reconnect
+    // Exponential backoff reconnection logic
     if (!staConnected || WiFi.status() != WL_CONNECTED) {
-        if (millis() - lastReconnectAttempt >= RECONNECT_INTERVAL) {
+        if (millis() - lastReconnectAttempt >= reconnectDelay) {
+            DEBUG_PRINT("WiFi reconnect attempt ");
+            DEBUG_PRINT(reconnectAttempts + 1);
+            DEBUG_PRINT(", delay: ");
+            DEBUG_PRINTLN(reconnectDelay);
+            
             staConnected = false;
+            connectionState = WIFI_STATE_CONNECTING;
+            statusMessage = "Reconnecting...";
             startSTA();
+            
+            // Increase delay for next attempt (exponential backoff)
+            reconnectAttempts++;
+            reconnectDelay = min(reconnectDelay * 2, RECONNECT_MAX_INTERVAL);
         }
     } else {
+        if (!staConnected) {
+            DEBUG_PRINTLN("WiFi connected!");
+            // Reset reconnection parameters on successful connection
+            reconnectAttempts = 0;
+            reconnectDelay = RECONNECT_BASE_INTERVAL;
+        }
         staConnected = true;
+        connectionState = WIFI_STATE_CONNECTED;
     }
+}
+
+WiFiConnectionState WiFiManager::getConnectionState() {
+    return connectionState;
+}
+
+bool WiFiManager::isReady() {
+    return (apStarted || staConnected);
+}
+
+String WiFiManager::getStatusMessage() {
+    return statusMessage;
+}
+
+void WiFiManager::setupWiFiEvents() {
+    WiFi.onEvent([this](WiFiEvent_t event, WiFiEventInfo_t info) {
+        switch(event) {
+            case ARDUINO_EVENT_WIFI_STA_START:
+                DEBUG_PRINTLN("WiFi STA started");
+                statusMessage = "Connecting...";
+                connectionState = WIFI_STATE_CONNECTING;
+                break;
+                
+            case ARDUINO_EVENT_WIFI_STA_CONNECTED:
+                DEBUG_PRINTLN("WiFi STA connected");
+                statusMessage = "Connected";
+                connectionState = WIFI_STATE_CONNECTED;
+                break;
+                
+            case ARDUINO_EVENT_WIFI_STA_GOT_IP:
+                DEBUG_PRINT("WiFi got IP: ");
+                DEBUG_PRINTLN(WiFi.localIP());
+                statusMessage = "Got IP: " + WiFi.localIP().toString();
+                staConnected = true;
+                connectionState = WIFI_STATE_CONNECTED;
+                // Setup mDNS after getting IP
+                setupMDNS();
+                break;
+                
+            case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
+                DEBUG_PRINTLN("WiFi STA disconnected");
+                statusMessage = "Disconnected";
+                staConnected = false;
+                if (connectionState == WIFI_STATE_CONNECTING) {
+                    connectionState = WIFI_STATE_FAILED;
+                } else {
+                    connectionState = WIFI_STATE_DISCONNECTED;
+                }
+                break;
+                
+            case ARDUINO_EVENT_WIFI_AP_START:
+                DEBUG_PRINTLN("WiFi AP started");
+                statusMessage = "AP Started";
+                apStarted = true;
+                // Start captive portal
+                startCaptivePortal();
+                // Setup mDNS for AP
+                setupMDNS();
+                break;
+                
+            case ARDUINO_EVENT_WIFI_AP_STOP:
+                DEBUG_PRINTLN("WiFi AP stopped");
+                apStarted = false;
+                stopCaptivePortal();
+                break;
+                
+            case ARDUINO_EVENT_WIFI_AP_STACONNECTED:
+                DEBUG_PRINTLN("Client connected to AP");
+                break;
+                
+            case ARDUINO_EVENT_WIFI_AP_STADISCONNECTED:
+                DEBUG_PRINTLN("Client disconnected from AP");
+                break;
+                
+            default:
+                break;
+        }
+    });
+}
+
+void WiFiManager::startCaptivePortal() {
+    if (dnsServer) {
+        return;  // Already running
+    }
+    
+    dnsServer = new DNSServer();
+    if (dnsServer) {
+        // Redirect all DNS requests to our AP IP
+        dnsServer->start(53, "*", WiFi.softAPIP());
+        DEBUG_PRINTLN("Captive portal DNS started");
+    }
+}
+
+void WiFiManager::stopCaptivePortal() {
+    if (dnsServer) {
+        dnsServer->stop();
+        delete dnsServer;
+        dnsServer = nullptr;
+        DEBUG_PRINTLN("Captive portal DNS stopped");
+    }
+}
+
+bool WiFiManager::setupMDNS() {
+    // Only initialize mDNS once
+    if (mdnsStarted) {
+        DEBUG_PRINTLN("mDNS already started");
+        return true;
+    }
+    
+    if (!MDNS.begin("loratncx")) {
+        DEBUG_PRINTLN("Error setting up mDNS");
+        return false;
+    }
+    
+    DEBUG_PRINTLN("mDNS started: loratncx.local");
+    MDNS.addService("http", "tcp", 80);
+    MDNS.addService("kiss", "tcp", currentConfig.tcp_kiss_port);
+    
+    mdnsStarted = true;
+    return true;
 }
