@@ -1,16 +1,28 @@
 #include "display.h"
 #include "board_config.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
 
 // Global instances
 DisplayManager displayManager;
-volatile bool buttonPressed = false;
+
+// Thread-safe button event queue
+QueueHandle_t buttonEventQueue = nullptr;
 volatile uint32_t lastInterruptTime = 0;
+
+// Initialize button event queue
+void initializeButtonQueue() {
+    buttonEventQueue = xQueueCreate(5, sizeof(bool));  // Queue for button press events
+}
 
 // Interrupt handler for button press
 void IRAM_ATTR buttonInterruptHandler() {
     uint32_t now = millis();
-    if (now - lastInterruptTime > 200) {  // 200ms debounce at interrupt level
-        buttonPressed = true;
+    if (now - lastInterruptTime > 500) {  // 500ms debounce at interrupt level
+        bool event = true;
+        if (buttonEventQueue) {
+            xQueueSendFromISR(buttonEventQueue, &event, nullptr);
+        }
         lastInterruptTime = now;
     }
 }
@@ -178,7 +190,7 @@ void DisplayManager::handleButtonPress() {
     
     // Wait while button is held, checking duration
     while (digitalRead(0) == LOW && pressDuration < BUTTON_LONG_PRESS_MS + 100) {
-        delay(50);
+        delay(BUTTON_CHECK_DELAY_MS);
         pressDuration = millis() - pressStart;
     }
     
@@ -188,7 +200,7 @@ void DisplayManager::handleButtonPress() {
         u8g2.setFont(u8g2_font_ncenB10_tr);
         u8g2.drawStr(10, 32, "Powering Off...");
         u8g2.sendBuffer();
-        delay(1000);
+        delay(POWER_OFF_DELAY_MS);
         
         // Turn off display
         u8g2.clearBuffer();

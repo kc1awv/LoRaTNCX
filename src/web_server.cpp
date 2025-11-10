@@ -13,7 +13,7 @@ bool TNCWebServer::begin() {
     }
     
     // Create server instance
-    server = new AsyncWebServer(80);
+    server = new AsyncWebServer(WEB_SERVER_PORT);
     
     if (!server) {
         return false;
@@ -42,7 +42,7 @@ void TNCWebServer::update() {
     // AsyncWebServer handles requests automatically
     
     // Check if we have a pending WiFi configuration change
-    if (pendingWiFiChange && millis() - wifiChangeTime >= 500) {
+    if (pendingWiFiChange && millis() - wifiChangeTime >= WIFI_CHANGE_DELAY_MS) {
         pendingWiFiChange = false;
         wifiManager->applyConfig(pendingWiFiConfig);
         // Save to NVS so it persists after reboot
@@ -56,7 +56,7 @@ bool TNCWebServer::isRunning() {
 
 void TNCWebServer::setupRoutes() {
     // Serve static files from SPIFFS with cache headers for better performance
-    server->serveStatic("/", SPIFFS, "/").setDefaultFile("index.html").setCacheControl("max-age=3600");
+    server->serveStatic("/", SPIFFS, "/").setDefaultFile("index.html").setCacheControl(("max-age=" + String(WEB_CACHE_MAX_AGE)).c_str());
     
     // API routes - System status
     server->on("/api/status", HTTP_GET, [this](AsyncWebServerRequest* request) {
@@ -81,7 +81,7 @@ void TNCWebServer::setupRoutes() {
             DeserializationError error = deserializeJson(doc, data, len);
             
             if (error) {
-                request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+                request->send(HTTP_BAD_REQUEST, "application/json", "{\"error\":\"Invalid JSON\"}");
                 return;
             }
             
@@ -90,7 +90,7 @@ void TNCWebServer::setupRoutes() {
             
             if (!doc["frequency"].isNull()) {
                 float freq = doc["frequency"].as<float>();
-                if (freq >= 150.0 && freq <= 960.0) {
+                if (freq >= RADIO_FREQ_MIN && freq <= RADIO_FREQ_MAX) {
                     loraRadio->setFrequency(freq);
                     needsReconfig = true;
                 }
@@ -104,7 +104,7 @@ void TNCWebServer::setupRoutes() {
             
             if (!doc["spreading"].isNull()) {
                 uint8_t sf = doc["spreading"].as<uint8_t>();
-                if (sf >= 7 && sf <= 12) {
+                if (sf >= RADIO_SF_MIN && sf <= RADIO_SF_MAX) {
                     loraRadio->setSpreadingFactor(sf);
                     needsReconfig = true;
                 }
@@ -112,7 +112,7 @@ void TNCWebServer::setupRoutes() {
             
             if (!doc["codingRate"].isNull()) {
                 uint8_t cr = doc["codingRate"].as<uint8_t>();
-                if (cr >= 5 && cr <= 8) {
+                if (cr >= RADIO_CR_MIN && cr <= RADIO_CR_MAX) {
                     loraRadio->setCodingRate(cr);
                     needsReconfig = true;
                 }
@@ -120,7 +120,7 @@ void TNCWebServer::setupRoutes() {
             
             if (!doc["power"].isNull()) {
                 int8_t pwr = doc["power"].as<int8_t>();
-                if (pwr >= -9 && pwr <= 22) {
+                if (pwr >= RADIO_POWER_MIN && pwr <= RADIO_POWER_MAX) {
                     loraRadio->setOutputPower(pwr);
                     needsReconfig = true;
                 }
@@ -136,7 +136,7 @@ void TNCWebServer::setupRoutes() {
                 loraRadio->reconfigure();
             }
             
-            AsyncWebServerResponse* response = request->beginResponse(200, "application/json", 
+            AsyncWebServerResponse* response = request->beginResponse(HTTP_STATUS_OK, "application/json", 
                 "{\"success\":true,\"message\":\"Configuration applied\"}");
             addCORSHeaders(response);
             request->send(response);
@@ -164,7 +164,7 @@ void TNCWebServer::setupRoutes() {
             DeserializationError error = deserializeJson(doc, data, len);
             
             if (error) {
-                request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+                request->send(HTTP_BAD_REQUEST, "application/json", "{\"error\":\"Invalid JSON\"}");
                 return;
             }
             
@@ -482,7 +482,7 @@ void TNCWebServer::handleSetGNSSConfig(AsyncWebServerRequest* request, const cha
     DeserializationError error = deserializeJson(doc, jsonData, len);
     
     if (error) {
-        request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+        request->send(HTTP_BAD_REQUEST, "application/json", "{\"error\":\"Invalid JSON\"}");
         return;
     }
     

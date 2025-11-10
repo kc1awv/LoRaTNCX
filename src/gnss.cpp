@@ -36,9 +36,9 @@ bool GNSSModule::begin(int8_t rxPin, int8_t txPin, int8_t ctrlPin,
     baudRate = baud;
     
     // Configure GNSS Vext (GPIO 37) - MUST be done first
-    pinMode(37, OUTPUT);
-    digitalWrite(37, LOW);  // Enable GNSS power (active LOW)
-    delay(50);
+    pinMode(GNSS_VEXT_PIN, OUTPUT);
+    digitalWrite(GNSS_VEXT_PIN, LOW);  // Enable GNSS power (active LOW)
+    delay(GNSS_POWER_ON_DELAY_MS);
     
     // Configure control pins if available
     if (pinCtrl >= 0) {
@@ -60,12 +60,12 @@ bool GNSSModule::begin(int8_t rxPin, int8_t txPin, int8_t ctrlPin,
         pinMode(pinPPS, INPUT);  // PPS is an input signal
     }
     
-    delay(100);  // Give GNSS module time to stabilize after power-on
+    delay(GNSS_STABILIZE_DELAY_MS);  // Give GNSS module time to stabilize after power-on
     
     // Initialize serial port (using Serial1)
     gnssSerial = &Serial1;
     gnssSerial->begin(baudRate, SERIAL_8N1, pinRX, pinTX);
-    delay(100);  // Wait for serial to stabilize
+    delay(GNSS_STABILIZE_DELAY_MS);  // Wait for serial to stabilize
     
     gnssEnabled = true;
     DEBUG_PRINTLN("GNSS initialized");
@@ -102,7 +102,7 @@ void GNSSModule::powerOn() {
         // For V4, VGNSS_CTRL (GPIO 34) LOW enables additional control
         digitalWrite(pinCtrl, LOW);
         DEBUG_PRINTLN("GNSS power ON (GPIO 37 Vext + GPIO 34 CTRL enabled)");
-        delay(100);  // Give GNSS module time to power up
+        delay(GNSS_STABILIZE_DELAY_MS);  // Give GNSS module time to power up
     }
     
     // Release from reset

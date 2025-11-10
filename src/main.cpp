@@ -1,5 +1,7 @@
 #include <Arduino.h>
 #include <SPIFFS.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
 #include "config.h"
 #include "board_config.h"
 #include "config_manager.h"
@@ -12,62 +14,164 @@
 #include "gnss.h"
 #include "nmea_server.h"
 
-// Temporary debug mode
-// #define DEBUG_MODE 1
+// Thread-safe button event queue (declared in display.cpp)
+extern QueueHandle_t buttonEventQueue;
 
-#ifdef DEBUG_MODE
-#define DEBUG_PRINT(x) Serial.print(x)
-#define DEBUG_PRINTLN(x) Serial.println(x)
-#else
-#define DEBUG_PRINT(x)
-#define DEBUG_PRINTLN(x)
+// Logging configuration
+#define LOG_LEVEL_NONE    0  // No logging
+#define LOG_LEVEL_ERROR   1  // Error messages only
+#define LOG_LEVEL_WARN    2  // Warnings and errors
+#define LOG_LEVEL_INFO    3  // Info, warnings, and errors
+#define LOG_LEVEL_DEBUG   4  // Debug, info, warnings, and errors
+
+// Set logging level (can be changed at compile time or runtime)
+#ifndef LOG_LEVEL
+#define LOG_LEVEL LOG_LEVEL_INFO
 #endif
 
-// Global objects
-KISSProtocol kiss;
-LoRaRadio loraRadio;
-ConfigManager configManager;
-WiFiManager wifiManager;
-TNCWebServer webServer(&wifiManager, &loraRadio, &configManager);
-TCPKISSServer tcpKissServer;
-GNSSModule gnssModule;
-NMEAServer nmeaServer;
+// Logging macros
+#if LOG_LEVEL >= LOG_LEVEL_DEBUG
+#define LOG_DEBUG(x) Serial.print(x)
+#define LOG_DEBUGLN(x) Serial.println(x)
+#else
+#define LOG_DEBUG(x)
+#define LOG_DEBUGLN(x)
+#endif
+
+#if LOG_LEVEL >= LOG_LEVEL_INFO
+#define LOG_INFO(x) Serial.print(x)
+#define LOG_INFOLN(x) Serial.println(x)
+#else
+#define LOG_INFO(x)
+#define LOG_INFOLN(x)
+#endif
+
+#if LOG_LEVEL >= LOG_LEVEL_WARN
+#define LOG_WARN(x) Serial.print(x)
+#define LOG_WARNLN(x) Serial.println(x)
+#else
+#define LOG_WARN(x)
+#define LOG_WARNLN(x)
+#endif
+
+#if LOG_LEVEL >= LOG_LEVEL_ERROR
+#define LOG_ERROR(x) Serial.print(x)
+#define LOG_ERRORLN(x) Serial.println(x)
+#else
+#define LOG_ERROR(x)
+#define LOG_ERRORLN(x)
+#endif
+
+// Global service instances (encapsulated access)
+static KISSProtocol& getKISSProtocol() {
+    static KISSProtocol instance;
+    return instance;
+}
+
+// Forward declarations for thread-safe button handling
+extern QueueHandle_t buttonEventQueue;
+void initializeButtonQueue();
+
+static LoRaRadio& getLoRaRadio() {
+    static LoRaRadio instance;
+    return instance;
+}
+
+static ConfigManager& getConfigManager() {
+    static ConfigManager instance;
+    return instance;
+}
+
+static WiFiManager& getWiFiManager() {
+    static WiFiManager instance;
+    return instance;
+}
+
+static GNSSModule& getGNSSModule() {
+    static GNSSModule instance;
+    return instance;
+}
+
+static NMEAServer& getNMEAServer() {
+    static NMEAServer instance;
+    return instance;
+}
+
+// Global references for backward compatibility and cross-dependencies
+KISSProtocol& kiss = getKISSProtocol();
+LoRaRadio& loraRadio = getLoRaRadio();
+ConfigManager& configManager = getConfigManager();
+WiFiManager& wifiManager = getWiFiManager();
+GNSSModule& gnssModule = getGNSSModule();
+NMEAServer& nmeaServer = getNMEAServer();
+
+// Web server needs references to other services
+static TNCWebServer& getWebServer() {
+    static TNCWebServer instance(&getWiFiManager(), &getLoRaRadio(), &getConfigManager());
+    return instance;
+}
+
+static TCPKISSServer& getTCPKISSServer() {
+    static TCPKISSServer instance;
+    return instance;
+}
+
+// Global references for web server and TCP KISS server
+TNCWebServer& webServer = getWebServer();
+TCPKISSServer& tcpKissServer = getTCPKISSServer();
 
 // Buffers
 uint8_t rxBuffer[LORA_BUFFER_SIZE];
 
-void setup() {
-    // Initialize serial
-    Serial.begin(115200);
-    delay(1000);
-    
-    DEBUG_PRINTLN("\n=== LoRaTNCX Debug Mode ===");
-    
-    // Initialize SPIFFS for web server
-    DEBUG_PRINTLN("Initializing SPIFFS...");
+// Error codes for initialization
+enum InitError {
+    INIT_SUCCESS = 0,
+    INIT_BOARD_UNKNOWN = 1,
+    INIT_RADIO_FAILED = 2,
+    INIT_SPIFFS_FAILED = 3,
+    INIT_CONFIG_FAILED = 4,
+    INIT_WIFI_FAILED = 5,
+    INIT_GNSS_FAILED = 6
+};
+
+// Helper functions for setup initialization
+InitError initializeSerial() {
+    Serial.begin(SERIAL_BAUD_RATE);
+    delay(SERIAL_INIT_DELAY);
+    LOG_INFOLN("\n=== LoRaTNCX Starting ===");
+    return INIT_SUCCESS;
+}
+
+InitError initializeFileSystem() {
+    LOG_INFOLN("Initializing SPIFFS...");
     if (!SPIFFS.begin(true)) {
-        DEBUG_PRINTLN("SPIFFS mount failed!");
+        LOG_ERRORLN("SPIFFS mount failed - continuing without web server");
+        return INIT_SPIFFS_FAILED;
     } else {
-        DEBUG_PRINTLN("SPIFFS mounted successfully");
+        LOG_INFOLN("SPIFFS mounted successfully");
+        return INIT_SUCCESS;
     }
-    
+}
+
+InitError initializeHardware() {
     // Initialize board-specific pins
-    DEBUG_PRINTLN("Initializing board pins...");
+    LOG_INFOLN("Initializing board pins...");
     initializeBoardPins();
     
     // Board type check - halt if unknown
     if (BOARD_TYPE == BOARD_UNKNOWN) {
-        DEBUG_PRINTLN("FATAL: Unknown board type!");
-        while (1) {
-            delay(1000);
-        }
+        LOG_ERRORLN("FATAL: Unknown board type - cannot continue");
+        return INIT_BOARD_UNKNOWN;
     }
-    DEBUG_PRINTLN("Board initialized");
+    LOG_INFOLN("Board initialized");
     
     // Initialize display
-    DEBUG_PRINTLN("Initializing display...");
+    LOG_INFOLN("Initializing display...");
     displayManager.begin();
-    DEBUG_PRINTLN("Display initialized");
+    LOG_INFOLN("Display initialized");
+    
+    // Initialize button event queue for thread-safe communication
+    initializeButtonQueue();
     
     // Setup user button interrupt
     pinMode(PIN_USER_BUTTON, INPUT_PULLUP);
@@ -76,30 +180,39 @@ void setup() {
     // Setup PA control (V4 only)
     setupPAControl();
     
+    return INIT_SUCCESS;
+}
+
+InitError initializeConfiguration() {
     // Initialize configuration manager
-    DEBUG_PRINTLN("Initializing config manager...");
-    configManager.begin();
-    
+    LOG_INFOLN("Initializing config manager...");
+    if (!configManager.begin()) {
+        LOG_ERRORLN("Config manager initialization failed - using defaults");
+        return INIT_CONFIG_FAILED;
+    }
+    return INIT_SUCCESS;
+}
+
+InitError initializeRadio() {
     // Initialize LoRa radio first - halt if failed
-    DEBUG_PRINTLN("Initializing radio...");
+    LOG_INFOLN("Initializing radio...");
     int radioState = loraRadio.beginWithState();
     if (radioState != RADIOLIB_ERR_NONE) {
-        DEBUG_PRINT("FATAL: Radio init failed with code: ");
-        DEBUG_PRINTLN(radioState);
-        while (1) {
-            delay(1000);
-        }
+        LOG_ERROR("FATAL: Radio init failed with code: ");
+        LOG_ERRORLN(radioState);
+        LOG_ERRORLN("Cannot continue without radio functionality");
+        return INIT_RADIO_FAILED;
     }
-    DEBUG_PRINTLN("Radio initialized!");
+    LOG_INFOLN("Radio initialized!");
     
     // Now try to load and apply saved configuration
     LoRaConfig savedConfig;
     if (configManager.loadConfig(savedConfig)) {
-        DEBUG_PRINTLN("Applying saved config...");
+        LOG_INFOLN("Applying saved config...");
         loraRadio.applyConfig(savedConfig);
         loraRadio.reconfigure();  // Reconfigure radio with saved settings
     } else {
-        DEBUG_PRINTLN("Using default config");
+        LOG_INFOLN("Using default config");
     }
     
     // Update display with initial radio config
@@ -114,10 +227,14 @@ void setup() {
         currentConfig.syncWord
     );
     
+    return INIT_SUCCESS;
+}
+
+InitError initializeNetworking() {
     // Initialize WiFi manager
-    DEBUG_PRINTLN("Initializing WiFi manager...");
+    LOG_INFOLN("Initializing WiFi manager...");
     if (wifiManager.begin()) {
-        DEBUG_PRINTLN("WiFi manager initialized");
+        LOG_INFOLN("WiFi manager initialized");
         
         // Switch to WiFi startup screen
         displayManager.setScreen(SCREEN_WIFI_STARTUP);
@@ -126,495 +243,565 @@ void setup() {
         
         // Start WiFi with saved/default configuration
         if (wifiManager.start()) {
-            DEBUG_PRINTLN("WiFi started");
+            LOG_INFOLN("WiFi started");
             
             // Wait for WiFi to be ready (either AP started or STA connected)
             // with a timeout of 30 seconds
             unsigned long wifiStartTime = millis();
-            const unsigned long WIFI_TIMEOUT = 30000;  // 30 seconds
+            const unsigned long WIFI_TIMEOUT = WIFI_TIMEOUT_MS;  // 30 seconds
             
             while (!wifiManager.isReady() && (millis() - wifiStartTime < WIFI_TIMEOUT)) {
                 wifiManager.update();
                 displayManager.setWiFiStartupMessage(wifiManager.getStatusMessage());
                 displayManager.update();
-                delay(100);
+                delay(WIFI_INIT_DELAY_MS);
             }
             
             if (wifiManager.isReady()) {
-                DEBUG_PRINTLN("WiFi ready!");
+                LOG_INFOLN("WiFi ready!");
                 
                 // Show WiFi info on display
                 if (wifiManager.isAPActive()) {
-                    DEBUG_PRINT("AP IP: ");
-                    DEBUG_PRINTLN(wifiManager.getAPIPAddress());
+                    LOG_INFO("AP IP: ");
+                    LOG_INFOLN(wifiManager.getAPIPAddress());
                     displayManager.setWiFiStartupMessage("AP: " + wifiManager.getAPIPAddress());
                 }
                 if (wifiManager.isConnected()) {
-                    DEBUG_PRINT("STA IP: ");
-                    DEBUG_PRINTLN(wifiManager.getIPAddress());
+                    LOG_INFO("STA IP: ");
+                    LOG_INFOLN(wifiManager.getIPAddress());
                     displayManager.setWiFiStartupMessage("Connected: " + wifiManager.getIPAddress());
                 }
                 displayManager.update();
-                delay(2000);  // Show WiFi status for 2 seconds
+                delay(WIFI_STATUS_DELAY_MS);  // Show WiFi status for 2 seconds
                 
                 // Start web server
-                DEBUG_PRINTLN("Starting web server...");
+                LOG_INFOLN("Starting web server...");
                 webServer.setGNSS(&gnssModule, &nmeaServer);  // Set GNSS references
                 if (webServer.begin()) {
-                    DEBUG_PRINTLN("Web server started on port 80");
-                    DEBUG_PRINTLN("Access via: http://loratncx.local");
+                    LOG_INFO("Web server started on port " + String(WEB_SERVER_PORT));
+                    LOG_INFOLN("Access via: http://loratncx.local");
                 } else {
-                    DEBUG_PRINTLN("Failed to start web server");
+                    LOG_ERRORLN("Failed to start web server");
                 }
                 
                 // Start TCP KISS server if enabled
                 WiFiConfig wifiConfig;
                 wifiManager.getCurrentConfig(wifiConfig);
                 if (wifiConfig.tcp_kiss_enabled) {
-                    DEBUG_PRINT("Starting TCP KISS server on port ");
-                    DEBUG_PRINTLN(wifiConfig.tcp_kiss_port);
+                    LOG_INFO("Starting TCP KISS server on port ");
+                    LOG_INFOLN(wifiConfig.tcp_kiss_port);
                     if (tcpKissServer.begin(wifiConfig.tcp_kiss_port)) {
-                        DEBUG_PRINTLN("TCP KISS server started");
+                        LOG_INFOLN("TCP KISS server started");
                     } else {
-                        DEBUG_PRINTLN("Failed to start TCP KISS server");
+                        LOG_ERRORLN("Failed to start TCP KISS server");
                     }
-                }
-                
-                // Initialize GNSS if enabled
-                GNSSConfig gnssConfig;
-                if (configManager.loadGNSSConfig(gnssConfig)) {
-                    DEBUG_PRINTLN("Loaded GNSS config from NVS");
-                } else {
-                    DEBUG_PRINTLN("No saved GNSS config, using defaults");
-                    configManager.resetGNSSToDefaults(gnssConfig);
-                }
-                
-                if (gnssConfig.enabled && gnssConfig.pinRX >= 0 && gnssConfig.pinTX >= 0) {
-                    DEBUG_PRINTLN("Initializing GNSS module...");
-                    if (gnssModule.begin(gnssConfig.pinRX, gnssConfig.pinTX, 
-                                        gnssConfig.pinCtrl, gnssConfig.pinWake,
-                                        gnssConfig.pinPPS, gnssConfig.pinRST,
-                                        gnssConfig.baudRate)) {
-                        DEBUG_PRINTLN("GNSS module initialized");
-                        
-                        // Start NMEA TCP server
-                        DEBUG_PRINT("Starting NMEA server on port ");
-                        DEBUG_PRINTLN(gnssConfig.tcpPort);
-                        if (nmeaServer.begin(gnssConfig.tcpPort)) {
-                            DEBUG_PRINTLN("NMEA server started");
-                        } else {
-                            DEBUG_PRINTLN("Failed to start NMEA server");
-                        }
-                    } else {
-                        DEBUG_PRINTLN("Failed to initialize GNSS module");
-                    }
-                } else {
-                    DEBUG_PRINTLN("GNSS disabled or not configured");
                 }
             } else {
-                DEBUG_PRINTLN("WiFi timeout - continuing anyway");
+                LOG_WARNLN("WiFi timeout - continuing anyway");
                 displayManager.setWiFiStartupMessage("WiFi Timeout");
                 displayManager.update();
-                delay(2000);
+                delay(WIFI_STATUS_DELAY_MS);
             }
         } else {
-            DEBUG_PRINTLN("WiFi start failed or disabled");
+            LOG_WARNLN("WiFi start failed or disabled");
             displayManager.setWiFiStartupMessage("WiFi Disabled");
             displayManager.update();
-            delay(2000);
+            delay(WIFI_STATUS_DELAY_MS);
         }
     } else {
-        DEBUG_PRINTLN("WiFi manager init failed");
+        LOG_ERRORLN("WiFi manager init failed - continuing without WiFi");
+        return INIT_WIFI_FAILED;
     }
     
-    DEBUG_PRINTLN("Entering KISS mode (debug enabled)\n");
+    return INIT_SUCCESS;
+}
+
+InitError initializeGNSS() {
+    // Initialize GNSS if enabled
+    GNSSConfig gnssConfig;
+    if (configManager.loadGNSSConfig(gnssConfig)) {
+        LOG_DEBUGLN("Loaded GNSS config from NVS");
+    } else {
+        LOG_DEBUGLN("No saved GNSS config, using defaults");
+        configManager.resetGNSSToDefaults(gnssConfig);
+    }
+    
+    if (gnssConfig.enabled && gnssConfig.pinRX >= 0 && gnssConfig.pinTX >= 0) {
+        LOG_INFOLN("Initializing GNSS module...");
+        if (gnssModule.begin(gnssConfig.pinRX, gnssConfig.pinTX, 
+                            gnssConfig.pinCtrl, gnssConfig.pinWake,
+                            gnssConfig.pinPPS, gnssConfig.pinRST,
+                            gnssConfig.baudRate)) {
+            LOG_INFOLN("GNSS module initialized");
+            
+            // Start NMEA TCP server
+            LOG_INFO("Starting NMEA server on port ");
+            LOG_INFOLN(gnssConfig.tcpPort);
+            if (nmeaServer.begin(gnssConfig.tcpPort)) {
+                LOG_INFOLN("NMEA server started");
+            } else {
+                LOG_ERRORLN("Failed to start NMEA server");
+                return INIT_GNSS_FAILED;
+            }
+        } else {
+            LOG_WARNLN("Failed to initialize GNSS module - continuing without GNSS");
+            return INIT_GNSS_FAILED;
+        }
+    } else {
+        LOG_INFOLN("GNSS disabled or not configured");
+    }
+    
+    return INIT_SUCCESS;
+}
+
+void setup() {
+    InitError error;
+    
+    // Initialize serial first for error reporting
+    error = initializeSerial();
+    if (error != INIT_SUCCESS) {
+        // Serial failed - we're blind, but continue anyway
+    }
+    
+    // Initialize file system (non-critical)
+    error = initializeFileSystem();
+    if (error != INIT_SUCCESS) {
+        LOG_WARNLN("Warning: File system initialization failed - web server disabled");
+    }
+    
+    // Initialize hardware (critical)
+    error = initializeHardware();
+    if (error != INIT_SUCCESS) {
+        LOG_ERROR("Critical error during hardware initialization: ");
+        LOG_ERRORLN(error);
+        LOG_ERRORLN("System cannot continue safely");
+        displayManager.setScreen(SCREEN_STATUS);
+        displayManager.update();
+        // For critical errors, we still halt but with better error indication
+        while (1) {
+            delay(1000);
+        }
+    }
+    
+    // Initialize configuration (non-critical, but affects other systems)
+    error = initializeConfiguration();
+    if (error != INIT_SUCCESS) {
+        LOG_WARNLN("Warning: Configuration system failed - using defaults");
+    }
+    
+    // Initialize radio (critical for TNC functionality)
+    error = initializeRadio();
+    if (error != INIT_SUCCESS) {
+        LOG_ERROR("Critical error during radio initialization: ");
+        LOG_ERRORLN(error);
+        LOG_ERRORLN("TNC functionality disabled - system will still start for configuration");
+        // For radio failure, we continue but with limited functionality
+        // Display error on screen
+        displayManager.setScreen(SCREEN_STATUS);
+        displayManager.update();
+    }
+    
+    // Initialize networking (non-critical)
+    error = initializeNetworking();
+    if (error != INIT_SUCCESS) {
+        LOG_WARNLN("Warning: Networking initialization failed - WiFi features disabled");
+    }
+    
+    // Initialize GNSS (non-critical)
+    error = initializeGNSS();
+    if (error != INIT_SUCCESS) {
+        LOG_WARNLN("Warning: GNSS initialization failed - location features disabled");
+    }
+    
+    LOG_INFOLN("LoRaTNCX ready - entering KISS mode");
     // TNC is now ready and enters KISS mode (silent operation)
 }
 
+// Helper functions for building hardware query response data
+size_t buildRadioConfigData(uint8_t* buffer, uint8_t command) {
+    buffer[0] = command;
+    
+    // Frequency (4 bytes, little-endian float)
+    float freq = loraRadio.getFrequency();
+    memcpy(&buffer[1], &freq, sizeof(float));
+    
+    // Bandwidth (4 bytes, little-endian float)
+    float bw = loraRadio.getBandwidth();
+    memcpy(&buffer[5], &bw, sizeof(float));
+    
+    // Spreading factor (1 byte)
+    buffer[9] = loraRadio.getSpreadingFactor();
+    
+    // Coding rate (1 byte)
+    buffer[10] = loraRadio.getCodingRate();
+    
+    // Output power (1 byte, signed)
+    int8_t pwr = loraRadio.getOutputPower();
+    memcpy(&buffer[11], &pwr, sizeof(int8_t));
+    
+    // Sync word (2 bytes, little-endian)
+    uint16_t sw = loraRadio.getSyncWord();
+    memcpy(&buffer[12], &sw, sizeof(uint16_t));
+    
+    return 14;  // Total size
+}
+
+size_t buildBatteryData(uint8_t* buffer) {
+    buffer[0] = HW_QUERY_BATTERY;
+    
+    float battVoltage = readBatteryVoltage();
+    memcpy(&buffer[1], &battVoltage, sizeof(float));
+    
+    return 5;  // Total size
+}
+
+size_t buildBoardData(uint8_t* buffer) {
+    buffer[0] = HW_QUERY_BOARD;
+    buffer[1] = (uint8_t)BOARD_TYPE;
+    
+    const char* boardName = BOARD_NAME;
+    size_t nameLen = strlen(boardName);
+    memcpy(&buffer[2], boardName, nameLen);
+    
+    return 2 + nameLen;  // Total size
+}
+
+size_t buildGNSSData(uint8_t* buffer) {
+    buffer[0] = HW_QUERY_GNSS;
+    
+    bool gnssEnabled = false;
+    bool hasFix = false;
+    uint8_t satellites = 0;
+    float lat = 0.0, lon = 0.0, alt = 0.0;
+    
+    if (gnssModule.isRunning()) {
+        gnssEnabled = true;
+        hasFix = gnssModule.hasValidFix();
+        satellites = gnssModule.getSatellites();
+        lat = gnssModule.getLatitude();
+        lon = gnssModule.getLongitude();
+        alt = gnssModule.getAltitude();
+    }
+    
+    buffer[1] = gnssEnabled ? 1 : 0;
+    buffer[2] = hasFix ? 1 : 0;
+    buffer[3] = satellites;
+    memcpy(&buffer[4], &lat, sizeof(float));
+    memcpy(&buffer[8], &lon, sizeof(float));
+    memcpy(&buffer[12], &alt, sizeof(float));
+    
+    return 16;  // Total size
+}
+
 void handleHardwareQuery(uint8_t* frame, size_t frameLen) {
-    if (frameLen < 2) return;  // Need at least command and subcommand
+    // Hardware Query Response System:
+    // Processes GETHARDWARE commands from KISS protocol clients.
+    // Provides real-time status information about radio, battery, board, and GNSS.
+    // Each query returns structured data that clients can parse and display.
+    //
+    // Frame format: [CMD_GETHARDWARE][subcommand]
+    // Responses are sent as separate KISS frames with structured data.
     
-    uint8_t subCmd = frame[1];
+    // Input validation - prevent crashes from malformed frames
+    if (frame == nullptr || frameLen < 2 || frameLen > LORA_BUFFER_SIZE) {
+        return;  // Invalid frame or insufficient data
+    }
     
+    uint8_t subCmd = frame[1];  // Extract query type
+    
+    // Process different types of hardware queries
     switch (subCmd) {
         case HW_QUERY_CONFIG:
-            // Send current radio config
-            // Format: HW_QUERY_CONFIG, freq(4 bytes float), bw(4 bytes float), 
-            //         sf(1 byte), cr(1 byte), pwr(1 byte signed), sync(2 bytes)
+            // Return current LoRa radio configuration
+            // Includes frequency, bandwidth, spreading factor, etc.
             {
                 uint8_t config[14];
-                config[0] = HW_QUERY_CONFIG;
-                
-                // Frequency (4 bytes, little-endian float)
-                float freq = loraRadio.getFrequency();
-                memcpy(&config[1], &freq, sizeof(float));
-                
-                // Bandwidth (4 bytes, little-endian float)
-                float bw = loraRadio.getBandwidth();
-                memcpy(&config[5], &bw, sizeof(float));
-                
-                // Spreading factor (1 byte)
-                config[9] = loraRadio.getSpreadingFactor();
-                
-                // Coding rate (1 byte)
-                config[10] = loraRadio.getCodingRate();
-                
-                // Output power (1 byte, signed)
-                int8_t pwr = loraRadio.getOutputPower();
-                memcpy(&config[11], &pwr, sizeof(int8_t));
-                
-                // Sync word (2 bytes, little-endian)
-                uint16_t sw = loraRadio.getSyncWord();
-                memcpy(&config[12], &sw, sizeof(uint16_t));
-                
-                kiss.sendCommand(CMD_GETHARDWARE, config, 14);
+                size_t len = buildRadioConfigData(config, HW_QUERY_CONFIG);
+                kiss.sendCommand(CMD_GETHARDWARE, config, len);
             }
             break;
             
         case HW_QUERY_BATTERY:
-            // Send battery voltage
-            // Format: HW_QUERY_BATTERY, voltage(4 bytes float)
+            // Return battery voltage for power management
+            // Critical for portable/mobile applications
             {
                 uint8_t battData[5];
-                battData[0] = HW_QUERY_BATTERY;
-                
-                float battVoltage = readBatteryVoltage();
-                memcpy(&battData[1], &battVoltage, sizeof(float));
-                
-                kiss.sendCommand(CMD_GETHARDWARE, battData, 5);
+                size_t len = buildBatteryData(battData);
+                kiss.sendCommand(CMD_GETHARDWARE, battData, len);
             }
             break;
             
         case HW_QUERY_BOARD:
-            // Send board information
-            // Format: HW_QUERY_BOARD, board_type(1 byte), board_name(string)
+            // Return board identification and capabilities
+            // Helps clients understand hardware features available
             {
-                const char* boardName = BOARD_NAME;
-                size_t nameLen = strlen(boardName);
                 uint8_t boardData[32];  // Max 32 bytes for board info
-                
-                boardData[0] = HW_QUERY_BOARD;
-                boardData[1] = (uint8_t)BOARD_TYPE;
-                memcpy(&boardData[2], boardName, nameLen);
-                
-                kiss.sendCommand(CMD_GETHARDWARE, boardData, 2 + nameLen);
+                size_t len = buildBoardData(boardData);
+                kiss.sendCommand(CMD_GETHARDWARE, boardData, len);
             }
             break;
             
         case HW_QUERY_GNSS:
-            // Send GNSS status and configuration
-            // Format: HW_QUERY_GNSS, enabled(1 byte), has_fix(1 byte), satellites(1 byte), 
-            //         latitude(4 bytes float), longitude(4 bytes float), altitude(4 bytes float)
+            // Return GNSS receiver status and position data
+            // Includes fix status, coordinates, satellite count
             {
                 uint8_t gnssData[18];
-                gnssData[0] = HW_QUERY_GNSS;
-                
-                bool gnssEnabled = false;
-                bool hasFix = false;
-                uint8_t satellites = 0;
-                float lat = 0.0, lon = 0.0, alt = 0.0;
-                
-                if (gnssModule.isRunning()) {
-                    gnssEnabled = true;
-                    hasFix = gnssModule.hasValidFix();
-                    satellites = gnssModule.getSatellites();
-                    lat = gnssModule.getLatitude();
-                    lon = gnssModule.getLongitude();
-                    alt = gnssModule.getAltitude();
-                }
-                
-                gnssData[1] = gnssEnabled ? 1 : 0;
-                gnssData[2] = hasFix ? 1 : 0;
-                gnssData[3] = satellites;
-                memcpy(&gnssData[4], &lat, sizeof(float));
-                memcpy(&gnssData[8], &lon, sizeof(float));
-                memcpy(&gnssData[12], &alt, sizeof(float));
-                
-                kiss.sendCommand(CMD_GETHARDWARE, gnssData, 16);
+                size_t len = buildGNSSData(gnssData);
+                kiss.sendCommand(CMD_GETHARDWARE, gnssData, len);
             }
             break;
             
         case HW_QUERY_ALL:
-            // Send all information: config, battery, board, and gnss
-            // We'll send them as separate responses for simplicity
+            // Return all available information in sequence
+            // Multiple KISS frames sent - client must handle sequence
+            // Useful for initial status synchronization
             {
-                // Radio config
+                // Radio configuration first
                 uint8_t config[14];
-                config[0] = HW_QUERY_CONFIG;
-                float freq = loraRadio.getFrequency();
-                memcpy(&config[1], &freq, sizeof(float));
-                float bw = loraRadio.getBandwidth();
-                memcpy(&config[5], &bw, sizeof(float));
-                config[9] = loraRadio.getSpreadingFactor();
-                config[10] = loraRadio.getCodingRate();
-                int8_t pwr = loraRadio.getOutputPower();
-                memcpy(&config[11], &pwr, sizeof(int8_t));
-                uint16_t sw = loraRadio.getSyncWord();
-                memcpy(&config[12], &sw, sizeof(uint16_t));
-                kiss.sendCommand(CMD_GETHARDWARE, config, 14);
+                size_t len = buildRadioConfigData(config, HW_QUERY_CONFIG);
+                kiss.sendCommand(CMD_GETHARDWARE, config, len);
                 
-                // Battery voltage
+                // Battery status
                 uint8_t battData[5];
-                battData[0] = HW_QUERY_BATTERY;
-                float battVoltage = readBatteryVoltage();
-                memcpy(&battData[1], &battVoltage, sizeof(float));
-                kiss.sendCommand(CMD_GETHARDWARE, battData, 5);
+                len = buildBatteryData(battData);
+                kiss.sendCommand(CMD_GETHARDWARE, battData, len);
                 
-                // Board info
-                const char* boardName = BOARD_NAME;
-                size_t nameLen = strlen(boardName);
+                // Board information
                 uint8_t boardData[32];
-                boardData[0] = HW_QUERY_BOARD;
-                boardData[1] = (uint8_t)BOARD_TYPE;
-                memcpy(&boardData[2], boardName, nameLen);
-                kiss.sendCommand(CMD_GETHARDWARE, boardData, 2 + nameLen);
+                len = buildBoardData(boardData);
+                kiss.sendCommand(CMD_GETHARDWARE, boardData, len);
                 
-                // GNSS status
+                // GNSS status and position
                 uint8_t gnssData[18];
-                gnssData[0] = HW_QUERY_GNSS;
-                bool gnssEnabled = false;
-                bool hasFix = false;
-                uint8_t satellites = 0;
-                float lat = 0.0, lon = 0.0, alt = 0.0;
-                
-                if (gnssModule.isRunning()) {
-                    gnssEnabled = true;
-                    hasFix = gnssModule.hasValidFix();
-                    satellites = gnssModule.getSatellites();
-                    lat = gnssModule.getLatitude();
-                    lon = gnssModule.getLongitude();
-                    alt = gnssModule.getAltitude();
-                }
-                
-                gnssData[1] = gnssEnabled ? 1 : 0;
-                gnssData[2] = hasFix ? 1 : 0;
-                gnssData[3] = satellites;
-                memcpy(&gnssData[4], &lat, sizeof(float));
-                memcpy(&gnssData[8], &lon, sizeof(float));
-                memcpy(&gnssData[12], &alt, sizeof(float));
-                kiss.sendCommand(CMD_GETHARDWARE, gnssData, 16);
+                len = buildGNSSData(gnssData);
+                kiss.sendCommand(CMD_GETHARDWARE, gnssData, len);
             }
             break;
+            
+        default:
+            // Invalid query type - ignore silently
+            return;
     }
 }
 
+static void handleFrequencyConfig(uint8_t* frame, size_t frameLen, bool& needsReconfig) {
+    if (frameLen >= 6) {  // Command + subcommand + 4 bytes for float
+        float freq;
+        memcpy(&freq, &frame[2], sizeof(float));
+        if (freq >= RADIO_FREQ_MIN && freq <= RADIO_FREQ_MAX) {  // SX1262 range
+            loraRadio.setFrequency(freq);
+            needsReconfig = true;
+        }
+    }
+}
+
+static void handleBandwidthConfig(uint8_t* frame, size_t frameLen, bool& needsReconfig) {
+    if (frameLen >= 3) {
+        uint8_t bwIdx = frame[2];
+        // Validate bandwidth index (0=125kHz, 1=250kHz, 2=500kHz)
+        if (bwIdx <= 2) {
+            float bw = 125.0;
+            if (bwIdx == 1) bw = 250.0;
+            else if (bwIdx == 2) bw = 500.0;
+            loraRadio.setBandwidth(bw);
+            needsReconfig = true;
+        }
+    }
+}
+
+static void handleSpreadingFactorConfig(uint8_t* frame, size_t frameLen, bool& needsReconfig) {
+    if (frameLen >= 3) {
+        uint8_t sf = frame[2];
+        if (sf >= RADIO_SF_MIN && sf <= RADIO_SF_MAX) {
+            loraRadio.setSpreadingFactor(sf);
+            needsReconfig = true;
+        }
+    }
+}
+
+static void handleCodingRateConfig(uint8_t* frame, size_t frameLen, bool& needsReconfig) {
+    if (frameLen >= 3) {
+        uint8_t cr = frame[2];
+        if (cr >= RADIO_CR_MIN && cr <= RADIO_CR_MAX) {
+            loraRadio.setCodingRate(cr);
+            needsReconfig = true;
+        }
+    }
+}
+
+static void handlePowerConfig(uint8_t* frame, size_t frameLen, bool& needsReconfig) {
+    if (frameLen >= 3) {
+        int8_t power = (int8_t)frame[2];
+        if (power >= RADIO_POWER_MIN && power <= RADIO_POWER_MAX) {  // SX1262 range
+            loraRadio.setOutputPower(power);
+            needsReconfig = true;
+        }
+    }
+}
+
+static void handleSyncWordConfig(uint8_t* frame, size_t frameLen, bool& needsReconfig) {
+    if (frameLen >= 4) {  // Command + subcommand + 2 bytes for sync word
+        uint16_t sw;
+        memcpy(&sw, &frame[2], sizeof(uint16_t));
+        // Validate sync word range (allow full 16-bit range for SX126x)
+        if (sw >= RADIO_SYNCWORD_MIN && sw <= RADIO_SYNCWORD_MAX) {
+            loraRadio.setSyncWord(sw);
+            needsReconfig = true;
+        }
+    }
+}
+
+static void handleGNSSConfig(uint8_t* frame, size_t frameLen) {
+    if (frameLen >= 3) {
+        uint8_t enableByte = frame[2];
+        // Validate enable value (must be 0 or 1)
+        if (enableByte <= 1) {
+            bool enable = (enableByte != 0);
+            GNSSConfig gnssConfig;
+            if (configManager.loadGNSSConfig(gnssConfig)) {
+                gnssConfig.enabled = enable;
+                configManager.saveGNSSConfig(gnssConfig);
+                
+                if (enable) {
+                    gnssModule.powerOn();
+                } else {
+                    gnssModule.powerOff();
+                }
+                
+                // Display will be updated in main loop
+            }
+        }
+    }
+}
+
+static void handleGetConfig() {
+    // Send current config back via KISS
+    uint8_t config[14];
+    size_t len = buildRadioConfigData(config, HW_GET_CONFIG);
+    kiss.sendCommand(CMD_SETHARDWARE, config, len);
+}
+
+static void handleSaveConfig() {
+    // Save current configuration to NVS
+    LoRaConfig currentConfig;
+    loraRadio.getCurrentConfig(currentConfig);
+    configManager.saveConfig(currentConfig);
+}
+
+static void handleResetConfig(bool& needsReconfig) {
+    loraRadio.setFrequency(LORA_FREQUENCY);
+    loraRadio.setBandwidth(LORA_BANDWIDTH);
+    loraRadio.setSpreadingFactor(LORA_SPREADING);
+    loraRadio.setCodingRate(LORA_CODINGRATE);
+    loraRadio.setOutputPower(LORA_POWER);
+    loraRadio.setSyncWord(LORA_SYNCWORD);
+    needsReconfig = true;
+    // Also clear saved config from NVS
+    configManager.clearConfig();
+}
+
 void handleHardwareConfig(uint8_t* frame, size_t frameLen) {
-    if (frameLen < 2) return;  // Need at least command and subcommand
+    // Hardware Configuration Command Processor:
+    // Processes SETHARDWARE commands from KISS protocol clients.
+    // These commands allow remote configuration of LoRa radio parameters.
+    //
+    // Frame format: [CMD_SETHARDWARE][subcommand][parameters...]
+    // Subcommands control different radio parameters and system features.
+    // Some commands require radio reconfiguration (frequency, modulation parameters).
     
-    uint8_t subCmd = frame[1];
-    bool needsReconfig = false;
+    // Input validation - prevent buffer overflows and null pointer issues
+    if (frame == nullptr || frameLen < 2 || frameLen > LORA_BUFFER_SIZE) {
+        return;  // Invalid frame or insufficient data
+    }
     
+    uint8_t subCmd = frame[1];  // Extract subcommand from frame
+    bool needsReconfig = false; // Track if radio needs reconfiguration after parameter changes
+    
+    // Dispatch to appropriate handler based on subcommand
+    // Each handler validates parameters and updates radio configuration
     switch (subCmd) {
         case HW_SET_FREQUENCY:
-            if (frameLen >= 6) {  // Command + subcommand + 4 bytes for float
-                float freq;
-                memcpy(&freq, &frame[2], sizeof(float));
-                if (freq >= 150.0 && freq <= 960.0) {  // SX1262 range
-                    loraRadio.setFrequency(freq);
-                    needsReconfig = true;
-                }
-            }
+            // Set carrier frequency (433/868/915 MHz bands)
+            handleFrequencyConfig(frame, frameLen, needsReconfig);
             break;
             
         case HW_SET_BANDWIDTH:
-            if (frameLen >= 3) {
-                uint8_t bwIdx = frame[2];
-                float bw = 125.0;
-                if (bwIdx == 0) bw = 125.0;
-                else if (bwIdx == 1) bw = 250.0;
-                else if (bwIdx == 2) bw = 500.0;
-                loraRadio.setBandwidth(bw);
-                needsReconfig = true;
-            }
+            // Set signal bandwidth (125/250/500 kHz)
+            // Affects data rate and receiver sensitivity
+            handleBandwidthConfig(frame, frameLen, needsReconfig);
             break;
             
         case HW_SET_SPREADING:
-            if (frameLen >= 3) {
-                uint8_t sf = frame[2];
-                if (sf >= 7 && sf <= 12) {
-                    loraRadio.setSpreadingFactor(sf);
-                    needsReconfig = true;
-                }
-            }
+            // Set spreading factor (6-12)
+            // Higher SF = longer range, lower data rate
+            handleSpreadingFactorConfig(frame, frameLen, needsReconfig);
             break;
             
         case HW_SET_CODINGRATE:
-            if (frameLen >= 3) {
-                uint8_t cr = frame[2];
-                if (cr >= 5 && cr <= 8) {
-                    loraRadio.setCodingRate(cr);
-                    needsReconfig = true;
-                }
-            }
+            // Set forward error correction coding rate (5-8)
+            // Higher CR = better error correction, lower data rate
+            handleCodingRateConfig(frame, frameLen, needsReconfig);
             break;
             
         case HW_SET_POWER:
-            if (frameLen >= 3) {
-                int8_t power = (int8_t)frame[2];
-                if (power >= -9 && power <= 22) {  // SX1262 range
-                    loraRadio.setOutputPower(power);
-                    needsReconfig = true;
-                }
-            }
+            // Set transmit power (-9 to +22 dBm)
+            // Must stay within regulatory limits for the band
+            handlePowerConfig(frame, frameLen, needsReconfig);
             break;
             
         case HW_SET_SYNCWORD:
-            if (frameLen >= 4) {  // Command + subcommand + 2 bytes for sync word
-                uint16_t sw;
-                memcpy(&sw, &frame[2], sizeof(uint16_t));
-                loraRadio.setSyncWord(sw);
-                needsReconfig = true;
-            }
+            // Set synchronization word for network identification
+            // Allows multiple networks to coexist on same frequency
+            handleSyncWordConfig(frame, frameLen, needsReconfig);
             break;
             
         case HW_SET_GNSS_ENABLE:
-            if (frameLen >= 3) {
-                bool enable = (frame[2] != 0);
-                GNSSConfig gnssConfig;
-                if (configManager.loadGNSSConfig(gnssConfig)) {
-                    gnssConfig.enabled = enable;
-                    configManager.saveGNSSConfig(gnssConfig);
-                    
-                    if (enable) {
-                        gnssModule.powerOn();
-                    } else {
-                        gnssModule.powerOff();
-                    }
-                    
-                    // Display will be updated in main loop
-                }
-            }
+            // Enable/disable GNSS receiver and NMEA serial passthrough
+            // GNSS provides position data for APRS applications
+            handleGNSSConfig(frame, frameLen);
             break;
             
         case HW_GET_CONFIG:
-            // Send current config back via KISS
-            // Format: HW_GET_CONFIG, freq(4 bytes float), bw(4 bytes float), 
-            //         sf(1 byte), cr(1 byte), pwr(1 byte signed), sync(2 bytes)
-            {
-                uint8_t config[14];
-                config[0] = HW_GET_CONFIG;
-                
-                // Frequency (4 bytes, little-endian float)
-                float freq = loraRadio.getFrequency();
-                memcpy(&config[1], &freq, sizeof(float));
-                
-                // Bandwidth (4 bytes, little-endian float)
-                float bw = loraRadio.getBandwidth();
-                memcpy(&config[5], &bw, sizeof(float));
-                
-                // Spreading factor (1 byte)
-                config[9] = loraRadio.getSpreadingFactor();
-                
-                // Coding rate (1 byte)
-                config[10] = loraRadio.getCodingRate();
-                
-                // Output power (1 byte, signed)
-                int8_t pwr = loraRadio.getOutputPower();
-                memcpy(&config[11], &pwr, sizeof(int8_t));
-                
-                // Sync word (2 bytes, little-endian)
-                uint16_t sw = loraRadio.getSyncWord();
-                memcpy(&config[12], &sw, sizeof(uint16_t));
-                
-                kiss.sendCommand(CMD_SETHARDWARE, config, 14);
-            }
+            // Request current radio configuration parameters
+            // Client can query current settings
+            handleGetConfig();
             break;
             
         case HW_SAVE_CONFIG:
-            // Save current configuration to NVS
-            {
-                LoRaConfig currentConfig;
-                loraRadio.getCurrentConfig(currentConfig);
-                configManager.saveConfig(currentConfig);
-            }
+            // Save current configuration to non-volatile storage
+            // Settings persist across power cycles
+            handleSaveConfig();
             break;
             
         case HW_RESET_CONFIG:
-            loraRadio.setFrequency(LORA_FREQUENCY);
-            loraRadio.setBandwidth(LORA_BANDWIDTH);
-            loraRadio.setSpreadingFactor(LORA_SPREADING);
-            loraRadio.setCodingRate(LORA_CODINGRATE);
-            loraRadio.setOutputPower(LORA_POWER);
-            loraRadio.setSyncWord(LORA_SYNCWORD);
-            needsReconfig = true;
-            // Also clear saved config from NVS
-            configManager.clearConfig();
+            // Reset to factory default configuration
+            // Clears any saved custom settings
+            handleResetConfig(needsReconfig);
             break;
+            
+        default:
+            // Invalid subcommand - ignore silently for compatibility
+            return;
     }
     
+    // Apply configuration changes to radio hardware if needed
+    // Reconfiguration is required for frequency and modulation parameters
     if (needsReconfig) {
         loraRadio.reconfigure();
     }
 }
 
-void loop() {
-    // Update WiFi manager
-    wifiManager.update();
-    
-    // Update web server
-    webServer.update();
-    
-    // Update TCP KISS server
-    tcpKissServer.update();
-    
-    // Update GNSS module
-    static bool gnssSerialPassthroughEnabled = false;
-    static uint32_t lastPassthroughConfigCheck = 0;
-    static uint32_t lastGNSSDebug = 0;
-    
-    // Check passthrough config every 5 seconds instead of every sentence
-    if (millis() - lastPassthroughConfigCheck >= 5000) {
-        GNSSConfig gnssConfig;
-        if (configManager.loadGNSSConfig(gnssConfig)) {
-            gnssSerialPassthroughEnabled = gnssConfig.serialPassthrough;
-        }
-        lastPassthroughConfigCheck = millis();
-    }
-    
-    if (gnssModule.isRunning()) {
-        gnssModule.update();
-        
-        // Check if we have an NMEA sentence ready
-        if (gnssModule.hasNMEASentence()) {
-            const char* sentence = gnssModule.getNMEASentence();
-            if (sentence) {
-                // Forward to TCP clients if available
-                if (nmeaServer.hasClients()) {
-                    nmeaServer.sendNMEA(sentence);
-                }
-                
-                // Forward to USB serial if passthrough is enabled
-                // NMEA sentences need CR+LF line ending
-                if (gnssSerialPassthroughEnabled) {
-                    Serial.print(sentence);
-                    Serial.print("\r\n");
-                }
-            }
-            gnssModule.clearNMEASentence();
-        }
-        
-        // Update NMEA server
-        nmeaServer.update();
-    }
-    
-    // Handle button press
-    if (buttonPressed) {
-        buttonPressed = false;
-        displayManager.handleButtonPress();
-    }
-    
-    // Update display
-    displayManager.update();
-    
-    // Update battery voltage periodically (every 10 seconds when not on boot screen)
+// Helper functions for periodic updates
+static void updateBatteryVoltage() {
     static uint32_t lastBatteryUpdate = 0;
     if (!displayManager.isBootScreenActive() && millis() - lastBatteryUpdate >= 10000) {
         float battVoltage = readBatteryVoltage();
         displayManager.setBatteryVoltage(battVoltage);
         lastBatteryUpdate = millis();
     }
-    
-    // Update WiFi status periodically (every 5 seconds when not on boot screen)
+}
+
+static void updateWiFiStatus() {
     static uint32_t lastWiFiUpdate = 0;
     if (!displayManager.isBootScreenActive() && millis() - lastWiFiUpdate >= 5000) {
         bool apActive = wifiManager.isAPActive();
@@ -625,8 +812,9 @@ void loop() {
         displayManager.setWiFiStatus(apActive, staConnected, apIP, staIP, rssi);
         lastWiFiUpdate = millis();
     }
-    
-    // Update GNSS status periodically (every 2 seconds when not on boot screen)
+}
+
+static void updateGNSSStatus() {
     static uint32_t lastGNSSUpdate = 0;
     if (!displayManager.isBootScreenActive() && millis() - lastGNSSUpdate >= 2000) {
         if (gnssModule.isRunning()) {
@@ -641,27 +829,84 @@ void loop() {
         }
         lastGNSSUpdate = millis();
     }
+}
+
+static void updateGNSSData() {
+    static bool gnssSerialPassthroughEnabled = false;
+    static uint32_t lastPassthroughConfigCheck = 0;
+    static uint32_t lastGNSSDebug = 0;
+
+    // Check passthrough config every 5 seconds instead of every sentence
+    if (millis() - lastPassthroughConfigCheck >= 5000) {
+        GNSSConfig gnssConfig;
+        if (configManager.loadGNSSConfig(gnssConfig)) {
+            gnssSerialPassthroughEnabled = gnssConfig.serialPassthrough;
+        }
+        lastPassthroughConfigCheck = millis();
+    }
+
+    if (gnssModule.isRunning()) {
+        gnssModule.update();
+
+        // Check if we have an NMEA sentence ready
+        if (gnssModule.hasNMEASentence()) {
+            const char* sentence = gnssModule.getNMEASentence();
+            if (sentence) {
+                // Forward to TCP clients if available
+                if (nmeaServer.hasClients()) {
+                    nmeaServer.sendNMEA(sentence);
+                }
+
+                // Forward to USB serial if passthrough is enabled
+                // NMEA sentences need CR+LF line ending
+                if (gnssSerialPassthroughEnabled) {
+                    Serial.print(sentence);
+                    Serial.print("\r\n");
+                }
+            }
+            gnssModule.clearNMEASentence();
+        }
+
+        // Update NMEA server
+        nmeaServer.update();
+    }
+}
+
+static void processKISSFrames() {
+    // Main KISS Protocol Processing Loop:
+    // This function bridges serial communication with LoRa radio operation.
+    // It processes incoming KISS frames from host applications and dispatches
+    // them to appropriate handlers for data transmission or configuration.
+    //
+    // The system supports three main frame types:
+    // 1. DATA frames: User data to be transmitted over LoRa
+    // 2. SETHARDWARE frames: Configuration commands for radio parameters
+    // 3. GETHARDWARE frames: Status queries for system information
     
-    // Process incoming serial data (KISS frames from host)
+    // Process all available serial data into KISS frame buffer
+    // Serial data arrives asynchronously, so we process it in chunks
     while (Serial.available() > 0) {
         uint8_t byte = Serial.read();
         kiss.processSerialByte(byte);
     }
-    
-    // Check if we have a complete KISS frame
+
+    // Check if we have a complete KISS frame ready for processing
     if (kiss.hasFrame()) {
         uint8_t* frame = kiss.getFrame();
         size_t frameLen = kiss.getFrameLength();
-        
+
         if (frameLen > 0) {
-            // First byte is the command
+            // Extract command from first byte (lower 4 bits)
             uint8_t cmd = frame[0] & 0x0F;
-            
+
             if (cmd == CMD_SETHARDWARE && frameLen > 1) {
-                // Handle hardware configuration
+                // Hardware Configuration Frame:
+                // Contains radio parameter settings from client application
+                // Updates LoRa radio configuration and refreshes display
                 handleHardwareConfig(frame, frameLen);
-                
-                // Update display with new config
+
+                // Update OLED display with new radio parameters
+                // Ensures user sees current configuration on device
                 LoRaConfig currentConfig;
                 loraRadio.getCurrentConfig(currentConfig);
                 displayManager.setRadioConfig(
@@ -674,39 +919,57 @@ void loop() {
                 );
             }
             else if (cmd == CMD_GETHARDWARE && frameLen > 1) {
-                // Handle hardware query
+                // Hardware Query Frame:
+                // Client requesting status information (config, battery, GNSS, etc.)
+                // Responses sent as separate KISS frames with structured data
                 handleHardwareQuery(frame, frameLen);
             }
             else if (cmd == CMD_DATA && frameLen > 1) {
-                // Transmit data frame (skip command byte at frame[0])
+                // Data Transmission Frame:
+                // Contains user data payload to be transmitted over LoRa
+                // Skip command byte and transmit remaining data
                 if (frameLen - 1 <= LORA_BUFFER_SIZE) {
                     loraRadio.transmit(frame + 1, frameLen - 1);
                 }
+                // Silently drop oversized frames to prevent buffer issues
             }
+            // Other command types (TXDELAY, etc.) handled in KISS layer
         }
-        
+
+        // Clear frame buffer for next frame processing
         kiss.clearFrame();
     }
+}
+
+static void processReceivedPackets() {
+    // LoRa Packet Reception and Distribution:
+    // This function handles the reverse data flow - from LoRa radio to clients.
+    // Received packets are distributed to both serial KISS clients and TCP KISS clients.
+    // The system supports multiple simultaneous client types for maximum flexibility.
     
-    // Check for received LoRa packets
+    // Check for received LoRa packets (non-blocking)
     size_t rxLen = 0;
     if (loraRadio.receive(rxBuffer, &rxLen)) {
         if (rxLen > 0) {
-            // Send received packet to host via KISS (serial)
+            // Send received packet to serial KISS client (host application)
+            // This is the primary interface for most KISS-compatible software
             kiss.sendFrame(rxBuffer, rxLen);
-            
-            // Also send to TCP KISS clients if any are connected
+
+            // Also distribute to TCP KISS clients if any are connected
+            // TCP clients get the same data but with full KISS framing
             if (tcpKissServer.hasClients()) {
-                // Build KISS frame for TCP clients
-                uint8_t tcpFrame[LORA_BUFFER_SIZE + 10];  // Extra space for KISS framing
+                // Build complete KISS frame for TCP transmission
+                // TCP framing includes FEND delimiters and command byte
+                uint8_t tcpFrame[LORA_BUFFER_SIZE + 10];  // Extra space for framing
                 size_t tcpFrameLen = 0;
-                
-                // FEND
+
+                // Start KISS frame with FEND delimiter
                 tcpFrame[tcpFrameLen++] = FEND;
-                // Command (port 0, data frame)
+                // Add command byte (data frame, port 0)
                 tcpFrame[tcpFrameLen++] = CMD_DATA;
-                
-                // Escape and add data
+
+                // Apply KISS byte stuffing to the received data
+                // Must escape any FEND or FESC characters in the payload
                 for (size_t i = 0; i < rxLen; i++) {
                     if (rxBuffer[i] == FEND) {
                         tcpFrame[tcpFrameLen++] = FESC;
@@ -718,16 +981,50 @@ void loop() {
                         tcpFrame[tcpFrameLen++] = rxBuffer[i];
                     }
                 }
-                
+
                 // FEND
                 tcpFrame[tcpFrameLen++] = FEND;
-                
+
                 // Send to all TCP clients
                 tcpKissServer.sendKISSFrame(tcpFrame, tcpFrameLen);
             }
         }
     }
+}
+
+void loop() {
+    // Update WiFi manager
+    wifiManager.update();
     
-    // Small delay to prevent tight looping
-    delay(1);
+    // Update web server
+    webServer.update();
+    
+    // Update TCP KISS server
+    tcpKissServer.update();
+    
+    // Update GNSS module and handle NMEA data
+    updateGNSSData();
+    
+    // Handle button press events from queue
+    bool buttonEvent;
+    while (xQueueReceive(buttonEventQueue, &buttonEvent, 0) == pdTRUE) {
+        displayManager.handleButtonPress();
+    }
+    
+    // Update display
+    displayManager.update();
+    
+    // Update periodic status information
+    updateBatteryVoltage();
+    updateWiFiStatus();
+    updateGNSSStatus();
+    
+    // Process KISS frames from serial
+    processKISSFrames();
+    
+    // Process received LoRa packets
+    processReceivedPackets();
+    
+    // Yield to allow other tasks and prevent watchdog resets
+    yield();
 }
