@@ -59,19 +59,19 @@ void initializeBoardPins() {
 float readBatteryVoltage() {
 #ifdef PIN_ADC_BATTERY
     // ADC resolution
-    const int resolution = 12;
+    const int resolution = ADC_RESOLUTION;
     const int adcMax = pow(2, resolution) - 1;  // 4095
     // Use 2.5dB attenuation for better accuracy in the 0.8-1.0V range
     // ADC_2_5db: 0-1.5V range (better resolution for our battery divider voltage)
-    const float adcMaxVoltage = 1.5;
+    const float adcMaxVoltage = ADC_MAX_VOLTAGE;
     
     // On-board voltage divider
-    const int R1 = 390;  // 390k ohm
-    const int R2 = 100;  // 100k ohm
+    const int R1 = BATTERY_R1;  // 390k ohm
+    const int R2 = BATTERY_R2;  // 100k ohm
     
     // Calibration measurements (measure your actual battery voltage with multimeter)
-    const float measuredVoltage = 4.2;    // Actual battery voltage
-    const float reportedVoltage = 4.875;  // What the ADC reports with 2.5dB attenuation
+    const float measuredVoltage = BATTERY_CAL_VOLTAGE;    // Actual battery voltage
+    const float reportedVoltage = BATTERY_CAL_REPORTED;  // What the ADC reports with 2.5dB attenuation
     
     // Calculate calibration factor
     const float factor = (adcMaxVoltage / adcMax) * ((R1 + R2) / (float)R2) * (measuredVoltage / reportedVoltage);
@@ -93,7 +93,7 @@ float readBatteryVoltage() {
 #endif
     
     // Wait for circuit to stabilize
-    delay(100);
+    delay(ADC_STABILIZE_DELAY);
     
     // Read ADC value
     int analogValue = analogRead(PIN_ADC_BATTERY);

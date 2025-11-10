@@ -12,61 +12,103 @@ LoRaRadio::LoRaRadio()
     instance = this;
 }
 
+LoRaRadio::~LoRaRadio() {
+    cleanup();
+}
+
+void LoRaRadio::cleanup() {
+    // Clean up in reverse order of allocation
+    if (radio) {
+        delete radio;
+        radio = nullptr;
+    }
+    if (module) {
+        delete module;
+        module = nullptr;
+    }
+    if (spi) {
+        delete spi;
+        spi = nullptr;
+    }
+}
+
 bool LoRaRadio::begin() {
     return (beginWithState() == RADIOLIB_ERR_NONE);
 }
 
 int LoRaRadio::beginWithState() {
+    // Clean up any existing allocations first
+    cleanup();
+    
     // Create SPI instance
     spi = new SPIClass(HSPI);
+    if (!spi) {
+        return RADIOLIB_ERR_MEMORY_ALLOCATION_FAILED;
+    }
     spi->begin(RADIO_SCLK_PIN, RADIO_MISO_PIN, RADIO_MOSI_PIN, RADIO_CS_PIN);
     
     // Create module
     module = new Module(RADIO_CS_PIN, RADIO_DIO1_PIN, RADIO_RST_PIN, RADIO_BUSY_PIN, *spi);
+    if (!module) {
+        cleanup();  // Clean up SPI
+        return RADIOLIB_ERR_MEMORY_ALLOCATION_FAILED;
+    }
     
     // Create radio instance
     radio = new SX1262(module);
+    if (!radio) {
+        cleanup();  // Clean up SPI and module
+        return RADIOLIB_ERR_MEMORY_ALLOCATION_FAILED;
+    }
     
     // Try with more conservative parameters first
     int state = radio->begin();
     
     if (state != RADIOLIB_ERR_NONE) {
+        cleanup();  // Clean up all allocations
         return state;
     }
     
     // Now configure parameters one by one
     state = radio->setFrequency(frequency);
     if (state != RADIOLIB_ERR_NONE) {
+        cleanup();  // Clean up all allocations
         return state;
     }
     
     state = radio->setBandwidth(bandwidth);
     if (state != RADIOLIB_ERR_NONE) {
+        cleanup();  // Clean up all allocations
         return state;
     }
     
     state = radio->setSpreadingFactor(spreadingFactor);
     if (state != RADIOLIB_ERR_NONE) {
+        cleanup();  // Clean up all allocations
         return state;
     }
     
     state = radio->setCodingRate(codingRate);
     if (state != RADIOLIB_ERR_NONE) {
+        cleanup();  // Clean up all allocations
         return state;
     }
     
     state = radio->setSyncWord(syncWord);
     if (state != RADIOLIB_ERR_NONE) {
+        cleanup();  // Clean up all allocations
         return state;
     }
     
     state = radio->setOutputPower(outputPower);
     if (state != RADIOLIB_ERR_NONE) {
+        cleanup();  // Clean up all allocations
         return state;
     }
     
     state = radio->setPreambleLength(LORA_PREAMBLE);
     if (state != RADIOLIB_ERR_NONE) {
+        cleanup();  // Clean up all allocations
         return state;
     }
     
@@ -76,6 +118,7 @@ int LoRaRadio::beginWithState() {
     // Start receiving
     state = radio->startReceive();
     if (state != RADIOLIB_ERR_NONE) {
+        cleanup();  // Clean up all allocations
         return state;
     }
     
@@ -83,8 +126,8 @@ int LoRaRadio::beginWithState() {
 }
 
 bool LoRaRadio::transmit(const uint8_t* data, size_t length) {
-    if (transmitting) {
-        return false; // Already transmitting
+    if (!isInitialized() || transmitting) {
+        return false; // Not initialized or already transmitting
     }
     
     transmitting = true;
@@ -110,6 +153,9 @@ bool LoRaRadio::transmit(const uint8_t* data, size_t length) {
 }
 
 bool LoRaRadio::receive(uint8_t* buffer, size_t* length) {
+    if (!isInitialized()) {
+        return false; // Not initialized
+    }
     // Deaf period after transmit to avoid hearing our own transmission
     // Configurable via DEAF_PERIOD_MS in config.h (set to 0 to disable)
     #if DEAF_PERIOD_MS > 0
@@ -180,6 +226,9 @@ void LoRaRadio::setOutputPower(int8_t power) {
 }
 
 void LoRaRadio::reconfigure() {
+    if (!isInitialized()) {
+        return; // Not initialized
+    }
     // Stop receiving
     radio->standby();
     
@@ -239,10 +288,16 @@ bool LoRaRadio::isTransmitting() {
 }
 
 int16_t LoRaRadio::getRSSI() {
+    if (!isInitialized()) {
+        return 0; // Not initialized
+    }
     return radio->getRSSI();
 }
 
 float LoRaRadio::getSNR() {
+    if (!isInitialized()) {
+        return 0.0f; // Not initialized
+    }
     return radio->getSNR();
 }
 

@@ -51,6 +51,18 @@
 #define LORA_POWER          20       // dBm
 #define LORA_PREAMBLE       8        // symbols
 
+// Radio Parameter Validation Ranges
+#define RADIO_FREQ_MIN              150.0f
+#define RADIO_FREQ_MAX              960.0f
+#define RADIO_SF_MIN                7
+#define RADIO_SF_MAX                12
+#define RADIO_CR_MIN                5
+#define RADIO_CR_MAX                8
+#define RADIO_POWER_MIN             -9
+#define RADIO_POWER_MAX             22
+#define RADIO_SYNCWORD_MIN          0x0000
+#define RADIO_SYNCWORD_MAX          0xFFFF
+
 // Deaf Period - prevents receiving own transmissions when radios are close
 // Set to 0 to disable. For SF12, packets take ~1-2 seconds to transmit.
 #define DEAF_PERIOD_MS      2000     // milliseconds to ignore RX after TX
@@ -59,10 +71,46 @@
 #define SERIAL_BUFFER_SIZE  512
 #define LORA_BUFFER_SIZE    256
 
+// Serial Configuration
+#define SERIAL_BAUD_RATE    115200
+#define SERIAL_INIT_DELAY   1000  // ms
+
+// WiFi Configuration
+#define WIFI_TIMEOUT_MS     30000  // 30 seconds
+#define WIFI_INIT_DELAY_MS  100    // ms
+#define WIFI_STATUS_DELAY_MS 2000  // 2 seconds
+
+// Web Server Configuration
+#define WEB_SERVER_PORT     80
+#define WEB_CACHE_MAX_AGE   3600   // 1 hour
+
+// ADC Configuration
+#define ADC_RESOLUTION      12
+#define ADC_MAX_VOLTAGE     1.5f   // 1.5V with 2.5dB attenuation
+#define ADC_STABILIZE_DELAY 100    // ms
+
+// Battery Measurement Circuit
+#define BATTERY_R1          390    // 390k ohm
+#define BATTERY_R2          100    // 100k ohm
+#define BATTERY_CAL_VOLTAGE 4.2f   // Measured battery voltage
+#define BATTERY_CAL_REPORTED 4.875f // ADC reported voltage
+
 // GNSS Configuration
 #define GNSS_ENABLED        true     // Enable/disable GNSS by default
 #define GNSS_BAUD_RATE      9600     // Standard GNSS baud rate
 #define GNSS_TCP_PORT       10110    // TCP port for NMEA data streaming (standard NMEA-over-TCP port)
+
+// Radio Parameter Validation Ranges
+#define RADIO_FREQ_MIN              150.0f
+#define RADIO_FREQ_MAX              960.0f
+#define RADIO_SF_MIN                7
+#define RADIO_SF_MAX                12
+#define RADIO_CR_MIN                5
+#define RADIO_CR_MAX                8
+#define RADIO_POWER_MIN             -9
+#define RADIO_POWER_MAX             22
+#define RADIO_SYNCWORD_MIN          0x0000
+#define RADIO_SYNCWORD_MAX          0xFFFF
 
 // Board Pin Definitions (will be set at runtime)
 extern int8_t RADIO_SCLK_PIN;
