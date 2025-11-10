@@ -301,8 +301,41 @@ void handleHardwareQuery(uint8_t* frame, size_t frameLen) {
             }
             break;
             
+        case HW_QUERY_GNSS:
+            // Send GNSS status and configuration
+            // Format: HW_QUERY_GNSS, enabled(1 byte), has_fix(1 byte), satellites(1 byte), 
+            //         latitude(4 bytes float), longitude(4 bytes float), altitude(4 bytes float)
+            {
+                uint8_t gnssData[18];
+                gnssData[0] = HW_QUERY_GNSS;
+                
+                bool gnssEnabled = false;
+                bool hasFix = false;
+                uint8_t satellites = 0;
+                float lat = 0.0, lon = 0.0, alt = 0.0;
+                
+                if (gnssModule.isRunning()) {
+                    gnssEnabled = true;
+                    hasFix = gnssModule.hasValidFix();
+                    satellites = gnssModule.getSatellites();
+                    lat = gnssModule.getLatitude();
+                    lon = gnssModule.getLongitude();
+                    alt = gnssModule.getAltitude();
+                }
+                
+                gnssData[1] = gnssEnabled ? 1 : 0;
+                gnssData[2] = hasFix ? 1 : 0;
+                gnssData[3] = satellites;
+                memcpy(&gnssData[4], &lat, sizeof(float));
+                memcpy(&gnssData[8], &lon, sizeof(float));
+                memcpy(&gnssData[12], &alt, sizeof(float));
+                
+                kiss.sendCommand(CMD_GETHARDWARE, gnssData, 16);
+            }
+            break;
+            
         case HW_QUERY_ALL:
-            // Send all information: config, battery, and board
+            // Send all information: config, battery, board, and gnss
             // We'll send them as separate responses for simplicity
             {
                 // Radio config
@@ -335,6 +368,31 @@ void handleHardwareQuery(uint8_t* frame, size_t frameLen) {
                 boardData[1] = (uint8_t)BOARD_TYPE;
                 memcpy(&boardData[2], boardName, nameLen);
                 kiss.sendCommand(CMD_GETHARDWARE, boardData, 2 + nameLen);
+                
+                // GNSS status
+                uint8_t gnssData[18];
+                gnssData[0] = HW_QUERY_GNSS;
+                bool gnssEnabled = false;
+                bool hasFix = false;
+                uint8_t satellites = 0;
+                float lat = 0.0, lon = 0.0, alt = 0.0;
+                
+                if (gnssModule.isRunning()) {
+                    gnssEnabled = true;
+                    hasFix = gnssModule.hasValidFix();
+                    satellites = gnssModule.getSatellites();
+                    lat = gnssModule.getLatitude();
+                    lon = gnssModule.getLongitude();
+                    alt = gnssModule.getAltitude();
+                }
+                
+                gnssData[1] = gnssEnabled ? 1 : 0;
+                gnssData[2] = hasFix ? 1 : 0;
+                gnssData[3] = satellites;
+                memcpy(&gnssData[4], &lat, sizeof(float));
+                memcpy(&gnssData[8], &lon, sizeof(float));
+                memcpy(&gnssData[12], &alt, sizeof(float));
+                kiss.sendCommand(CMD_GETHARDWARE, gnssData, 16);
             }
             break;
     }
@@ -406,6 +464,25 @@ void handleHardwareConfig(uint8_t* frame, size_t frameLen) {
                 memcpy(&sw, &frame[2], sizeof(uint16_t));
                 loraRadio.setSyncWord(sw);
                 needsReconfig = true;
+            }
+            break;
+            
+        case HW_SET_GNSS_ENABLE:
+            if (frameLen >= 3) {
+                bool enable = (frame[2] != 0);
+                GNSSConfig gnssConfig;
+                if (configManager.loadGNSSConfig(gnssConfig)) {
+                    gnssConfig.enabled = enable;
+                    configManager.saveGNSSConfig(gnssConfig);
+                    
+                    if (enable) {
+                        gnssModule.powerOn();
+                    } else {
+                        gnssModule.powerOff();
+                    }
+                    
+                    // Display will be updated in main loop
+                }
             }
             break;
             

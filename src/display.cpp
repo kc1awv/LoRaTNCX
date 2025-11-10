@@ -1,6 +1,5 @@
 #include "display.h"
 #include "board_config.h"
-#include "esp_private/periph_ctrl.h"
 
 // Global instances
 DisplayManager displayManager;
@@ -192,11 +191,6 @@ void DisplayManager::handleButtonPress() {
         
         // Disable Vext (powers off OLED and other peripherals)
         digitalWrite(Vext, HIGH);
-        
-        // Disable USB peripheral for clean shutdown (ESP32-S3 specific)
-        #ifdef CONFIG_IDF_TARGET_ESP32S3
-            periph_module_disable(PERIPH_USB_MODULE);
-        #endif
         
         delay(100);
         

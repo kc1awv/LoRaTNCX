@@ -7,7 +7,8 @@ Features
 - View/update radio parameters (simple placeholder commands sent to device)
 - GNSS enable/disable prompt for V4 devices (sends toggle command)
 - Toggle beacons and manual beacon command
-- Commands: connect, disconnect, beacon, ping, ack
+- Commands: connect, disconnect, beacon, ping, ack, gnss
+- Hardware queries: radio config, battery, board info, GNSS status
 - Save/load configuration to JSON
 
 Dependencies
@@ -28,5 +29,6 @@ python tools/keyboard_chat/main.py
 
 Notes and assumptions
 - This tool communicates with the TNC over a serial port using KISS framing. It implements a minimal KISS encoder/decoder.
-- Device configuration commands are sent as simple text commands (e.g. `RADIOCFG key=value`). If your device expects a different protocol, update `main.py` send logic accordingly.
+- Device configuration commands are sent as simple text commands (e.g. `RADIOCFG key=value`) or binary KISS hardware commands.
+- Supported hardware commands: GET_RADIOCFG, GET_BATTERY, GET_BOARD, GET_GNSS, GET_ALL, RADIOCFG (with FREQ, BW, SF, CR, PWR, SYNC, GNSS keys)
 - The program is intentionally simple; proposed improvements: richer GUI, secure/authenticated messages, automatic device discovery, integrated logging.

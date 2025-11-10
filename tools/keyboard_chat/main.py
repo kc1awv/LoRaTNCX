@@ -29,6 +29,7 @@ from kiss import (
     HW_QUERY_CONFIG,
     HW_QUERY_BATTERY,
     HW_QUERY_BOARD,
+    HW_QUERY_GNSS,
     HW_QUERY_ALL,
     HW_SET_FREQUENCY,
     HW_SET_BANDWIDTH,
@@ -37,6 +38,7 @@ from kiss import (
     HW_SET_POWER,
     HW_SAVE_CONFIG,
     HW_SET_SYNCWORD,
+    HW_SET_GNSS_ENABLE,
     HW_RESET_CONFIG,
 )
 from config_manager import load_config, save_config
@@ -296,6 +298,15 @@ class KeyboardChat:
                 btype = payload[2]
                 name = payload[3:].decode('ascii', errors='ignore')
                 print(f"[BOARD] Type=V{btype}, Name={name}")
+            elif sub == HW_QUERY_GNSS and len(payload) >= 16:
+                # HW_QUERY_GNSS, enabled(1), has_fix(1), satellites(1), lat(4), lon(4), alt(4)
+                enabled = payload[2] != 0
+                has_fix = payload[3] != 0
+                satellites = payload[4]
+                lat = struct.unpack('<f', payload[5:9])[0]
+                lon = struct.unpack('<f', payload[9:13])[0]
+                alt = struct.unpack('<f', payload[13:17])[0]
+                print(f"[GNSS] Enabled={enabled}, Fix={has_fix}, Sats={satellites}, Lat={lat:.6f}, Lon={lon:.6f}, Alt={alt:.1f}m")
             else:
                 print(f"[HW] Unknown hardware response: sub={sub} payload={payload[2:]}")
 
@@ -331,8 +342,9 @@ class KeyboardChat:
         - "GET_RADIOCFG" -> GETHARDWARE / HW_QUERY_CONFIG
         - "GET_BATTERY" -> GETHARDWARE / HW_QUERY_BATTERY
         - "GET_BOARD" -> GETHARDWARE / HW_QUERY_BOARD
+        - "GET_GNSS" -> GETHARDWARE / HW_QUERY_GNSS
         - "GET_ALL" -> GETHARDWARE / HW_QUERY_ALL
-        - "RADIOCFG: KEY=VAL ..." -> maps keys like FREQ,BW,SF,CR,PWR,SYNC to SETHARDWARE subcommands
+        - "RADIOCFG: KEY=VAL ..." -> maps keys like FREQ,BW,SF,CR,PWR,SYNC,GNSS to SETHARDWARE subcommands
         - "ID" -> mapped to GET_BOARD
         Otherwise, falls back to sending a text DATA frame.
         """
@@ -352,6 +364,10 @@ class KeyboardChat:
                 return
             if uc == "GET_BOARD" or uc == "ID":
                 frame = encode_command(CMD_GETHARDWARE, HW_QUERY_BOARD)
+                self.send_raw(frame)
+                return
+            if uc == "GET_GNSS":
+                frame = encode_command(CMD_GETHARDWARE, HW_QUERY_GNSS)
                 self.send_raw(frame)
                 return
             if uc == "GET_ALL":
@@ -391,6 +407,10 @@ class KeyboardChat:
                                 val = int(v)
                             data = struct.pack('<H', int(val))
                             self.send_raw(encode_command(CMD_SETHARDWARE, HW_SET_SYNCWORD, data))
+                        elif k in ("GNSS", "GNSS_ENABLE"):
+                            enable_val = 1 if v.lower() in ("1", "y", "yes", "on", "true") else 0
+                            data = bytes([enable_val])
+                            self.send_raw(encode_command(CMD_SETHARDWARE, HW_SET_GNSS_ENABLE, data))
                         elif k in ("SAVE",) and v in ("1", "Y", "YES"):
                             self.send_raw(encode_command(CMD_SETHARDWARE, HW_SAVE_CONFIG))
                         else:
@@ -503,7 +523,7 @@ class KeyboardChat:
         cmd = parts[0].lower()
         args = parts[1:]
         if cmd == "help":
-            print("Commands:\n  /connect <callsign>  /disconnect  /accept <callsign>  /reject <callsign>  /beacon  /ping <callsign>  /acceptping on|off  /cfg KEY=VAL  /selftest  /exit")
+            print("Commands:\n  /connect <callsign>  /disconnect  /accept <callsign>  /reject <callsign>  /beacon  /ping <callsign>  /acceptping on|off  /cfg KEY=VAL  /gnss  /selftest  /exit")
             return
         if cmd == "connect":
             # logical connect to a remote user (sends CONNREQ and waits for CONNACK)
@@ -560,6 +580,9 @@ class KeyboardChat:
             cmdstr = f"RADIOCFG:{cfg}"
             self.send_device_command(cmdstr)
             print("Radio config command sent")
+            return
+        if cmd == "gnss":
+            self.send_device_command("GET_GNSS")
             return
         if cmd == "id":
             self.send_device_command("ID")
