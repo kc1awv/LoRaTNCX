@@ -55,8 +55,8 @@ bool TNCWebServer::isRunning() {
 }
 
 void TNCWebServer::setupRoutes() {
-    // Serve static files from SPIFFS
-    server->serveStatic("/", SPIFFS, "/").setDefaultFile("index.html");
+    // Serve static files from SPIFFS with cache headers for better performance
+    server->serveStatic("/", SPIFFS, "/").setDefaultFile("index.html").setCacheControl("max-age=3600");
     
     // API routes - System status
     server->on("/api/status", HTTP_GET, [this](AsyncWebServerRequest* request) {
