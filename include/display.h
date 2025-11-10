@@ -107,7 +107,7 @@ private:
     
     // Button handling
     uint32_t lastButtonPress;
-    static const uint32_t BUTTON_DEBOUNCE_MS = 200;
+    static const uint32_t BUTTON_DEBOUNCE_MS = 500;
     static const uint32_t BUTTON_LONG_PRESS_MS = 2000;
     
     // Screen rendering functions

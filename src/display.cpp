@@ -4,10 +4,15 @@
 // Global instances
 DisplayManager displayManager;
 volatile bool buttonPressed = false;
+volatile uint32_t lastInterruptTime = 0;
 
 // Interrupt handler for button press
 void IRAM_ATTR buttonInterruptHandler() {
-    buttonPressed = true;
+    uint32_t now = millis();
+    if (now - lastInterruptTime > 200) {  // 200ms debounce at interrupt level
+        buttonPressed = true;
+        lastInterruptTime = now;
+    }
 }
 
 // Constructor
@@ -146,7 +151,7 @@ void DisplayManager::nextScreen() {
             currentScreen = SCREEN_GNSS;
             break;
         case SCREEN_GNSS:
-            currentScreen = SCREEN_OFF;
+            displayOff();
             break;
         case SCREEN_OFF:
             currentScreen = SCREEN_STATUS;
@@ -265,17 +270,20 @@ void DisplayManager::displayOff() {
     currentScreen = SCREEN_OFF;
     u8g2.clearBuffer();
     u8g2.sendBuffer();
-    // Turn off Vext power to OLED
-    digitalWrite(Vext, HIGH);
+    // Put display into power save mode instead of turning off Vext
+    u8g2.setPowerSave(1);
 }
 
 void DisplayManager::displayOn() {
-    // Turn on Vext power to OLED
-    digitalWrite(Vext, LOW);
-    delay(100);
-    // Reinitialize display
-    u8g2.begin();
-    lastScreen = SCREEN_BOOT;  // Force re-render
+    // Wake display from power save mode
+    u8g2.setPowerSave(0);
+    
+    // Clear buffer and ensure display is ready
+    u8g2.clearBuffer();
+    u8g2.sendBuffer();
+    
+    // Force re-render on next update
+    lastScreen = SCREEN_BOOT;
 }
 
 bool DisplayManager::isBootScreenActive() {
