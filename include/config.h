@@ -32,13 +32,15 @@
 #define HW_GET_CONFIG       0x06  // Get current configuration
 #define HW_SAVE_CONFIG      0x07  // Save configuration to flash
 #define HW_SET_SYNCWORD     0x08  // Set sync word (2 bytes for SX126x)
+#define HW_SET_GNSS_ENABLE  0x09  // Enable/disable GNSS (1 byte: 0=disable, 1=enable)
 #define HW_RESET_CONFIG     0xFF  // Reset to defaults
 
 // GETHARDWARE Sub-commands for reading hardware status
 #define HW_QUERY_CONFIG     0x01  // Query current radio configuration
 #define HW_QUERY_BATTERY    0x02  // Query battery voltage
 #define HW_QUERY_BOARD      0x03  // Query board information
-#define HW_QUERY_ALL        0xFF  // Query everything (config + battery + board)
+#define HW_QUERY_GNSS       0x04  // Query GNSS status and configuration
+#define HW_QUERY_ALL        0xFF  // Query everything (config + battery + board + gnss)
 
 // LoRa Default Parameters (915 MHz ISM band for North America)
 #define LORA_FREQUENCY      915.0    // MHz - US ISM band (902-928 MHz)

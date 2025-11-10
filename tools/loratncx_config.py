@@ -10,6 +10,7 @@ Usage:
     loratncx_config.py <port> --get-config
     loratncx_config.py <port> --get-battery
     loratncx_config.py <port> --get-board
+    loratncx_config.py <port> --get-gnss
     loratncx_config.py <port> --get-all
     loratncx_config.py <port> --frequency 915.0
     loratncx_config.py <port> --bandwidth 125
@@ -17,6 +18,7 @@ Usage:
     loratncx_config.py <port> --coding-rate 7
     loratncx_config.py <port> --power 20
     loratncx_config.py <port> --syncword 0x1424
+    loratncx_config.py <port> --gnss-enable true
     loratncx_config.py <port> --save
     loratncx_config.py <port> --reset
     
@@ -69,12 +71,14 @@ HW_SET_POWER = 0x05
 HW_GET_CONFIG = 0x06
 HW_SAVE_CONFIG = 0x07
 HW_SET_SYNCWORD = 0x08
+HW_SET_GNSS_ENABLE = 0x09
 HW_RESET_CONFIG = 0xFF
 
 # GETHARDWARE Subcommands
 HW_QUERY_CONFIG = 0x01
 HW_QUERY_BATTERY = 0x02
 HW_QUERY_BOARD = 0x03
+HW_QUERY_GNSS = 0x04
 HW_QUERY_ALL = 0xFF
 
 
@@ -273,20 +277,47 @@ class LoRaTNCConfig:
         
         return board
     
+    def get_gnss(self):
+        """Get GNSS status and position from TNC"""
+        # Send QUERY_GNSS command
+        self.send_query(HW_QUERY_GNSS)
+        
+        # Wait for response
+        frame = self.receive_frame(timeout=3.0)
+        
+        if not frame:
+            return None
+        
+        # Parse response
+        # Format: CMD_GETHARDWARE, HW_QUERY_GNSS, enabled(1), has_fix(1), satellites(1), lat(4), lon(4), alt(4)
+        if len(frame) < 17 or frame[0] != CMD_GETHARDWARE or frame[1] != HW_QUERY_GNSS:
+            return None
+        
+        gnss = {}
+        gnss['enabled'] = frame[2] != 0
+        gnss['has_fix'] = frame[3] != 0
+        gnss['satellites'] = frame[4]
+        gnss['latitude'] = struct.unpack('<f', frame[5:9])[0]
+        gnss['longitude'] = struct.unpack('<f', frame[9:13])[0]
+        gnss['altitude'] = struct.unpack('<f', frame[13:17])[0]
+        
+        return gnss
+    
     def get_all(self):
         """Get all hardware information from TNC"""
         # Send QUERY_ALL command
         self.send_query(HW_QUERY_ALL)
         
-        # Wait for multiple responses (config, battery, board)
+        # Wait for multiple responses (config, battery, board, gnss)
         all_info = {
             'config': None,
             'battery': None,
-            'board': None
+            'board': None,
+            'gnss': None
         }
         
-        # Receive up to 3 frames
-        for _ in range(3):
+        # Receive up to 4 frames
+        for _ in range(4):
             frame = self.receive_frame(timeout=2.0)
             if not frame or frame[0] != CMD_GETHARDWARE:
                 continue
@@ -311,6 +342,16 @@ class LoRaTNCConfig:
                 board['type'] = frame[2]
                 board['name'] = frame[3:].decode('ascii', errors='ignore')
                 all_info['board'] = board
+            
+            elif subcmd == HW_QUERY_GNSS and len(frame) >= 17:
+                gnss = {}
+                gnss['enabled'] = frame[2] != 0
+                gnss['has_fix'] = frame[3] != 0
+                gnss['satellites'] = frame[4]
+                gnss['latitude'] = struct.unpack('<f', frame[5:9])[0]
+                gnss['longitude'] = struct.unpack('<f', frame[9:13])[0]
+                gnss['altitude'] = struct.unpack('<f', frame[13:17])[0]
+                all_info['gnss'] = gnss
         
         return all_info
     
@@ -351,6 +392,12 @@ class LoRaTNCConfig:
         data = struct.pack('<H', int(syncword))
         self.send_command(HW_SET_SYNCWORD, data)
         print(f"✓ Set sync word to 0x{syncword:04X}")
+    
+    def set_gnss_enable(self, enable):
+        """Enable/disable GNSS"""
+        data = bytes([1 if enable else 0])
+        self.send_command(HW_SET_GNSS_ENABLE, data)
+        print(f"✓ GNSS {'enabled' if enable else 'disabled'}")
     
     def save_config(self):
         """Save current configuration to NVS"""
@@ -432,6 +479,27 @@ def print_board(board):
     print()
 
 
+def print_gnss(gnss):
+    """Pretty-print GNSS information"""
+    if not gnss:
+        print("✗ Could not retrieve GNSS information")
+        return
+    
+    print("\n" + "=" * 60)
+    print("LoRaTNCX GNSS Status")
+    print("=" * 60)
+    print(f"  GNSS Enabled:     {'Yes' if gnss['enabled'] else 'No'}")
+    if gnss['enabled']:
+        print(f"  GPS Fix:          {'Yes' if gnss['has_fix'] else 'No'}")
+        print(f"  Satellites:       {gnss['satellites']}")
+        if gnss['has_fix']:
+            print(f"  Latitude:         {gnss['latitude']:.6f}°")
+            print(f"  Longitude:        {gnss['longitude']:.6f}°")
+            print(f"  Altitude:         {gnss['altitude']:.1f} m")
+    print("=" * 60)
+    print()
+
+
 def print_all(all_info):
     """Pretty-print all hardware information"""
     if not all_info:
@@ -446,6 +514,9 @@ def print_all(all_info):
     
     if all_info['battery'] is not None:
         print_battery(all_info['battery'])
+    
+    if all_info['gnss']:
+        print_gnss(all_info['gnss'])
 
 
 def main():
@@ -470,7 +541,8 @@ Examples:
     parser.add_argument('--get-config', '-g', action='store_true', help='Get current radio configuration')
     parser.add_argument('--get-battery', '-B', action='store_true', help='Get battery voltage')
     parser.add_argument('--get-board', '-I', action='store_true', help='Get board information')
-    parser.add_argument('--get-all', '-A', action='store_true', help='Get all hardware info (config + battery + board)')
+    parser.add_argument('--get-gnss', '-G', action='store_true', help='Get GNSS status and position')
+    parser.add_argument('--get-all', '-A', action='store_true', help='Get all hardware info (config + battery + board + gnss)')
     
     # Configuration commands
     parser.add_argument('--frequency', '-f', type=float, metavar='MHZ', help='Set frequency in MHz (e.g., 915.0)')
@@ -479,15 +551,16 @@ Examples:
     parser.add_argument('--coding-rate', '-c', type=int, metavar='CR', choices=range(5, 9), help='Set coding rate (5-8 for 4/5 to 4/8)')
     parser.add_argument('--power', '-p', type=int, metavar='DBM', help='Set output power in dBm (e.g., 20)')
     parser.add_argument('--syncword', '-w', metavar='WORD', help='Set sync word (e.g., 0x1424)')
+    parser.add_argument('--gnss-enable', type=lambda x: x.lower() in ('true', '1', 'yes', 'on'), metavar='BOOL', help='Enable/disable GNSS (true/false)')
     parser.add_argument('--save', action='store_true', help='Save configuration to NVS')
     parser.add_argument('--reset', action='store_true', help='Reset to factory defaults')
     
     args = parser.parse_args()
     
     # Check if any action was specified
-    has_action = (args.get_config or args.get_battery or args.get_board or args.get_all or
+    has_action = (args.get_config or args.get_battery or args.get_board or args.get_gnss or args.get_all or
                   args.frequency or args.bandwidth or args.spreading_factor or 
-                  args.coding_rate or args.power or args.syncword or args.save or args.reset)
+                  args.coding_rate or args.power or args.syncword or args.gnss_enable or args.save or args.reset)
     
     if not has_action:
         parser.print_help()
@@ -518,6 +591,12 @@ Examples:
         if args.get_board:
             board = tnc.get_board()
             print_board(board)
+            if not (args.get_config or args.get_gnss):
+                return
+        
+        if args.get_gnss:
+            gnss = tnc.get_gnss()
+            print_gnss(gnss)
             if not args.get_config:
                 return
         
@@ -540,7 +619,10 @@ Examples:
         if args.syncword:
             tnc.set_syncword(args.syncword)
         
-        if args.reset:
+        if args.gnss_enable is not None:
+            tnc.set_gnss_enable(args.gnss_enable)
+        
+        if args.save:
             tnc.reset_config()
         
         if args.save:

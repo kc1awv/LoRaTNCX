@@ -19,3 +19,4 @@
 .vscode/launch.json
 
 docs/
+tools/keyboard_chat/.venv/
