@@ -456,6 +456,16 @@ String TNCWebServer::getJSONStatus() {
     doc["wifi"]["ap_ip"] = wifiManager->getAPIPAddress();
     doc["wifi"]["rssi"] = wifiManager->getRSSI();
     
+    // LoRa status
+    doc["lora"]["enabled"] = loraRadio->isInitialized();
+    
+    // GNSS status
+    if (gnssModule) {
+        doc["gnss"]["enabled"] = gnssModule->isRunning();
+    } else {
+        doc["gnss"]["enabled"] = false;
+    }
+    
     // Battery
     doc["battery"]["voltage"] = readBatteryVoltage();
     
