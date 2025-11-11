@@ -3,6 +3,41 @@
 
 LoRaRadio* LoRaRadio::instance = nullptr;
 
+// PA gain values for V4 board (GC1109 power amplifier)
+// Index corresponds to output power level (7-28 dBm)
+#ifdef ARDUINO_HELTEC_WIFI_LORA_32_V4
+static const int8_t paGainValues[PA_GAIN_POINTS] = PA_GAIN_VALUES;
+#endif
+
+// Calculate SX1262 power setting from desired output power for V4 boards
+int8_t LoRaRadio::calculateSX1262Power(int8_t desiredOutputPower) {
+#ifdef ARDUINO_HELTEC_WIFI_LORA_32_V4
+    // For V4 boards with non-linear PA, calculate SX1262 power from gain table
+    if (desiredOutputPower >= 7 && desiredOutputPower <= PA_MAX_OUTPUT) {
+        // Map output power to gain table index (7dBm = index 0, 28dBm = index 21)
+        uint8_t gainIndex = desiredOutputPower - 7;
+        if (gainIndex < PA_GAIN_POINTS) {
+            int8_t gain = paGainValues[gainIndex];
+            int8_t sx1262Power = desiredOutputPower - gain;
+            
+            // Ensure SX1262 power stays within valid range (-9 to +22 dBm)
+            if (sx1262Power < -9) {
+                sx1262Power = -9;
+            } else if (sx1262Power > 22) {
+                sx1262Power = 22;
+            }
+            
+            return sx1262Power;
+        }
+    }
+    // Fall back to direct power for out-of-range values
+    return desiredOutputPower;
+#else
+    // For V3 and other boards, use power directly
+    return desiredOutputPower;
+#endif
+}
+
 LoRaRadio::LoRaRadio() 
     : radio(nullptr), spi(nullptr), module(nullptr),
       frequency(LORA_FREQUENCY), bandwidth(LORA_BANDWIDTH),
@@ -222,7 +257,11 @@ void LoRaRadio::setSyncWord(uint16_t sw) {
 
 void LoRaRadio::setOutputPower(int8_t power) {
     outputPower = power;
-    radio->setOutputPower(power);
+    
+    // Calculate the actual SX1262 power setting (handles V4 PA gain)
+    int8_t sx1262Power = calculateSX1262Power(power);
+    
+    radio->setOutputPower(sx1262Power);
 }
 
 void LoRaRadio::reconfigure() {
@@ -237,7 +276,10 @@ void LoRaRadio::reconfigure() {
     radio->setBandwidth(bandwidth);
     radio->setSpreadingFactor(spreadingFactor);
     radio->setCodingRate(codingRate);
-    radio->setOutputPower(outputPower);
+    
+    // Use calculated SX1262 power (handles V4 PA gain)
+    int8_t sx1262Power = calculateSX1262Power(outputPower);
+    radio->setOutputPower(sx1262Power);
     
     // Resume receiving
     radio->startReceive();
@@ -265,7 +307,7 @@ bool LoRaRadio::applyConfig(const LoRaConfig& config) {
     if (config.codingRate < 5 || config.codingRate > 8) {
         return false;
     }
-    if (config.power < -9 || config.power > 22) {
+    if (config.power < RADIO_POWER_MIN || config.power > RADIO_POWER_MAX) {
         return false;
     }
     

@@ -26,7 +26,7 @@
 #define RADIO_CR_MIN                5       ///< Minimum coding rate
 #define RADIO_CR_MAX                8       ///< Maximum coding rate
 #define RADIO_POWER_MIN             -9      ///< Minimum power in dBm
-#define RADIO_POWER_MAX             22      ///< Maximum power in dBm
+// RADIO_POWER_MAX is now defined in config.h based on board type
 
 /**
  * @brief Web Server for LoRa TNC configuration and monitoring

@@ -268,6 +268,17 @@ private:
     unsigned long lastTransmitTime;  // Track when we last transmitted
     volatile bool packetReceived;    // Flag set by interrupt when packet arrives
     
+    /**
+     * @brief Calculate SX1262 power setting from desired output power for V4 boards
+     *
+     * For Heltec V4 boards with non-linear PA, this function maps the desired
+     * output power to the appropriate SX1262 input power using a gain lookup table.
+     *
+     * @param desiredOutputPower Desired output power in dBm (7-28 for V4)
+     * @return SX1262 power setting in dBm (-9 to +22)
+     */
+    int8_t calculateSX1262Power(int8_t desiredOutputPower);
+    
     static void IRAM_ATTR onDio1Action();
     static LoRaRadio* instance;
     

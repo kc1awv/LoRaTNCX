@@ -1071,7 +1071,7 @@
                         <i class="fas fa-info-circle tooltip-trigger" data-tippy-content="Transmission power. Higher values = longer range but more power consumption."></i>
                     </label>
                     <input type="number" id="power" min="-9" max="22">
-                    <div class="help-text">Valid range: -9 to 22 dBm</div>
+                    <div class="help-text" id="power-range">Valid range: -9 to 22 dBm</div>
                     <div class="validation-message" id="power-validation"></div>
                 </div>
 
@@ -1554,6 +1554,7 @@
 
             // Load data for the tab
             if (tabName === 'lora') {
+                loadBoardInfo();
                 loadLoRaConfig();
             } else if (tabName === 'wifi') {
                 loadWiFiConfig();
@@ -1837,6 +1838,28 @@
             }
         }
 
+        // Board Information and Dynamic Limits
+        async function loadBoardInfo() {
+            try {
+                const data = await apiGet('system');
+                const boardType = data.board.type;
+                
+                // Set power limits based on board type
+                const powerInput = document.getElementById('power');
+                const powerRange = document.getElementById('power-range');
+                
+                if (boardType === 4) { // BOARD_V4
+                    powerInput.max = 28;
+                    powerRange.textContent = 'Valid range: -9 to 28 dBm (V4 with PA gain control)';
+                } else {
+                    powerInput.max = 22;
+                    powerRange.textContent = 'Valid range: -9 to 22 dBm';
+                }
+            } catch (error) {
+                console.error('Failed to load board info:', error);
+            }
+        }
+
         // LoRa Configuration
         async function loadLoRaConfig() {
             try {
@@ -1861,8 +1884,9 @@
 
             const powerValid = validateField('power', (val) => {
                 const num = parseInt(val);
-                return num >= -9 && num <= 22;
-            }, 'Power must be between -9 to 22 dBm');
+                const maxPower = document.getElementById('power').max;
+                return num >= -9 && num <= parseInt(maxPower);
+            }, `Power must be between -9 to ${document.getElementById('power').max} dBm`);
 
             const syncWordValid = validateField('syncWord', (val) => {
                 return /^0x[0-9A-Fa-f]{4}$/.test(val);
