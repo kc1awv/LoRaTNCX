@@ -249,7 +249,7 @@ class LoRaTNCXInterface {
         const config = {
             frequency: parseFloat(document.getElementById('frequency').value),
             bandwidth: parseFloat(document.getElementById('bandwidth').value),
-            spreadingFactor: parseInt(document.getElementById('spreadingFactor').value),
+            spreading: parseInt(document.getElementById('spreadingFactor').value),
             codingRate: parseInt(document.getElementById('codingRate').value),
             power: parseInt(document.getElementById('power').value),
             syncWord: this.parseSyncWord(document.getElementById('syncWord').value)
@@ -604,24 +604,29 @@ class LoRaTNCXInterface {
 
     async startWiFiScan() {
         try {
+            // Show modal immediately for better UX
+            const modal = new bootstrap.Modal(document.getElementById('wifiScanModal'));
+            modal.show();
+
             // Start the scan
             const startResponse = await fetch('/api/wifi/scan');
             const startResult = await startResponse.json();
 
             if (!startResult.status || startResult.status !== 'started') {
+                // Hide modal if scan failed to start
+                modal.hide();
                 this.showAlert(startResult.error || 'Failed to start WiFi scan', 'danger');
                 return;
             }
-
-            // Show modal
-            const modal = new bootstrap.Modal(document.getElementById('wifiScanModal'));
-            modal.show();
 
             // Start polling for results
             this.pollScanStatus();
 
         } catch (error) {
             console.error('Failed to start WiFi scan:', error);
+            // Hide modal on error
+            const modal = bootstrap.Modal.getInstance(document.getElementById('wifiScanModal'));
+            if (modal) modal.hide();
             this.showAlert('Error starting WiFi scan', 'danger');
         }
     }
