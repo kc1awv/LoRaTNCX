@@ -12,6 +12,7 @@ class LoRaTNCXInterface {
         this.setupEventListeners();
         this.loadInitialData();
         this.startAutoRefresh();
+        this.loadDarkModePreference();
     }
 
     setupEventListeners() {
@@ -80,6 +81,11 @@ class LoRaTNCXInterface {
                 const targetId = e.target.getAttribute('href').substring(1);
                 this.scrollToSection(targetId);
             });
+        });
+
+        // Dark mode toggle
+        document.getElementById('darkMode').addEventListener('change', (e) => {
+            this.toggleDarkMode(e.target.checked);
         });
     }
 
@@ -791,6 +797,32 @@ class LoRaTNCXInterface {
         // Parse as hex
         const parsed = parseInt(cleanValue, 16);
         return isNaN(parsed) ? 0 : parsed;
+    }
+
+    loadDarkModePreference() {
+        const darkModeEnabled = localStorage.getItem('darkMode') === 'true';
+        document.getElementById('darkMode').checked = darkModeEnabled;
+        this.setDarkMode(darkModeEnabled);
+    }
+
+    toggleDarkMode(enabled) {
+        this.setDarkMode(enabled);
+        localStorage.setItem('darkMode', enabled);
+    }
+
+    setDarkMode(enabled) {
+        const html = document.documentElement;
+        const body = document.body;
+        
+        if (enabled) {
+            html.setAttribute('data-bs-theme', 'dark');
+            body.classList.remove('bg-light');
+            body.classList.add('bg-dark');
+        } else {
+            html.removeAttribute('data-bs-theme');
+            body.classList.remove('bg-dark');
+            body.classList.add('bg-light');
+        }
     }
 }
 

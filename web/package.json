@@ -4,7 +4,7 @@
   "description": "Web interface for LoRaTNCX",
   "main": "index.js",
   "scripts": {
-    "build": "cp -r src/* dist/ && echo 'Build complete'",
+    "build": "mkdir -p dist && cp -r src/* dist/ && find dist -name '*.css' -o -name '*.js' | grep -v '.gz$' | xargs -I {} sh -c 'gzip -c {} > {}.gz' && echo 'Build complete'",
     "dev": "python3 -m http.server 3000",
     "clean": "rm -rf dist/*"
   },

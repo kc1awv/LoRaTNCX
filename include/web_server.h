@@ -148,6 +148,9 @@ private:
     String getJSONGNSSConfig();
     String getJSONGNSSStatus();
     
+    // File serving with compression
+    void serveCompressedFile(AsyncWebServerRequest* request, const char* path, const char* contentType);
+    
     // CORS headers
     void addCORSHeaders(AsyncWebServerResponse* response);
 };
