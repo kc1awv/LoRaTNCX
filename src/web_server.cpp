@@ -58,6 +58,15 @@ void TNCWebServer::setupRoutes() {
     // Serve static files from SPIFFS with cache headers for better performance
     server->serveStatic("/", SPIFFS, "/").setDefaultFile("index.html").setCacheControl(("max-age=" + String(WEB_CACHE_MAX_AGE)).c_str());
     
+    // Add GZ compression support for Bootstrap files
+    server->on("/a/css/bs.css", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        serveCompressedFile(request, "/a/css/bs.css", "text/css");
+    });
+    
+    server->on("/a/js/bs.js", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        serveCompressedFile(request, "/a/js/bs.js", "application/javascript");
+    });
+    
     // API routes - System status
     server->on("/api/status", HTTP_GET, [this](AsyncWebServerRequest* request) {
         handleGetStatus(request);
@@ -456,6 +465,16 @@ String TNCWebServer::getJSONStatus() {
     doc["wifi"]["ap_ip"] = wifiManager->getAPIPAddress();
     doc["wifi"]["rssi"] = wifiManager->getRSSI();
     
+    // LoRa status
+    doc["lora"]["enabled"] = loraRadio->isInitialized();
+    
+    // GNSS status
+    if (gnssModule) {
+        doc["gnss"]["enabled"] = gnssModule->isRunning();
+    } else {
+        doc["gnss"]["enabled"] = false;
+    }
+    
     // Battery
     doc["battery"]["voltage"] = readBatteryVoltage();
     
@@ -482,6 +501,10 @@ String TNCWebServer::getJSONSystemInfo() {
     doc["memory"]["flash_size"] = ESP.getFlashChipSize();
     doc["memory"]["free_heap"] = ESP.getFreeHeap();
     doc["memory"]["heap_size"] = ESP.getHeapSize();
+    
+    // Add SPIFFS storage information
+    doc["storage"]["spiffs_used"] = SPIFFS.usedBytes();
+    doc["storage"]["spiffs_total"] = SPIFFS.totalBytes();
     
     String output;
     serializeJson(doc, output);
@@ -741,4 +764,36 @@ String TNCWebServer::getJSONGNSSStatus() {
     String output;
     serializeJson(doc, output);
     return output;
+}
+
+void TNCWebServer::serveCompressedFile(AsyncWebServerRequest* request, const char* path, const char* contentType) {
+    // Check if client accepts gzip encoding
+    bool acceptsGzip = false;
+    if (request->hasHeader("Accept-Encoding")) {
+        String acceptEncoding = request->getHeader("Accept-Encoding")->value();
+        acceptsGzip = (acceptEncoding.indexOf("gzip") >= 0);
+    }
+    
+    // Try to serve .gz version if client supports gzip
+    if (acceptsGzip) {
+        String gzPath = String(path) + ".gz";
+        if (SPIFFS.exists(gzPath)) {
+            AsyncWebServerResponse* response = request->beginResponse(SPIFFS, gzPath, contentType);
+            response->addHeader("Content-Encoding", "gzip");
+            response->addHeader("Cache-Control", ("max-age=" + String(WEB_CACHE_MAX_AGE)).c_str());
+            addCORSHeaders(response);
+            request->send(response);
+            return;
+        }
+    }
+    
+    // Fall back to uncompressed version
+    if (SPIFFS.exists(path)) {
+        AsyncWebServerResponse* response = request->beginResponse(SPIFFS, path, contentType);
+        response->addHeader("Cache-Control", ("max-age=" + String(WEB_CACHE_MAX_AGE)).c_str());
+        addCORSHeaders(response);
+        request->send(response);
+    } else {
+        request->send(404, "text/plain", "File not found");
+    }
 }

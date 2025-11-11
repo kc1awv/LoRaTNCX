@@ -1,20 +1,16 @@
 {
   "name": "loratncx-web",
   "version": "1.0.0",
-  "description": "LoRaTNCX Web Interface Development",
-  "main": "script.js",
+  "description": "Web interface for LoRaTNCX",
+  "main": "index.js",
   "scripts": {
-    "build": "node build.js",
-    "dev": "node build.js && echo 'Files built and ready for upload'",
-    "clean": "rm -f ../data/script.min.js ../data/style.min.css ../data/index.html"
+    "build": "mkdir -p dist && cp -r src/* dist/ && find dist -name '*.css' -o -name '*.js' | grep -v '.gz$' | xargs -I {} sh -c 'gzip -c {} > {}.gz' && echo 'Build complete'",
+    "dev": "python3 -m http.server 3000",
+    "clean": "rm -rf dist/*"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "devDependencies": {
-    "csso": "^5.0.5",
-    "html-minifier": "^4.0.0",
-    "terser": "^5.44.1"
-  }
+  "license": "MIT",
+  "devDependencies": {},
+  "dependencies": {}
 }
