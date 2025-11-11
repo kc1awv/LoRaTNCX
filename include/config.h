@@ -37,7 +37,7 @@
 
 // GETHARDWARE Sub-commands for reading hardware status
 #define HW_QUERY_CONFIG     0x01  // Query current radio configuration
-#define HW_QUERY_BATTERY    0x02  // Query battery voltage
+#define HW_QUERY_BATTERY    0x02  // Query battery status: voltage(float), avg_voltage(float), percent(float), state(uint8), ready(uint8)
 #define HW_QUERY_BOARD      0x03  // Query board information
 #define HW_QUERY_GNSS       0x04  // Query GNSS status and configuration
 #define HW_QUERY_ALL        0xFF  // Query everything (config + battery + board + gnss)
@@ -97,8 +97,22 @@
 // Battery Measurement Circuit
 #define BATTERY_R1          390    // 390k ohm
 #define BATTERY_R2          100    // 100k ohm
-#define BATTERY_CAL_VOLTAGE 4.2f   // Measured battery voltage
-#define BATTERY_CAL_REPORTED 4.875f // ADC reported voltage
+#define BATTERY_CAL_VOLTAGE 4.2f   // Target voltage to display (standard LiPo)
+#define BATTERY_CAL_REPORTED 4.75f // What ADC actually reports for target voltage
+
+// Battery Monitoring Constants
+#define BATTERY_SAMPLE_COUNT    10     // Number of samples to average
+#define BATTERY_VOLTAGE_MIN     3.0f   // Minimum battery voltage (0%)
+#define BATTERY_VOLTAGE_MAX     4.2f   // Maximum battery voltage (100%) - standard LiPo max
+#define BATTERY_FLOAT_VOLTAGE   4.1f   // Float voltage threshold for charged state
+
+// Battery Charge States
+enum BatteryChargeState {
+    BATTERY_CHARGE_UNKNOWN = 0,
+    BATTERY_CHARGE_DISCHARGING = 1,
+    BATTERY_CHARGE_CHARGING = 2,
+    BATTERY_CHARGE_CHARGED = 3
+};
 
 // GNSS Configuration
 #define GNSS_ENABLED        true     // Enable/disable GNSS by default

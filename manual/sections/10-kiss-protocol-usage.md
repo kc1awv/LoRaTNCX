@@ -273,8 +273,10 @@ FEND + 0x07 + Subcommand + [Data] + FEND
   ```
 
 **Query Battery (0x02):**
-- **Response:** Battery voltage (float)
-- **Format:** 4 bytes (little-endian float)
+- **Response:** Battery status (voltage, averaged voltage, percentage, state, ready flag)
+- **Format:** 4 bytes voltage (float) + 4 bytes avg_voltage (float) + 4 bytes percent (float) + 1 byte state (uint8) + 1 byte ready (uint8)
+- **State values:** 0=unknown, 1=discharging, 2=charging, 3=charged
+- **Ready flag:** 0=not ready (collecting samples), 1=ready (averaged values available)
 - **Example Query:**
   ```
   FEND + 0x07 + 0x02 + FEND
