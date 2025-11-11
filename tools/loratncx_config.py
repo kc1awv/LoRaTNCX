@@ -237,7 +237,7 @@ class LoRaTNCConfig:
         return config
     
     def get_battery(self):
-        """Get battery voltage from TNC"""
+        """Get battery status from TNC"""
         # Send QUERY_BATTERY command
         self.send_query(HW_QUERY_BATTERY)
         
@@ -248,12 +248,23 @@ class LoRaTNCConfig:
             return None
         
         # Parse response
-        # Format: CMD_GETHARDWARE, HW_QUERY_BATTERY, voltage(4 bytes float)
-        if len(frame) < 6 or frame[0] != CMD_GETHARDWARE or frame[1] != HW_QUERY_BATTERY:
+        # Format: CMD_GETHARDWARE, HW_QUERY_BATTERY, voltage(4), avg_voltage(4), percent(4), state(1), ready(1)
+        if len(frame) < 15 or frame[0] != CMD_GETHARDWARE or frame[1] != HW_QUERY_BATTERY:
             return None
         
         voltage = struct.unpack('<f', frame[2:6])[0]
-        return voltage
+        avg_voltage = struct.unpack('<f', frame[6:10])[0]
+        percent = struct.unpack('<f', frame[10:14])[0]
+        state = frame[14]
+        ready = frame[15]
+        
+        return {
+            'voltage': voltage,
+            'avg_voltage': avg_voltage,
+            'percent': percent,
+            'state': state,
+            'ready': ready
+        }
     
     def get_board(self):
         """Get board information from TNC"""
@@ -334,8 +345,15 @@ class LoRaTNCConfig:
                 config['syncword'] = struct.unpack('<H', frame[13:15])[0]
                 all_info['config'] = config
             
-            elif subcmd == HW_QUERY_BATTERY and len(frame) >= 6:
-                all_info['battery'] = struct.unpack('<f', frame[2:6])[0]
+            elif subcmd == HW_QUERY_BATTERY and len(frame) >= 15:
+                battery = {
+                    'voltage': struct.unpack('<f', frame[2:6])[0],
+                    'avg_voltage': struct.unpack('<f', frame[6:10])[0],
+                    'percent': struct.unpack('<f', frame[10:14])[0],
+                    'state': frame[14],
+                    'ready': frame[15]
+                }
+                all_info['battery'] = battery
             
             elif subcmd == HW_QUERY_BOARD and len(frame) >= 3:
                 board = {}
@@ -436,30 +454,49 @@ def print_config(config):
     print()
 
 
-def print_battery(voltage):
-    """Pretty-print battery voltage"""
-    if voltage is None:
-        print("✗ Could not retrieve battery voltage")
+def print_battery(battery_data):
+    """Pretty-print battery status"""
+    if battery_data is None:
+        print("✗ Could not retrieve battery status")
         return
     
     print("\n" + "=" * 60)
     print("LoRaTNCX Battery Status")
     print("=" * 60)
-    print(f"  Battery Voltage:  {voltage:.2f} V")
     
-    # Battery status indicator
-    if voltage >= 4.1:
-        status = "Fully Charged"
-    elif voltage >= 3.9:
-        status = "Good"
-    elif voltage >= 3.7:
-        status = "Medium"
-    elif voltage >= 3.4:
-        status = "Low"
+    if battery_data['ready']:
+        print(f"  Current Voltage:  {battery_data['voltage']:.2f} V")
+        print(f"  Average Voltage:  {battery_data['avg_voltage']:.2f} V")
+        print(f"  Battery Level:    {battery_data['percent']:.1f}%")
+        
+        # State interpretation
+        state_names = {
+            0: "Unknown",
+            1: "Discharging", 
+            2: "Charging",
+            3: "Charged"
+        }
+        state_name = state_names.get(battery_data['state'], "Unknown")
+        print(f"  Charge State:     {state_name}")
+        
+        # Status based on percentage
+        percent = battery_data['percent']
+        if percent >= 95:
+            status = "Fully Charged"
+        elif percent >= 75:
+            status = "Good"
+        elif percent >= 50:
+            status = "Medium"
+        elif percent >= 25:
+            status = "Low"
+        else:
+            status = "Critical - Charge Soon!"
+        
+        print(f"  Status:           {status}")
     else:
-        status = "Critical - Charge Soon!"
+        print(f"  Current Voltage:  {battery_data['voltage']:.2f} V")
+        print("  Status:           Collecting samples...")
     
-    print(f"  Status:           {status}")
     print("=" * 60)
     print()
 
@@ -583,8 +620,8 @@ Examples:
             return
         
         if args.get_battery:
-            voltage = tnc.get_battery()
-            print_battery(voltage)
+            battery_data = tnc.get_battery()
+            print_battery(battery_data)
             if not (args.get_config or args.get_board):
                 return
         

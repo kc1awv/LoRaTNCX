@@ -14,6 +14,12 @@
 #include "gnss.h"
 #include "nmea_server.h"
 
+// Battery monitoring globals (from board_config.cpp)
+extern bool battery_ready;
+extern BatteryChargeState battery_charge_state;
+extern float battery_voltage;
+extern float battery_percent;
+
 // Thread-safe button event queue (declared in display.cpp)
 extern QueueHandle_t buttonEventQueue;
 
@@ -449,10 +455,17 @@ size_t buildRadioConfigData(uint8_t* buffer, uint8_t command) {
 size_t buildBatteryData(uint8_t* buffer) {
     buffer[0] = HW_QUERY_BATTERY;
     
+    // Read current battery voltage (also updates sampling)
     float battVoltage = readBatteryVoltage();
     memcpy(&buffer[1], &battVoltage, sizeof(float));
     
-    return 5;  // Total size
+    // Include averaged values if ready
+    memcpy(&buffer[5], &battery_voltage, sizeof(float));
+    memcpy(&buffer[9], &battery_percent, sizeof(float));
+    buffer[13] = (uint8_t)battery_charge_state;
+    buffer[14] = battery_ready ? 1 : 0;
+    
+    return 15;  // Total size: cmd(1) + voltage(4) + avg_voltage(4) + percent(4) + state(1) + ready(1)
 }
 
 size_t buildBoardData(uint8_t* buffer) {
