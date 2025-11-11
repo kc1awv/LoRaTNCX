@@ -8,7 +8,7 @@ WiFiManager::WiFiManager()
     : initialized(false), apStarted(false), staConnected(false), mdnsStarted(false),
       connectionState(WIFI_STATE_DISCONNECTED), lastReconnectAttempt(0), 
       reconnectDelay(RECONNECT_BASE_INTERVAL), reconnectAttempts(0), 
-      scanResults(0), dnsServer(nullptr) {
+      scanResults(0), dnsServer(nullptr), scanInProgress(false), scanStartTime(0) {
 }
 
 bool WiFiManager::begin() {
@@ -265,6 +265,87 @@ bool WiFiManager::getScannedEncryption(int index) {
         return WiFi.encryptionType(index) != WIFI_AUTH_OPEN;
     }
     return false;
+}
+
+bool WiFiManager::startAsyncScan() {
+    // Check if WiFi scanning is supported in current mode
+    if (currentConfig.mode == TNC_WIFI_OFF || currentConfig.mode == TNC_WIFI_AP) {
+        return false; // Cannot scan in AP-only or disabled mode
+    }
+
+    // Check if scan is already in progress
+    if (scanInProgress) {
+        // Check for timeout (10 seconds max)
+        if (millis() - scanStartTime > 10000) {
+            // Scan timed out, reset state
+            scanInProgress = false;
+            WiFi.scanDelete(); // Clean up any pending scan
+        } else {
+            return false; // Scan still in progress
+        }
+    }
+
+    // Start async scan (true = async, false = show_hidden, false = passive, 300 = max_ms)
+    scanInProgress = true;
+    scanStartTime = millis();
+
+    if (WiFi.scanNetworks(true, false, false, 300) == WIFI_SCAN_RUNNING) {
+        return true;
+    } else {
+        scanInProgress = false;
+        return false;
+    }
+}
+
+bool WiFiManager::isScanComplete() {
+    if (!scanInProgress) {
+        return false;
+    }
+
+    // Check for timeout (10 seconds max)
+    if (millis() - scanStartTime > 10000) {
+        // Scan timed out, reset state
+        scanInProgress = false;
+        scanResults = 0;
+        WiFi.scanDelete(); // Clean up any pending scan
+        return true; // Consider timed out scan as "complete" with no results
+    }
+    
+    // Check if scan completed
+    int status = WiFi.scanComplete();
+    if (status >= 0) {
+        // Scan completed successfully
+        scanResults = status;
+        scanInProgress = false;
+        return true;
+    } else if (status == WIFI_SCAN_FAILED) {
+        // Scan failed
+        scanResults = 0;
+        scanInProgress = false;
+        return true; // Consider failed scan as "complete"
+    }
+    
+    // Still scanning
+    return false;
+}
+
+int WiFiManager::getScanProgress() {
+    if (!scanInProgress) {
+        return scanResults > 0 ? 100 : 0;
+    }
+    
+    // Estimate progress based on time (typical scan takes 1-3 seconds)
+    unsigned long elapsed = millis() - scanStartTime;
+    int progress = min(95, (int)(elapsed * 100 / 3000)); // Max 95% until actually complete
+    return progress;
+}
+
+bool WiFiManager::isScanInProgress() {
+    return scanInProgress;
+}
+
+int WiFiManager::getScanResults() {
+    return scanResults;
 }
 
 bool WiFiManager::startAP() {

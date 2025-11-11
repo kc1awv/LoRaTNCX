@@ -1,0 +1,20 @@
+{
+  "name": "loratncx-web",
+  "version": "1.0.0",
+  "description": "LoRaTNCX Web Interface Development",
+  "main": "script.js",
+  "scripts": {
+    "build": "node build.js",
+    "dev": "node build.js && echo 'Files built and ready for upload'",
+    "clean": "rm -f ../data/script.min.js ../data/style.min.css ../data/index.html"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "csso": "^5.0.5",
+    "html-minifier": "^4.0.0",
+    "terser": "^5.44.1"
+  }
+}

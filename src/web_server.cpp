@@ -229,6 +229,10 @@ void TNCWebServer::setupRoutes() {
         handleSaveWiFiConfig(request);
     });
     
+    server->on("/api/wifi/scan/status", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        handleScanStatus(request);
+    });
+    
     server->on("/api/wifi/scan", HTTP_GET, [this](AsyncWebServerRequest* request) {
         handleScanWiFi(request);
     });
@@ -349,16 +353,78 @@ void TNCWebServer::handleSaveWiFiConfig(AsyncWebServerRequest* request) {
 }
 
 void TNCWebServer::handleScanWiFi(AsyncWebServerRequest* request) {
-    int n = wifiManager->scanNetworks();
-    
+    // Start async scan if not already in progress
+    if (wifiManager->startAsyncScan()) {
+        AsyncWebServerResponse* response = request->beginResponse(200, "application/json", 
+            "{\"status\":\"started\",\"message\":\"WiFi scan started\"}");
+        addCORSHeaders(response);
+        request->send(response);
+    } else {
+        // Check why scan failed
+        WiFiConfig currentConfig;
+        wifiManager->getCurrentConfig(currentConfig);
+        
+        String errorMsg = "{\"error\":\"";
+        if (currentConfig.mode == TNC_WIFI_OFF) {
+            errorMsg += "WiFi is disabled. Enable WiFi in Station or AP+Station mode to scan.\"}";
+        } else if (currentConfig.mode == TNC_WIFI_AP) {
+            errorMsg += "Cannot scan in AP-only mode. Switch to Station or AP+Station mode.\"}";
+        } else {
+            errorMsg += "Scan already in progress or failed to start.\"}";
+        }
+        request->send(409, "application/json", errorMsg);
+    }
+}
+
+void TNCWebServer::handleScanStatus(AsyncWebServerRequest* request) {
     JsonDocument doc;
-    JsonArray networks = doc["networks"].to<JsonArray>();
     
-    for (int i = 0; i < n; i++) {
-        JsonObject network = networks.add<JsonObject>();
-        network["ssid"] = wifiManager->getScannedSSID(i);
-        network["rssi"] = wifiManager->getScannedRSSI(i);
-        network["encrypted"] = wifiManager->getScannedEncryption(i);
+    // Check if there's an active scan or completed scan results
+    if (!wifiManager->isScanInProgress() && wifiManager->getScanResults() == 0) {
+        // No scan in progress and no results available
+        doc["status"] = "idle";
+        doc["message"] = "No scan in progress";
+        
+        String output;
+        serializeJson(doc, output);
+        
+        AsyncWebServerResponse* response = request->beginResponse(200, "application/json", output);
+        addCORSHeaders(response);
+        request->send(response);
+        return;
+    }
+
+    // Check memory pressure - if heap is very low, limit response size
+    uint32_t freeHeap = ESP.getFreeHeap();
+    const uint32_t MIN_SAFE_HEAP = 8192; // 8KB minimum safe heap
+    int maxNetworks = (freeHeap < MIN_SAFE_HEAP) ? 5 : 20; // Reduce networks if memory low
+    
+    if (wifiManager->isScanComplete()) {
+        // Scan completed, return results (limit based on memory)
+        int n = wifiManager->scanNetworks();
+        
+        doc["status"] = "completed";
+        doc["progress"] = 100;
+        JsonArray networks = doc["networks"].to<JsonArray>();
+        
+        int networksToReturn = min(n, maxNetworks);
+        
+        for (int i = 0; i < networksToReturn; i++) {
+            JsonObject network = networks.add<JsonObject>();
+            network["ssid"] = wifiManager->getScannedSSID(i);
+            network["rssi"] = wifiManager->getScannedRSSI(i);
+            network["encrypted"] = wifiManager->getScannedEncryption(i);
+        }
+        
+        if (n > maxNetworks) {
+            doc["truncated"] = true;
+            doc["total_networks"] = n;
+            doc["memory_limited"] = (freeHeap < MIN_SAFE_HEAP);
+        }
+    } else {
+        // Scan still in progress
+        doc["status"] = "scanning";
+        doc["progress"] = wifiManager->getScanProgress();
     }
     
     String output;
@@ -393,9 +459,11 @@ String TNCWebServer::getJSONStatus() {
     // Battery
     doc["battery"]["voltage"] = readBatteryVoltage();
     
-    // Uptime
+    // System status with memory monitoring
     doc["system"]["uptime"] = millis() / 1000;
     doc["system"]["free_heap"] = ESP.getFreeHeap();
+    doc["system"]["min_free_heap"] = ESP.getMinFreeHeap();
+    doc["system"]["heap_size"] = ESP.getHeapSize();
     
     String output;
     serializeJson(doc, output);

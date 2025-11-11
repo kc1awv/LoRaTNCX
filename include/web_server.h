@@ -130,6 +130,7 @@ private:
     void handleGetWiFiConfig(AsyncWebServerRequest* request);
     void handleSaveWiFiConfig(AsyncWebServerRequest* request);
     void handleScanWiFi(AsyncWebServerRequest* request);
+    void handleScanStatus(AsyncWebServerRequest* request);
     
     // API handlers - GNSS configuration
     void handleGetGNSSConfig(AsyncWebServerRequest* request);

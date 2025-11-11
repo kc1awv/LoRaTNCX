@@ -273,6 +273,46 @@ public:
      */
     bool getScannedEncryption(int index);
     
+    /**
+     * @brief Start asynchronous WiFi network scan
+     *
+     * Initiates a non-blocking WiFi scan. Use isScanComplete() to check status.
+     *
+     * @return true if scan started successfully
+     * @return false if scan already in progress or failed to start
+     */
+    bool startAsyncScan();
+    
+    /**
+     * @brief Check if asynchronous scan is complete
+     *
+     * @return true if scan completed and results are available
+     * @return false if scan still in progress or failed
+     */
+    bool isScanComplete();
+    
+    /**
+     * @brief Get scan progress as percentage (0-100)
+     *
+     * @return Progress percentage (0 = not started, 100 = complete)
+     */
+    int getScanProgress();
+    
+    /**
+     * @brief Check if a scan is currently in progress
+     *
+     * @return true if scan is active
+     * @return false if no scan in progress
+     */
+    bool isScanInProgress();
+    
+    /**
+     * @brief Get the number of scan results available
+     *
+     * @return Number of networks found (0 if no scan completed)
+     */
+    int getScanResults();
+    
 private:
     Preferences preferences;
     WiFiConfig currentConfig;
@@ -287,6 +327,8 @@ private:
     int reconnectAttempts;
     int scanResults;
     String statusMessage;
+    bool scanInProgress;  // Track if async scan is in progress
+    unsigned long scanStartTime;  // Track when scan started
     
     static const uint32_t CONFIG_MAGIC = 0xFEEDBEEF;
     static const char* NVS_NAMESPACE;

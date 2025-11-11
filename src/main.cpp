@@ -282,6 +282,11 @@ InitError initializeNetworking() {
                 
                 // Start web server
                 LOG_INFOLN("Starting web server...");
+                
+                // Log memory status for debugging TCP issues
+                LOG_INFO("Free heap before web server: ");
+                LOG_INFOLN(ESP.getFreeHeap());
+                
                 webServer.setGNSS(&gnssModule, &nmeaServer);  // Set GNSS references
                 if (webServer.begin()) {
                     LOG_INFO("Web server started on port " + String(WEB_SERVER_PORT));
