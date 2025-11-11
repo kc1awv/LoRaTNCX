@@ -460,6 +460,42 @@ direwolf -t 0 -k 192.168.4.1:8001
 
 **Important Note**: Most KISS applications don't support LoRa-specific parameters (because they were written in the 1990s), which is why you should pre-configure the TNC using the configuration tool before launching your KISS application. Set it and forget it!
 
+## Web Interface Development
+
+The web interface uses a development workflow with automatic minification for optimal ESP32 performance:
+
+### Development Setup
+```bash
+# Install Node.js dependencies (one time)
+cd web
+npm install
+
+# Edit source files (unminified, readable)
+# - index.html
+# - style.css  
+# - script.js
+```
+
+### Build Process
+```bash
+# Build and minify for production
+cd web
+npm run build
+
+# Or from project root
+./build-web.sh
+```
+
+### Upload to ESP32
+```bash
+# Upload minified files to ESP32 filesystem
+platformio run --target uploadfs --environment heltec_wifi_lora_32_V4
+```
+
+**Tools Used**: Terser (JS), CSSO (CSS), html-minifier (HTML) - automatically installed via npm.
+
+See `web/README.md` for detailed development workflow documentation.
+
 ## Configuration Examples
 
 ### Long Range Configuration

@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# LoRaTNCX Web Build Script
+# Convenience script to build web interface from project root
+
+echo "🔧 Building LoRaTNCX web interface..."
+cd web && npm run build
+echo "✅ Web interface built successfully!"
+echo "📤 Ready to upload with: platformio run --target uploadfs --environment heltec_wifi_lora_32_V4"
