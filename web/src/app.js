@@ -5,6 +5,7 @@ class LoRaTNCXInterface {
         this.apiBase = '';
         this.autoRefresh = true;
         this.refreshInterval = null;
+        this.board = null; // Store board information
         this.init();
     }
 
@@ -90,10 +91,11 @@ class LoRaTNCXInterface {
     }
 
     async loadInitialData() {
+        // Load system info first to get board information and populate forms
+        await this.loadSystemInfo();
+        
+        // Then load other data in parallel
         await Promise.all([
-            this.loadStatus(),
-            this.loadLoRaConfig(),
-            this.loadSystemInfo(),
             this.loadWiFiConfig(),
             this.loadGNSSConfig(),
             this.loadGNSSStatus()
@@ -161,21 +163,22 @@ class LoRaTNCXInterface {
         }
     }
 
-    async loadLoRaConfig() {
-        try {
-            const response = await fetch('/api/lora/config');
-            const config = await response.json();
-
-            document.getElementById('frequency').value = config.frequency || '';
-            document.getElementById('bandwidth').value = config.bandwidth || '';
-            document.getElementById('spreadingFactor').value = config.spreading || '';
-            document.getElementById('codingRate').value = config.codingRate || '';
-            document.getElementById('power').value = config.power || '';
-            // Display sync word as hex
-            const syncWord = config.syncWord || 0;
-            document.getElementById('syncWord').value = '0x' + syncWord.toString(16).toUpperCase().padStart(4, '0');
-        } catch (error) {
-            console.error('Failed to load LoRa config:', error);
+    updatePowerLimits() {
+        const powerInput = document.getElementById('power');
+        const powerHelp = document.getElementById('powerHelp');
+        
+        if (!powerInput || !powerHelp) return; // Elements not loaded yet
+        
+        if (this.board && this.board.type === 4) {
+            powerInput.max = 28;
+            powerHelp.textContent = 'Valid range: -9 to 28 dBm (V4 device)';
+        } else if (this.board && this.board.type === 3) {
+            powerInput.max = 22;
+            powerHelp.textContent = 'Valid range: -9 to 22 dBm (V3 device)';
+        } else {
+            // Board info not loaded yet, set conservative default
+            powerInput.max = 22;
+            powerHelp.textContent = 'Valid range: -9 to 22 dBm (loading board info...)';
         }
     }
 
@@ -183,6 +186,12 @@ class LoRaTNCXInterface {
         try {
             const response = await fetch('/api/system');
             const data = await response.json();
+
+            // Store board information
+            this.board = data.board;
+
+            // Update TX power limits if LoRa config is already loaded
+            this.updatePowerLimits();
 
             // Update board info card
             const boardName = data.board?.name || data.board?.type || 'Unknown';
@@ -383,6 +392,9 @@ class LoRaTNCXInterface {
             const response = await fetch('/api/system');
             const data = await response.json();
 
+            // Store board information for power limit updates
+            this.board = data.board;
+
             // Set board info in status card
             const boardInfo = `${data.board?.name || 'Unknown'}`;
             document.getElementById('boardInfo').textContent = boardInfo;
@@ -412,6 +424,20 @@ class LoRaTNCXInterface {
             try {
                 const loraResponse = await fetch('/api/lora/config');
                 const loraConfig = await loraResponse.json();
+                
+                // Populate LoRa form fields
+                document.getElementById('frequency').value = loraConfig.frequency || '';
+                document.getElementById('bandwidth').value = loraConfig.bandwidth || '';
+                document.getElementById('spreadingFactor').value = loraConfig.spreading || '';
+                document.getElementById('codingRate').value = loraConfig.codingRate || '';
+                document.getElementById('power').value = loraConfig.power || '';
+                // Display sync word as hex
+                const syncWord = loraConfig.syncWord || 0;
+                document.getElementById('syncWord').value = '0x' + syncWord.toString(16).toUpperCase().padStart(4, '0');
+                
+                // Update TX power limits based on board type
+                this.updatePowerLimits();
+                
                 currentConfig = `
                     <strong>LoRa:</strong> ${loraConfig.frequency || 'Unknown'}MHz, SF${loraConfig.spreading || 'Unknown'}, ${loraConfig.bandwidth || 'Unknown'}kHz, CR${loraConfig.codingRate || 'Unknown'}<br>
                     <strong>Power:</strong> ${loraConfig.power || 'Unknown'}dBm

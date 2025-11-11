@@ -115,13 +115,14 @@
                             <div class="mb-3">
                                 <label for="frequency" class="form-label">Frequency (MHz)</label>
                                 <input type="number" class="form-control" id="frequency" step="0.1" min="150" max="960">
+                                <div id="frequencyHelp" class="form-text">Valid range: 150 - 960 MHz</div>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="bandwidth" class="form-label">Bandwidth (kHz)</label>
                                 <select class="form-select" id="bandwidth">
-                                    <option value="7.8">7.8 kHz</option>
+                                    <option value="7.8">7.8 kHz (Narrowest)</option>
                                     <option value="10.4">10.4 kHz</option>
                                     <option value="15.6">15.6 kHz</option>
                                     <option value="20.8">20.8 kHz</option>
@@ -130,8 +131,9 @@
                                     <option value="62.5">62.5 kHz</option>
                                     <option value="125">125 kHz</option>
                                     <option value="250">250 kHz</option>
-                                    <option value="500">500 kHz</option>
+                                    <option value="500">500 kHz (Widest)</option>
                                 </select>
+                                <div id="bandwidthHelp" class="form-text">More bandwidth allows for higher data rates but may reduce range.</div>
                             </div>
                         </div>
                     </div>
@@ -140,24 +142,26 @@
                             <div class="mb-3">
                                 <label for="spreadingFactor" class="form-label">Spreading Factor</label>
                                 <select class="form-select" id="spreadingFactor">
-                                    <option value="7">7</option>
+                                    <option value="7">7 (Fastest)</option>
                                     <option value="8">8</option>
                                     <option value="9">9</option>
                                     <option value="10">10</option>
                                     <option value="11">11</option>
-                                    <option value="12">12</option>
+                                    <option value="12">12 (Slowest)</option>
                                 </select>
+                                <div id="spreadingFactorHelp" class="form-text">Higher spreading factors increase range but reduce data rate.</div>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="codingRate" class="form-label">Coding Rate</label>
                                 <select class="form-select" id="codingRate">
-                                    <option value="5">4/5</option>
+                                    <option value="5">4/5 (Fast)</option>
                                     <option value="6">4/6</option>
                                     <option value="7">4/7</option>
-                                    <option value="8">4/8</option>
+                                    <option value="8">4/8 (Robust)</option>
                                 </select>
+                                <div id="codingRateHelp" class="form-text">Higher coding rates improve robustness but reduce data rate.</div>
                             </div>
                         </div>
                     </div>
@@ -165,13 +169,15 @@
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="power" class="form-label">TX Power (dBm)</label>
-                                <input type="number" class="form-control" id="power" min="-9" max="22">
+                                <input type="number" class="form-control" id="power" min="-9">
+                                <div id="powerHelp" class="form-text">Loading board information...</div>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="syncWord" class="form-label">Sync Word (hex)</label>
                                 <input type="text" class="form-control" id="syncWord" placeholder="0x12AB">
+                                <div id="syncWordHelp" class="form-text">Valid range: 0x0000 - 0xFFFF</div>
                             </div>
                         </div>
                     </div>
