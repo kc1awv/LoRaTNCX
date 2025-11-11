@@ -67,6 +67,11 @@ void setupPAControl();
     #define PIN_LORA_PA_POWER   7   // PA power control
     #define HAS_PA_CONTROL      1   // Flag indicating PA control is needed
     
+    // V4 PA gain control for non-linear GC1109 power amplifier
+    #define PA_MAX_OUTPUT       28  // Maximum output power (dBm)
+    #define PA_GAIN_POINTS      22  // Number of gain points (0-21 corresponding to 7-28 dBm)
+    #define PA_GAIN_VALUES      {11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 16, 10, 10, 9, 9, 8, 7}
+    
     // Battery voltage measurement (V4 uses NPN transistor, active HIGH)
     #define PIN_ADC_BATTERY     1   // GPIO1 - ADC input
     #define PIN_ADC_CTRL        37  // GPIO37 - Transistor control (active HIGH for V4)

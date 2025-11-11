@@ -59,7 +59,12 @@
 #define RADIO_CR_MIN                5
 #define RADIO_CR_MAX                8
 #define RADIO_POWER_MIN             -9
-#define RADIO_POWER_MAX             22
+// Power limits depend on board type (V4 supports higher power)
+#ifdef ARDUINO_HELTEC_WIFI_LORA_32_V4
+#define RADIO_POWER_MAX             28  // V4 supports up to 28dBm with PA gain control
+#else
+#define RADIO_POWER_MAX             22  // V3 and other boards limited to 22dBm
+#endif
 #define RADIO_SYNCWORD_MIN          0x0000
 #define RADIO_SYNCWORD_MAX          0xFFFF
 
@@ -99,18 +104,6 @@
 #define GNSS_ENABLED        true     // Enable/disable GNSS by default
 #define GNSS_BAUD_RATE      9600     // Standard GNSS baud rate
 #define GNSS_TCP_PORT       10110    // TCP port for NMEA data streaming (standard NMEA-over-TCP port)
-
-// Radio Parameter Validation Ranges
-#define RADIO_FREQ_MIN              150.0f
-#define RADIO_FREQ_MAX              960.0f
-#define RADIO_SF_MIN                7
-#define RADIO_SF_MAX                12
-#define RADIO_CR_MIN                5
-#define RADIO_CR_MAX                8
-#define RADIO_POWER_MIN             -9
-#define RADIO_POWER_MAX             22
-#define RADIO_SYNCWORD_MIN          0x0000
-#define RADIO_SYNCWORD_MAX          0xFFFF
 
 // Board Pin Definitions (will be set at runtime)
 extern int8_t RADIO_SCLK_PIN;
