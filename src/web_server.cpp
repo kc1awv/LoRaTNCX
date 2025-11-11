@@ -493,6 +493,10 @@ String TNCWebServer::getJSONSystemInfo() {
     doc["memory"]["free_heap"] = ESP.getFreeHeap();
     doc["memory"]["heap_size"] = ESP.getHeapSize();
     
+    // Add SPIFFS storage information
+    doc["storage"]["spiffs_used"] = SPIFFS.usedBytes();
+    doc["storage"]["spiffs_total"] = SPIFFS.totalBytes();
+    
     String output;
     serializeJson(doc, output);
     return output;

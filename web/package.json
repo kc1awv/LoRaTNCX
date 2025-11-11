@@ -1,0 +1,16 @@
+{
+  "name": "loratncx-web",
+  "version": "1.0.0",
+  "description": "Web interface for LoRaTNCX",
+  "main": "index.js",
+  "scripts": {
+    "build": "cp -r src/* dist/ && echo 'Build complete'",
+    "dev": "python3 -m http.server 3000",
+    "clean": "rm -rf dist/*"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {},
+  "dependencies": {}
+}
