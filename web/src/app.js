@@ -5,6 +5,7 @@ class LoRaTNCXInterface {
         this.apiBase = '';
         this.autoRefresh = true;
         this.refreshInterval = null;
+        this.systemRefreshInterval = null;
         this.board = null; // Store board information
         this.init();
     }
@@ -52,10 +53,6 @@ class LoRaTNCXInterface {
             this.toggleScanButton(e.target.value);
         });
 
-        document.getElementById('wifiMode').addEventListener('change', (e) => {
-            this.toggleWiFiMode(e.target.value);
-        });
-
         // GNSS form
         document.getElementById('gnssForm').addEventListener('submit', (e) => {
             e.preventDefault();
@@ -91,15 +88,23 @@ class LoRaTNCXInterface {
     }
 
     async loadInitialData() {
-        // Load system info first to get board information and populate forms
-        await this.loadSystemInfo();
-        
-        // Then load other data in parallel
-        await Promise.all([
-            this.loadWiFiConfig(),
-            this.loadGNSSConfig(),
-            this.loadGNSSStatus()
-        ]);
+        try {
+            // Show loading progress bar
+            this.showLoadingProgress();
+            
+            // Load system info first to get board information and populate forms
+            await this.loadSystemInfo();
+            
+            // Then load other data in parallel
+            await Promise.all([
+                this.loadWiFiConfig(),
+                this.loadGNSSConfig(),
+                this.loadGNSSStatus()
+            ]);
+        } finally {
+            // Hide loading progress bar
+            this.hideLoadingProgress();
+        }
     }
 
     async loadStatus() {
@@ -182,33 +187,31 @@ class LoRaTNCXInterface {
         }
     }
 
-    async loadSystemInfo() {
-        try {
-            const response = await fetch('/api/system');
-            const data = await response.json();
+    showLoadingProgress() {
+        const progressBar = document.getElementById('navbarProgress');
+        if (progressBar) {
+            progressBar.style.display = 'block';
+        }
+    }
 
-            // Store board information
-            this.board = data.board;
+    hideLoadingProgress() {
+        const progressBar = document.getElementById('navbarProgress');
+        if (progressBar) {
+            progressBar.style.display = 'none';
+        }
+    }
 
-            // Update TX power limits if LoRa config is already loaded
-            this.updatePowerLimits();
+    showLoadingProgress() {
+        const progressBar = document.getElementById('navbarProgress');
+        if (progressBar) {
+            progressBar.style.display = 'block';
+        }
+    }
 
-            // Update board info card
-            const boardName = data.board?.name || data.board?.type || 'Unknown';
-            document.getElementById('boardInfo').textContent = boardName;
-
-            document.getElementById('firmwareInfo').textContent = `Board: ${boardName}, Type: ${data.board?.type || 'Unknown'}`;
-            document.getElementById('hardwareInfo').textContent = `Chip: ${data.chip?.model || 'Unknown'} (${data.chip?.cores || 1} cores @ ${data.chip?.frequency || 0}MHz)`;
-            document.getElementById('memoryInfo').textContent = `Free: ${data.memory?.free_heap || 0} bytes, Total: ${data.memory?.heap_size || 0} bytes`;
-            document.getElementById('storageInfo').textContent = `Flash: ${data.memory?.flash_size ? (data.memory.flash_size / 1024 / 1024).toFixed(1) + 'MB' : 'Unknown'}`;
-        } catch (error) {
-            console.error('Failed to load system info:', error);
-            // Set fallback values
-            document.getElementById('boardInfo').textContent = 'Unknown';
-            document.getElementById('firmwareInfo').textContent = 'Error loading firmware info';
-            document.getElementById('hardwareInfo').textContent = 'Error loading hardware info';
-            document.getElementById('memoryInfo').textContent = 'Error loading memory info';
-            document.getElementById('storageInfo').textContent = 'Error loading storage info';
+    hideLoadingProgress() {
+        const progressBar = document.getElementById('navbarProgress');
+        if (progressBar) {
+            progressBar.style.display = 'none';
         }
     }
 

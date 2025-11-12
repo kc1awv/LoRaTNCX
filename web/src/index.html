@@ -6,6 +6,18 @@
     <title>LoRaTNCX - Web Interface</title>
     <!-- Bootstrap CSS -->
     <link href="a/css/bs.css" rel="stylesheet">
+    <style>
+        .navbar-progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+        }
+        .navbar-progress .progress {
+            border-radius: 0;
+        }
+    </style>
 </head>
 <body class="bg-light">
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
@@ -46,6 +58,13 @@
                         Dark Mode
                     </label>
                 </div>
+            </div>
+        </div>
+        <!-- Loading Progress Bar -->
+        <div class="navbar-progress" id="navbarProgress" style="display: none;">
+            <div class="progress" style="height: 2px; margin: 0; border-radius: 0;">
+                <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" 
+                     role="progressbar" style="width: 100%;"></div>
             </div>
         </div>
     </nav>
