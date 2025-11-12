@@ -56,7 +56,8 @@ bool TNCWebServer::isRunning() {
 
 void TNCWebServer::setupRoutes() {
     // Serve static files from SPIFFS with cache headers for better performance
-    server->serveStatic("/", SPIFFS, "/").setDefaultFile("index.html").setCacheControl(("max-age=" + String(WEB_CACHE_MAX_AGE)).c_str());
+    String cacheControl = "max-age=" + String(WEB_CACHE_MAX_AGE);
+    server->serveStatic("/", SPIFFS, "/").setDefaultFile("index.html").setCacheControl(cacheControl.c_str());
     
     // Add GZ compression support for Bootstrap files
     server->on("/a/css/bs.css", HTTP_GET, [this](AsyncWebServerRequest* request) {
@@ -586,7 +587,7 @@ void TNCWebServer::handleSetGNSSConfig(AsyncWebServerRequest* request, const cha
     // Update configuration from JSON
     bool configChanged = false;
     
-    if (doc.containsKey("enabled")) {
+    if (!doc["enabled"].isUnbound()) {
         bool newEnabled = doc["enabled"].as<bool>();
         if (config.enabled != newEnabled) {
             config.enabled = newEnabled;
@@ -594,7 +595,7 @@ void TNCWebServer::handleSetGNSSConfig(AsyncWebServerRequest* request, const cha
         }
     }
     
-    if (doc.containsKey("serialPassthrough")) {
+    if (!doc["serialPassthrough"].isUnbound()) {
         bool newPassthrough = doc["serialPassthrough"].as<bool>();
         if (config.serialPassthrough != newPassthrough) {
             config.serialPassthrough = newPassthrough;
@@ -602,7 +603,7 @@ void TNCWebServer::handleSetGNSSConfig(AsyncWebServerRequest* request, const cha
         }
     }
     
-    if (doc.containsKey("tcpPort")) {
+    if (!doc["tcpPort"].isUnbound()) {
         uint16_t newPort = doc["tcpPort"].as<uint16_t>();
         if (newPort > 0 && newPort != config.tcpPort) {
             config.tcpPort = newPort;
@@ -610,7 +611,7 @@ void TNCWebServer::handleSetGNSSConfig(AsyncWebServerRequest* request, const cha
         }
     }
     
-    if (doc.containsKey("baudRate")) {
+    if (!doc["baudRate"].isUnbound()) {
         uint32_t newBaud = doc["baudRate"].as<uint32_t>();
         // Validate common GNSS baud rates
         if ((newBaud == 4800 || newBaud == 9600 || newBaud == 19200 || 
@@ -623,12 +624,12 @@ void TNCWebServer::handleSetGNSSConfig(AsyncWebServerRequest* request, const cha
     
     // Pin configuration (only if not using built-in port)
     #ifndef HAS_GNSS_PORT
-        if (doc.containsKey("pinRX")) config.pinRX = doc["pinRX"].as<int8_t>();
-        if (doc.containsKey("pinTX")) config.pinTX = doc["pinTX"].as<int8_t>();
-        if (doc.containsKey("pinCtrl")) config.pinCtrl = doc["pinCtrl"].as<int8_t>();
-        if (doc.containsKey("pinWake")) config.pinWake = doc["pinWake"].as<int8_t>();
-        if (doc.containsKey("pinPPS")) config.pinPPS = doc["pinPPS"].as<int8_t>();
-        if (doc.containsKey("pinRST")) config.pinRST = doc["pinRST"].as<int8_t>();
+        if (!doc["pinRX"].isUnbound()) config.pinRX = doc["pinRX"].as<int8_t>();
+        if (!doc["pinTX"].isUnbound()) config.pinTX = doc["pinTX"].as<int8_t>();
+        if (!doc["pinCtrl"].isUnbound()) config.pinCtrl = doc["pinCtrl"].as<int8_t>();
+        if (!doc["pinWake"].isUnbound()) config.pinWake = doc["pinWake"].as<int8_t>();
+        if (!doc["pinPPS"].isUnbound()) config.pinPPS = doc["pinPPS"].as<int8_t>();
+        if (!doc["pinRST"].isUnbound()) config.pinRST = doc["pinRST"].as<int8_t>();
         configChanged = true;
     #endif
     
@@ -651,12 +652,12 @@ void TNCWebServer::handleSetGNSSConfig(AsyncWebServerRequest* request, const cha
     }
     
     // Update NMEA server if available
-    if (nmeaServer && doc.containsKey("tcpPort")) {
+    if (nmeaServer && !doc["tcpPort"].isUnbound()) {
         // NMEA server port change would require restart
     }
     
     String response = "{\"success\":true,\"message\":\"GNSS configuration saved\",\"rebootRequired\":";
-    response += (configChanged && (doc.containsKey("tcpPort") || doc.containsKey("baudRate"))) ? "true" : "false";
+    response += (configChanged && (!doc["tcpPort"].isUnbound() || !doc["baudRate"].isUnbound())) ? "true" : "false";
     response += "}";
     
     AsyncWebServerResponse* resp = request->beginResponse(200, "application/json", response);
@@ -774,13 +775,15 @@ void TNCWebServer::serveCompressedFile(AsyncWebServerRequest* request, const cha
         acceptsGzip = (acceptEncoding.indexOf("gzip") >= 0);
     }
     
+    String cacheControl = "max-age=" + String(WEB_CACHE_MAX_AGE);
+    
     // Try to serve .gz version if client supports gzip
     if (acceptsGzip) {
         String gzPath = String(path) + ".gz";
         if (SPIFFS.exists(gzPath)) {
             AsyncWebServerResponse* response = request->beginResponse(SPIFFS, gzPath, contentType);
             response->addHeader("Content-Encoding", "gzip");
-            response->addHeader("Cache-Control", ("max-age=" + String(WEB_CACHE_MAX_AGE)).c_str());
+            response->addHeader("Cache-Control", cacheControl.c_str());
             addCORSHeaders(response);
             request->send(response);
             return;
@@ -790,7 +793,7 @@ void TNCWebServer::serveCompressedFile(AsyncWebServerRequest* request, const cha
     // Fall back to uncompressed version
     if (SPIFFS.exists(path)) {
         AsyncWebServerResponse* response = request->beginResponse(SPIFFS, path, contentType);
-        response->addHeader("Cache-Control", ("max-age=" + String(WEB_CACHE_MAX_AGE)).c_str());
+        response->addHeader("Cache-Control", cacheControl.c_str());
         addCORSHeaders(response);
         request->send(response);
     } else {
