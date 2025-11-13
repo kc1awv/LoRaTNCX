@@ -28,7 +28,7 @@ jobs:
       - name: Build web interface and prepare SPIFFS data
         run: bash build-web.sh
       - name: Upload web build artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: web-data
           path: data/
@@ -69,12 +69,12 @@ jobs:
       - name: Build SPIFFS filesystem image for ${{ matrix.board }}
         run: pio run --target buildfs -e ${{ matrix.board }}
       - name: Upload firmware artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: firmware-${{ matrix.board }}
           path: .pio/build/${{ matrix.board }}/firmware.bin
       - name: Upload SPIFFS artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: spiffs-${{ matrix.board }}
           path: .pio/build/${{ matrix.board }}/spiffs.bin
