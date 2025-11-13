@@ -5,6 +5,9 @@ on:
         tags:
             - "v*.*.*" # Semantic versioning tags, e.g., v1.0.0
 
+permissions:
+    contents: write
+
 jobs:
     release:
         runs-on: ubuntu-latest
@@ -36,21 +39,13 @@ jobs:
               run: |
                   pio run -e heltec_wifi_lora_32_V4
                   pio run --target buildfs -e heltec_wifi_lora_32_V4
-            - name: Create release and upload assets
-              uses: softprops/action-gh-release@v1
-              with:
-                tag_name: ${{ github.ref_name }}
-                name: Release ${{ github.ref_name }}
-                body: |
-                  Automated release for ${{ github.ref_name }}.
-                  - Firmware binaries and SPIFFS images for V3 and V4 attached.
-                  - Web interface included in SPIFFS.
-                draft: false
-                prerelease: false
-                files: |
-                  .pio/build/heltec_wifi_lora_32_V3/firmware.bin
-                  .pio/build/heltec_wifi_lora_32_V3/spiffs.bin
-                  .pio/build/heltec_wifi_lora_32_V4/firmware.bin
-                  .pio/build/heltec_wifi_lora_32_V4/spiffs.bin
+            - name: Create release
+              id: create_release
               env:
-                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  TAG: ${{ github.ref_name }}
+              run: |
+                  gh release create "$TAG" \
+                    --repo=${GITHUB_REPOSITORY} \
+                    --title="${GITHUB_REPOSITORY#*/} ${TAG#v}" \
+                    --generate-notes
