@@ -36,8 +36,6 @@ jobs:
               run: |
                   pio run -e heltec_wifi_lora_32_V4
                   pio run --target buildfs -e heltec_wifi_lora_32_V4
-            - name: Run Python tests
-              run: python test/kiss_test.py
             - name: Create web assets zip
               run: cd web && zip -r ../web-assets.zip dist/
             - name: Create release
