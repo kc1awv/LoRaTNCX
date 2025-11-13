@@ -1,0 +1,43 @@
+name: Release
+
+on:
+    push:
+        tags:
+            - "v*.*.*" # Semantic versioning tags, e.g., v1.0.0
+
+jobs:
+    release:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+            - name: Build all components # Reuse CI logic
+              run: |
+                  # Firmware (example for one board; expand for matrix if needed)
+                  pip install platformio
+                  pio run -e heltec_wifi_lora_32_V3
+                  pio run -e heltec_wifi_lora_32_V4
+                  # Web
+                  cd web && npm ci && npm run build
+                  # Python tests (optional, but good to verify)
+                  python test/kiss_test.py
+            - name: Zip web assets
+              run: |
+                  cd web && zip -r ../web-dist.zip dist/
+            - name: Create GitHub Release and Upload Assets
+              uses: softprops/action-gh-release@v1
+              with:
+                  tag_name: ${{ github.ref }}
+                  name: Release ${{ github.ref }}
+                  body: |
+                      Automated release for ${{ github.ref }}.
+                      - Firmware binaries attached.
+                      - Web assets included.
+                  draft: false
+                  prerelease: false
+                  files: |
+                      .pio/build/heltec_wifi_lora_32_V3/firmware.bin
+                      .pio/build/heltec_wifi_lora_32_V4/firmware.bin
+                      web-dist.zip
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
