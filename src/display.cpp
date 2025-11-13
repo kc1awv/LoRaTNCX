@@ -110,6 +110,20 @@ DisplayManager::DisplayManager()
       radioPower(LORA_POWER),
       radioSyncWord(LORA_SYNCWORD),
       batteryVoltage(0.0),
+      wifiAPActive(false),
+      wifiSTAConnected(false),
+      wifiAPIP(""),
+      wifiSTAIP(""),
+      wifiRSSI(0),
+      wifiStartupMessage(""),
+      initMessage("Initializing..."),
+      initComponent(""),
+      initSuccess(true),
+      readyRadioOK(false),
+      readyWiFiStatus("OFF"),
+      readyGNSSOK(false),
+      readyGNSSFix(false),
+      readyBoardType("V3"),
       gnssEnabled(false),
       gnssHasFix(false),
       gnssLatitude(0.0),
@@ -132,7 +146,7 @@ void DisplayManager::begin() {
     u8g2.sendBuffer();
     
     // Show boot screen
-    showBootScreen();
+    showBootScreen(3000);
 }
 
 void DisplayManager::showBootScreen(uint32_t duration_ms) {
@@ -150,10 +164,10 @@ void DisplayManager::showBootScreen(uint32_t duration_ms) {
 
 void DisplayManager::update() {
     // Check if boot screen should expire
-    if (bootScreenActive) {
+    if (bootScreenActive && currentScreen == SCREEN_BOOT) {
         if (millis() - bootScreenStartTime >= bootScreenDuration) {
             bootScreenActive = false;
-            currentScreen = SCREEN_STATUS;  // Move to status screen after boot
+            currentScreen = SCREEN_INIT;  // Move to init screen after boot
             lastScreen = SCREEN_BOOT;  // Force re-render
         }
     }
@@ -170,6 +184,12 @@ void DisplayManager::update() {
         switch (currentScreen) {
             case SCREEN_BOOT:
                 renderBootScreen();
+                break;
+            case SCREEN_INIT:
+                renderInitScreen();
+                break;
+            case SCREEN_READY:
+                renderReadyScreen();
                 break;
             case SCREEN_WIFI_STARTUP:
                 renderWiFiStartupScreen();
@@ -199,8 +219,12 @@ void DisplayManager::update() {
 }
 
 void DisplayManager::setScreen(DisplayScreen screen) {
-    if (!bootScreenActive && screen != currentScreen) {
+    if (screen != currentScreen) {
         currentScreen = screen;
+        // Disable boot screen timeout if switching away from boot screen
+        if (screen != SCREEN_BOOT) {
+            bootScreenActive = false;
+        }
     }
 }
 
@@ -215,29 +239,32 @@ void DisplayManager::nextScreen() {
     // If display is off, turn it back on
     if (currentScreen == SCREEN_OFF) {
         displayOn();
-        currentScreen = SCREEN_STATUS;
+        currentScreen = SCREEN_READY;
         return;
     }
     
-    // Cycle through screens: STATUS -> WIFI -> BATTERY -> GNSS -> OFF -> STATUS
+    // Cycle through screens: READY -> STATUS -> WIFI -> GNSS -> BATTERY -> OFF -> READY
     switch (currentScreen) {
+        case SCREEN_READY:
+            currentScreen = SCREEN_STATUS;
+            break;
         case SCREEN_STATUS:
             currentScreen = SCREEN_WIFI;
             break;
         case SCREEN_WIFI:
-            currentScreen = SCREEN_BATTERY;
-            break;
-        case SCREEN_BATTERY:
             currentScreen = SCREEN_GNSS;
             break;
         case SCREEN_GNSS:
+            currentScreen = SCREEN_BATTERY;
+            break;
+        case SCREEN_BATTERY:
             displayOff();
             break;
         case SCREEN_OFF:
-            currentScreen = SCREEN_STATUS;
+            currentScreen = SCREEN_READY;
             break;
         default:
-            currentScreen = SCREEN_STATUS;
+            currentScreen = SCREEN_READY;
             break;
     }
 }
@@ -332,6 +359,38 @@ void DisplayManager::setWiFiStartupMessage(String message) {
     }
 }
 
+void DisplayManager::setInitMessage(String message) {
+    initMessage = message;
+    
+    // Trigger update if on init screen
+    if (currentScreen == SCREEN_INIT) {
+        lastScreen = SCREEN_BOOT;  // Force re-render
+    }
+}
+
+void DisplayManager::setInitStatus(String component, bool success) {
+    initComponent = component;
+    initSuccess = success;
+    
+    // Trigger update if on init screen
+    if (currentScreen == SCREEN_INIT) {
+        lastScreen = SCREEN_BOOT;  // Force re-render
+    }
+}
+
+void DisplayManager::setReadyStatus(bool radioOK, String wifiStatus, bool gnssOK, bool gnssFix, String boardType) {
+    readyRadioOK = radioOK;
+    readyWiFiStatus = wifiStatus;
+    readyGNSSOK = gnssOK;
+    readyGNSSFix = gnssFix;
+    readyBoardType = boardType;
+    
+    // Trigger update if on ready screen
+    if (currentScreen == SCREEN_READY) {
+        lastScreen = SCREEN_BOOT;  // Force re-render
+    }
+}
+
 void DisplayManager::setGNSSStatus(bool enabled, bool hasFix, double lat, double lon, uint8_t sats, uint8_t clients) {
     gnssEnabled = enabled;
     gnssHasFix = hasFix;
@@ -373,6 +432,76 @@ bool DisplayManager::isBootScreenActive() {
 void DisplayManager::renderBootScreen() {
     // Draw the logo bitmap (128x64 pixels)
     u8g2.drawBitmap(0, 0, 16, 64, logoBitmap);
+}
+
+void DisplayManager::renderInitScreen() {
+    u8g2.setFont(u8g2_font_ncenB08_tr);
+    
+    // Title
+    const char* title = "LoRaTNCX Init";
+    int titleWidth = u8g2.getStrWidth(title);
+    u8g2.drawStr((128 - titleWidth) / 2, 12, title);
+    
+    // Current status message
+    u8g2.setFont(u8g2_font_6x10_tr);
+    if (initMessage.length() > 0) {
+        String msg = initMessage;
+        if (msg.length() > 21) {
+            String line1 = msg.substring(0, 21);
+            u8g2.drawStr(0, 30, line1.c_str());
+            
+            if (msg.length() > 42) {
+                String line2 = msg.substring(21, 42);
+                u8g2.drawStr(0, 42, line2.c_str());
+                
+                String line3 = msg.substring(42);
+                if (line3.length() > 21) line3 = line3.substring(0, 21);
+                u8g2.drawStr(0, 54, line3.c_str());
+            } else {
+                String line2 = msg.substring(21);
+                u8g2.drawStr(0, 42, line2.c_str());
+            }
+        } else {
+            u8g2.drawStr(0, 30, msg.c_str());
+        }
+    }
+    
+    // Component status if available
+    if (initComponent.length() > 0) {
+        String status = initComponent + ": " + (initSuccess ? "OK" : "FAIL");
+        u8g2.drawStr(0, 54, status.c_str());
+    }
+}
+
+void DisplayManager::renderReadyScreen() {
+    u8g2.setFont(u8g2_font_ncenB08_tr);
+    
+    // Title
+    const char* title = "LoRaTNCX Ready";
+    int titleWidth = u8g2.getStrWidth(title);
+    u8g2.drawStr((128 - titleWidth) / 2, 12, title);
+    
+    // Status information
+    u8g2.setFont(u8g2_font_6x10_tr);
+    
+    // Radio status
+    String radioStatus = "Radio: " + String(readyRadioOK ? "OK" : "NO");
+    u8g2.drawStr(0, 28, radioStatus.c_str());
+    
+    // WiFi status
+    String wifiStatus = "WiFi: " + readyWiFiStatus;
+    u8g2.drawStr(0, 40, wifiStatus.c_str());
+    
+    // GNSS status
+    String gnssStatus = "GNSS: " + String(readyGNSSOK ? "OK" : "NO");
+    if (readyGNSSOK) {
+        gnssStatus += " Fix: " + String(readyGNSSFix ? "OK" : "NO");
+    }
+    u8g2.drawStr(0, 52, gnssStatus.c_str());
+    
+    // Board type
+    String boardStatus = "Board: " + readyBoardType;
+    u8g2.drawStr(0, 64, boardStatus.c_str());
 }
 
 void DisplayManager::renderWiFiStartupScreen() {
@@ -574,7 +703,7 @@ void DisplayManager::renderGNSSScreen() {
     } else {
         // Waiting for fix
         u8g2.setFont(u8g2_font_6x10_tr);
-        const char* msg = "Waiting for GPS fix...";
+        const char* msg = "Waiting for GPS fix";
         int msgWidth = u8g2.getStrWidth(msg);
         u8g2.drawStr((128 - msgWidth) / 2, 40, msg);
     }

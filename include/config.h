@@ -42,14 +42,35 @@
 #define HW_QUERY_GNSS       0x04  // Query GNSS status and configuration
 #define HW_QUERY_ALL        0xFF  // Query everything (config + battery + board + gnss)
 
-// LoRa Default Parameters (915 MHz ISM band for North America)
-#define LORA_FREQUENCY      915.0    // MHz - US ISM band (902-928 MHz)
-#define LORA_BANDWIDTH      125.0    // kHz
-#define LORA_SPREADING      12       // SF12
-#define LORA_CODINGRATE     7        // 4/7
-#define LORA_SYNCWORD       0x1424   // Private network (SX126x format: 0x1424, compatible with SX127x 0x12)
-#define LORA_POWER          20       // dBm
-#define LORA_PREAMBLE       8        // symbols
+// LoRa Buffer Sizes
+#define LORA_BUFFER_SIZE        256
+#define LORA_MAX_FRAME_SIZE     240  // Leave room for headers
+#define SERIAL_BUFFER_SIZE      512  // Serial buffer size
+
+// Serial Configuration
+#define SERIAL_BAUD_RATE        115200
+#define SERIAL_INIT_DELAY       100
+
+// WiFi Configuration
+#define WIFI_TIMEOUT_MS         30000
+#define WIFI_INIT_DELAY_MS      100
+#define WIFI_STATUS_DELAY_MS    2000
+#define WIFI_CHANGE_DELAY_MS    1000
+
+// GNSS Configuration
+#define GNSS_DEFAULT_BAUD       9600
+#define GNSS_POWER_ON_DELAY_MS  100
+#define GNSS_STABILIZE_DELAY_MS 1000
+
+// Web Server Configuration
+#define WEB_SERVER_PORT         80
+#define WEB_CACHE_MAX_AGE       86400  // 24 hours
+
+// Battery Monitoring
+#define BATTERY_SAMPLE_INTERVAL 10000  // 10 seconds
+
+// Watchdog Configuration
+#define WDT_TIMEOUT_SECONDS     30
 
 // Radio Parameter Validation Ranges
 #define RADIO_FREQ_MIN              150.0f
@@ -67,27 +88,6 @@
 #endif
 #define RADIO_SYNCWORD_MIN          0x0000
 #define RADIO_SYNCWORD_MAX          0xFFFF
-
-// Deaf Period - prevents receiving own transmissions when radios are close
-// Set to 0 to disable. For SF12, packets take ~1-2 seconds to transmit.
-#define DEAF_PERIOD_MS      2000     // milliseconds to ignore RX after TX
-
-// Buffer Sizes
-#define SERIAL_BUFFER_SIZE  512
-#define LORA_BUFFER_SIZE    256
-
-// Serial Configuration
-#define SERIAL_BAUD_RATE    115200
-#define SERIAL_INIT_DELAY   1000  // ms
-
-// WiFi Configuration
-#define WIFI_TIMEOUT_MS     30000  // 30 seconds
-#define WIFI_INIT_DELAY_MS  100    // ms
-#define WIFI_STATUS_DELAY_MS 2000  // 2 seconds
-
-// Web Server Configuration
-#define WEB_SERVER_PORT     80
-#define WEB_CACHE_MAX_AGE   3600   // 1 hour
 
 // ADC Configuration
 #define ADC_RESOLUTION      12
@@ -118,6 +118,15 @@ enum BatteryChargeState {
 #define GNSS_ENABLED        true     // Enable/disable GNSS by default
 #define GNSS_BAUD_RATE      9600     // Standard GNSS baud rate
 #define GNSS_TCP_PORT       10110    // TCP port for NMEA data streaming (standard NMEA-over-TCP port)
+
+// LoRa Default Parameters (915 MHz ISM band for North America)
+#define LORA_FREQUENCY      915.0    // MHz - US ISM band (902-928 MHz)
+#define LORA_BANDWIDTH      125.0    // kHz
+#define LORA_SPREADING      12       // SF12
+#define LORA_CODINGRATE     7        // 4/7
+#define LORA_SYNCWORD       0x1424   // Private network (SX126x format: 0x1424, compatible with SX127x 0x12)
+#define LORA_POWER          20       // dBm
+#define LORA_PREAMBLE       8        // symbols
 
 // Board Pin Definitions (will be set at runtime)
 extern int8_t RADIO_SCLK_PIN;

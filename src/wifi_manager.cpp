@@ -128,6 +128,12 @@ bool WiFiManager::loadConfig(WiFiConfig& config) {
         return false;
     }
     
+    // Check if WiFi config key exists to avoid error logs on first boot
+    if (!preferences.isKey(NVS_WIFI_KEY)) {
+        preferences.end();
+        return false;
+    }
+    
     size_t len = preferences.getBytes(NVS_WIFI_KEY, &config, sizeof(WiFiConfig));
     preferences.end();
     
@@ -151,6 +157,12 @@ bool WiFiManager::loadConfig(WiFiConfig& config) {
 
 bool WiFiManager::hasValidConfig() {
     if (!preferences.begin(NVS_NAMESPACE, true)) {
+        return false;
+    }
+    
+    // Check if WiFi config key exists to avoid error logs
+    if (!preferences.isKey(NVS_WIFI_KEY)) {
+        preferences.end();
         return false;
     }
     

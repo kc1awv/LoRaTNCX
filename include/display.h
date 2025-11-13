@@ -10,6 +10,8 @@
  */
 enum DisplayScreen {
     SCREEN_BOOT,         ///< Boot/splash screen with version info
+    SCREEN_INIT,         ///< Initialization progress screen
+    SCREEN_READY,        ///< Ready screen showing system status summary
     SCREEN_WIFI_STARTUP, ///< WiFi initialization progress screen
     SCREEN_STATUS,       ///< Main status screen showing radio configuration
     SCREEN_WIFI,         ///< WiFi connection status and IP addresses
@@ -112,6 +114,32 @@ public:
     void setWiFiStartupMessage(String message);
     
     /**
+     * @brief Set the initialization status message
+     *
+     * @param message Status message to display during system initialization
+     */
+    void setInitMessage(String message);
+    
+    /**
+     * @brief Set the initialization status with success/fail indicator
+     *
+     * @param component Name of the component being initialized
+     * @param success True if initialization succeeded, false if failed
+     */
+    void setInitStatus(String component, bool success);
+    
+    /**
+     * @brief Set the ready screen status data
+     *
+     * @param radioOK True if radio is initialized successfully
+     * @param wifiStatus WiFi status: "OFF", "AP", "STA", or "AP+STA"
+     * @param gnssOK True if GNSS module is initialized
+     * @param gnssFix True if GNSS has a valid fix
+     * @param boardType Board type string ("V3" or "V4")
+     */
+    void setReadyStatus(bool radioOK, String wifiStatus, bool gnssOK, bool gnssFix, String boardType);
+    
+    /**
      * @brief Update the WiFi status display data
      *
      * @param apActive True if access point is active
@@ -211,6 +239,18 @@ private:
     // WiFi startup status
     String wifiStartupMessage;
     
+    // Initialization status
+    String initMessage;
+    String initComponent;
+    bool initSuccess;
+    
+    // Ready screen status
+    bool readyRadioOK;
+    String readyWiFiStatus;
+    bool readyGNSSOK;
+    bool readyGNSSFix;
+    String readyBoardType;
+    
     // GNSS data
     bool gnssEnabled;
     bool gnssHasFix;
@@ -228,6 +268,8 @@ private:
     
     // Screen rendering functions
     void renderBootScreen();
+    void renderInitScreen();
+    void renderReadyScreen();
     void renderWiFiStartupScreen();
     void renderStatusScreen();
     void renderWiFiScreen();

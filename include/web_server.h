@@ -12,21 +12,8 @@
 #include "nmea_server.h"
 
 // Web Server Constants
-#define WEB_SERVER_PORT             80      ///< HTTP server port
-#define WIFI_CHANGE_DELAY_MS        500     ///< Delay before applying WiFi changes
 #define HTTP_STATUS_OK              200     ///< HTTP OK status code
 #define HTTP_BAD_REQUEST            400     ///< HTTP Bad Request status code
-#define WEB_CACHE_MAX_AGE           3600    ///< Cache max age in seconds (1 hour)
-
-// Radio Parameter Validation Ranges
-#define RADIO_FREQ_MIN              150.0f  ///< Minimum frequency in MHz
-#define RADIO_FREQ_MAX              960.0f  ///< Maximum frequency in MHz
-#define RADIO_SF_MIN                7       ///< Minimum spreading factor
-#define RADIO_SF_MAX                12      ///< Maximum spreading factor
-#define RADIO_CR_MIN                5       ///< Minimum coding rate
-#define RADIO_CR_MAX                8       ///< Maximum coding rate
-#define RADIO_POWER_MIN             -9      ///< Minimum power in dBm
-// RADIO_POWER_MAX is now defined in config.h based on board type
 
 /**
  * @brief Web Server for LoRa TNC configuration and monitoring

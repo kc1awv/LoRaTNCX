@@ -2,6 +2,7 @@
 #include <SPIFFS.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
+#include <esp_task_wdt.h>
 #include "config.h"
 #include "board_config.h"
 #include "config_manager.h"
@@ -137,7 +138,8 @@ enum InitError {
     INIT_SPIFFS_FAILED = 3,
     INIT_CONFIG_FAILED = 4,
     INIT_WIFI_FAILED = 5,
-    INIT_GNSS_FAILED = 6
+    INIT_GNSS_FAILED = 6,
+    INIT_WATCHDOG_FAILED = 7
 };
 
 // Helper functions for setup initialization
@@ -192,46 +194,61 @@ InitError initializeHardware() {
 InitError initializeConfiguration() {
     // Initialize configuration manager
     LOG_INFOLN("Initializing config manager...");
+    displayManager.setInitMessage("Loading configuration...");
+    displayManager.update();
+    
     if (!configManager.begin()) {
         LOG_ERRORLN("Config manager initialization failed - using defaults");
+        displayManager.setInitStatus("Config", false);
+        displayManager.update();
+        delay(500);
         return INIT_CONFIG_FAILED;
     }
+    
+    displayManager.setInitStatus("Config", true);
+    displayManager.update();
+    delay(200);
     return INIT_SUCCESS;
 }
 
 InitError initializeRadio() {
     // Initialize LoRa radio first - halt if failed
     LOG_INFOLN("Initializing radio...");
+    displayManager.setInitMessage("Initializing LoRa radio...");
+    displayManager.update();
+    
     int radioState = loraRadio.beginWithState();
     if (radioState != RADIOLIB_ERR_NONE) {
         LOG_ERROR("FATAL: Radio init failed with code: ");
         LOG_ERRORLN(radioState);
         LOG_ERRORLN("Cannot continue without radio functionality");
+        displayManager.setInitStatus("Radio", false);
+        displayManager.update();
+        delay(1000);
         return INIT_RADIO_FAILED;
     }
     LOG_INFOLN("Radio initialized!");
+    displayManager.setInitStatus("Radio", true);
+    displayManager.update();
+    delay(200);
     
     // Now try to load and apply saved configuration
     LoRaConfig savedConfig;
     if (configManager.loadConfig(savedConfig)) {
         LOG_INFOLN("Applying saved config...");
+        displayManager.setInitMessage("Applying radio config...");
+        displayManager.update();
         loraRadio.applyConfig(savedConfig);
         loraRadio.reconfigure();  // Reconfigure radio with saved settings
+        displayManager.setInitStatus("Radio Config", true);
+        displayManager.update();
+        delay(200);
     } else {
         LOG_INFOLN("Using default config");
+        displayManager.setInitStatus("Radio Config", true);
+        displayManager.update();
+        delay(200);
     }
-    
-    // Update display with initial radio config
-    LoRaConfig currentConfig;
-    loraRadio.getCurrentConfig(currentConfig);
-    displayManager.setRadioConfig(
-        currentConfig.frequency,
-        currentConfig.bandwidth,
-        currentConfig.spreading,
-        currentConfig.codingRate,
-        currentConfig.power,
-        currentConfig.syncWord
-    );
     
     return INIT_SUCCESS;
 }
@@ -239,17 +256,20 @@ InitError initializeRadio() {
 InitError initializeNetworking() {
     // Initialize WiFi manager
     LOG_INFOLN("Initializing WiFi manager...");
+    displayManager.setInitMessage("Initializing WiFi...");
+    displayManager.update();
+    
     if (wifiManager.begin()) {
         LOG_INFOLN("WiFi manager initialized");
-        
-        // Switch to WiFi startup screen
-        displayManager.setScreen(SCREEN_WIFI_STARTUP);
-        displayManager.setWiFiStartupMessage("Starting WiFi...");
+        displayManager.setInitStatus("WiFi Manager", true);
         displayManager.update();
+        delay(200);
         
         // Start WiFi with saved/default configuration
         if (wifiManager.start()) {
             LOG_INFOLN("WiFi started");
+            displayManager.setInitMessage("Connecting to WiFi...");
+            displayManager.update();
             
             // Wait for WiFi to be ready (either AP started or STA connected)
             // with a timeout of 30 seconds
@@ -258,30 +278,19 @@ InitError initializeNetworking() {
             
             while (!wifiManager.isReady() && (millis() - wifiStartTime < WIFI_TIMEOUT)) {
                 wifiManager.update();
-                displayManager.setWiFiStartupMessage(wifiManager.getStatusMessage());
-                displayManager.update();
                 delay(WIFI_INIT_DELAY_MS);
             }
             
             if (wifiManager.isReady()) {
                 LOG_INFOLN("WiFi ready!");
-                
-                // Show WiFi info on display
-                if (wifiManager.isAPActive()) {
-                    LOG_INFO("AP IP: ");
-                    LOG_INFOLN(wifiManager.getAPIPAddress());
-                    displayManager.setWiFiStartupMessage("AP: " + wifiManager.getAPIPAddress());
-                }
-                if (wifiManager.isConnected()) {
-                    LOG_INFO("STA IP: ");
-                    LOG_INFOLN(wifiManager.getIPAddress());
-                    displayManager.setWiFiStartupMessage("Connected: " + wifiManager.getIPAddress());
-                }
+                displayManager.setInitStatus("WiFi", true);
                 displayManager.update();
-                delay(WIFI_STATUS_DELAY_MS);  // Show WiFi status for 2 seconds
+                delay(200);
                 
                 // Start web server
                 LOG_INFOLN("Starting web server...");
+                displayManager.setInitMessage("Starting web server...");
+                displayManager.update();
                 
                 // Log memory status for debugging TCP issues
                 LOG_INFO("Free heap before web server: ");
@@ -289,10 +298,16 @@ InitError initializeNetworking() {
                 
                 webServer.setGNSS(&gnssModule, &nmeaServer);  // Set GNSS references
                 if (webServer.begin()) {
-                    LOG_INFO("Web server started on port " + String(WEB_SERVER_PORT));
+                    LOG_INFO("Web server started on port " + String(WEB_SERVER_PORT) + " ");
                     LOG_INFOLN("Access via: http://loratncx.local");
+                    displayManager.setInitStatus("Web Server", true);
+                    displayManager.update();
+                    delay(200);
                 } else {
                     LOG_ERRORLN("Failed to start web server");
+                    displayManager.setInitStatus("Web Server", false);
+                    displayManager.update();
+                    delay(500);
                 }
                 
                 // Start TCP KISS server if enabled
@@ -301,26 +316,38 @@ InitError initializeNetworking() {
                 if (wifiConfig.tcp_kiss_enabled) {
                     LOG_INFO("Starting TCP KISS server on port ");
                     LOG_INFOLN(wifiConfig.tcp_kiss_port);
+                    displayManager.setInitMessage("Starting TCP KISS...");
+                    displayManager.update();
+                    
                     if (tcpKissServer.begin(wifiConfig.tcp_kiss_port)) {
                         LOG_INFOLN("TCP KISS server started");
+                        displayManager.setInitStatus("TCP KISS", true);
+                        displayManager.update();
+                        delay(200);
                     } else {
                         LOG_ERRORLN("Failed to start TCP KISS server");
+                        displayManager.setInitStatus("TCP KISS", false);
+                        displayManager.update();
+                        delay(500);
                     }
                 }
             } else {
                 LOG_WARNLN("WiFi timeout - continuing anyway");
-                displayManager.setWiFiStartupMessage("WiFi Timeout");
+                displayManager.setInitStatus("WiFi", false);
                 displayManager.update();
-                delay(WIFI_STATUS_DELAY_MS);
+                delay(500);
             }
         } else {
             LOG_WARNLN("WiFi start failed or disabled");
-            displayManager.setWiFiStartupMessage("WiFi Disabled");
+            displayManager.setInitStatus("WiFi", false);
             displayManager.update();
-            delay(WIFI_STATUS_DELAY_MS);
+            delay(500);
         }
     } else {
         LOG_ERRORLN("WiFi manager init failed - continuing without WiFi");
+        displayManager.setInitStatus("WiFi Manager", false);
+        displayManager.update();
+        delay(500);
         return INIT_WIFI_FAILED;
     }
     
@@ -339,29 +366,61 @@ InitError initializeGNSS() {
     
     if (gnssConfig.enabled && gnssConfig.pinRX >= 0 && gnssConfig.pinTX >= 0) {
         LOG_INFOLN("Initializing GNSS module...");
+        displayManager.setInitMessage("Initializing GNSS...");
+        displayManager.update();
+        
         if (gnssModule.begin(gnssConfig.pinRX, gnssConfig.pinTX, 
                             gnssConfig.pinCtrl, gnssConfig.pinWake,
                             gnssConfig.pinPPS, gnssConfig.pinRST,
                             gnssConfig.baudRate)) {
             LOG_INFOLN("GNSS module initialized");
+            displayManager.setInitStatus("GNSS Module", true);
+            displayManager.update();
+            delay(200);
             
             // Start NMEA TCP server
             LOG_INFO("Starting NMEA server on port ");
             LOG_INFOLN(gnssConfig.tcpPort);
+            displayManager.setInitMessage("Starting NMEA server...");
+            displayManager.update();
+            
             if (nmeaServer.begin(gnssConfig.tcpPort)) {
                 LOG_INFOLN("NMEA server started");
+                displayManager.setInitStatus("NMEA Server", true);
+                displayManager.update();
+                delay(200);
             } else {
                 LOG_ERRORLN("Failed to start NMEA server");
+                displayManager.setInitStatus("NMEA Server", false);
+                displayManager.update();
+                delay(500);
                 return INIT_GNSS_FAILED;
             }
         } else {
             LOG_WARNLN("Failed to initialize GNSS module - continuing without GNSS");
+            displayManager.setInitStatus("GNSS Module", false);
+            displayManager.update();
+            delay(500);
             return INIT_GNSS_FAILED;
         }
     } else {
         LOG_INFOLN("GNSS disabled or not configured");
+        displayManager.setInitStatus("GNSS", false);
+        displayManager.update();
+        delay(200);
     }
     
+    return INIT_SUCCESS;
+}
+
+InitError initializeWatchdog() {
+    // Enable ESP32 Task Watchdog Timer with 30 second timeout
+    esp_task_wdt_init(WDT_TIMEOUT_SECONDS, true);
+    
+    // Add current task to watchdog
+    esp_task_wdt_add(NULL);
+    
+    LOG_INFOLN("Watchdog initialized");
     return INIT_SUCCESS;
 }
 
@@ -372,6 +431,12 @@ void setup() {
     error = initializeSerial();
     if (error != INIT_SUCCESS) {
         // Serial failed - we're blind, but continue anyway
+    }
+    
+    // Initialize watchdog for system stability
+    error = initializeWatchdog();
+    if (error != INIT_SUCCESS) {
+        LOG_WARNLN("Warning: Watchdog initialization failed - system may hang on errors");
     }
     
     // Initialize file system (non-critical)
@@ -393,6 +458,16 @@ void setup() {
             delay(1000);
         }
     }
+    
+    // Wait for boot screen to complete, then switch to initialization screen
+    while (displayManager.isBootScreenActive()) {
+        displayManager.update();
+        delay(100);
+    }
+    
+    // Now on init screen, set initial message
+    displayManager.setInitMessage("Initializing system...");
+    displayManager.update();
     
     // Initialize configuration (non-critical, but affects other systems)
     error = initializeConfiguration();
@@ -425,6 +500,40 @@ void setup() {
     }
     
     LOG_INFOLN("LoRaTNCX ready - entering KISS mode");
+    
+    // Prepare ready screen data
+    bool radioOK = (initializeRadio() == INIT_SUCCESS);  // We already initialized radio, but check if it was successful
+    // Actually, we need to track if radio init was successful. Let me check if we can determine this.
+    // For now, assume radio is OK if we reached this point
+    radioOK = true;
+    
+    // Determine WiFi status
+    String wifiStatus = "OFF";
+    if (wifiManager.isAPActive() && wifiManager.isConnected()) {
+        wifiStatus = "AP+STA";
+    } else if (wifiManager.isAPActive()) {
+        wifiStatus = "AP";
+    } else if (wifiManager.isConnected()) {
+        wifiStatus = "STA";
+    }
+    
+    // Determine GNSS status
+    bool gnssOK = gnssModule.isRunning();
+    bool gnssFix = gnssOK && gnssModule.hasValidFix();
+    
+    // Get board type
+    String boardType = "UNK";
+    if (BOARD_TYPE == BOARD_V3) {
+        boardType = "V3";
+    } else if (BOARD_TYPE == BOARD_V4) {
+        boardType = "V4";
+    }
+    
+    // Show ready screen (this will be the default screen users see)
+    displayManager.setReadyStatus(radioOK, wifiStatus, gnssOK, gnssFix, boardType);
+    displayManager.setScreen(SCREEN_READY);
+    displayManager.update();
+    
     // TNC is now ready and enters KISS mode (silent operation)
 }
 
@@ -1042,6 +1151,9 @@ void loop() {
     
     // Process received LoRa packets
     processReceivedPackets();
+    
+    // Feed watchdog to prevent reset
+    esp_task_wdt_reset();
     
     // Yield to allow other tasks and prevent watchdog resets
     yield();

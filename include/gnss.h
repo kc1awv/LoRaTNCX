@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <TinyGPS++.h>
+#include "config.h"
 
 // Default GNSS settings
 #define GNSS_DEFAULT_BAUD           9600
@@ -12,10 +13,6 @@
 
 // GNSS Hardware Pins (GPIO numbers)
 #define GNSS_VEXT_PIN               37      // GPIO 37 - GNSS power control (active LOW)
-
-// GNSS Timing
-#define GNSS_POWER_ON_DELAY_MS      50      // Delay after power on
-#define GNSS_STABILIZE_DELAY_MS     100     // Delay for module stabilization
 
 // GNSS module class
 class GNSSModule {
