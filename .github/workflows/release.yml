@@ -48,4 +48,8 @@ jobs:
                   gh release create "$TAG" \
                     --repo=${GITHUB_REPOSITORY} \
                     --title="${GITHUB_REPOSITORY#*/} ${TAG#v}" \
-                    --generate-notes
+                    --generate-notes \
+                    .pio/build/heltec_wifi_lora_32_V3/firmware.bin \
+                    .pio/build/heltec_wifi_lora_32_V3/spiffs.bin \
+                    .pio/build/heltec_wifi_lora_32_V4/firmware.bin \
+                    .pio/build/heltec_wifi_lora_32_V4/spiffs.bin
