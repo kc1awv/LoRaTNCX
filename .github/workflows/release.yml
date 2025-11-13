@@ -11,33 +11,89 @@ jobs:
         steps:
             - name: Checkout code
               uses: actions/checkout@v4
-            - name: Build all components # Reuse CI logic
+            - name: Set up Python
+              uses: actions/setup-python@v4
+              with:
+                  python-version: "3.9"
+            - name: Install PlatformIO
               run: |
-                  # Firmware (example for one board; expand for matrix if needed)
+                  python -m pip install --upgrade pip
                   pip install platformio
-                  pio run -e heltec_wifi_lora_32_V3
-                  pio run -e heltec_wifi_lora_32_V4
-                  # Web
-                  cd web && npm ci && npm run build
-                  # Python tests (optional, but good to verify)
-                  python test/kiss_test.py
-            - name: Zip web assets
+            - name: Cache PlatformIO dependencies
+              uses: actions/cache@v3
+              with:
+                  path: ~/.platformio
+                  key: ${{ runner.os }}-pio-${{ hashFiles('**/platformio.ini') }}
+                  restore-keys: |
+                      ${{ runner.os }}-pio-
+            - name: Build web interface and prepare SPIFFS data
+              run: bash build-web.sh
+            - name: Build firmware and SPIFFS for V3
               run: |
-                  cd web && zip -r ../web-dist.zip dist/
-            - name: Create GitHub Release and Upload Assets
-              uses: softprops/action-gh-release@v1
+                  pio run -e heltec_wifi_lora_32_V3
+                  pio run --target buildfs -e heltec_wifi_lora_32_V3
+            - name: Build firmware and SPIFFS for V4
+              run: |
+                  pio run -e heltec_wifi_lora_32_V4
+                  pio run --target buildfs -e heltec_wifi_lora_32_V4
+            - name: Create web assets zip
+              run: cd web && zip -r ../web-assets.zip dist/
+            - name: Create release
+              id: create_release
+              uses: actions/create-release@v1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
                   tag_name: ${{ github.ref }}
-                  name: Release ${{ github.ref }}
+                  release_name: Release ${{ github.ref }}
                   body: |
                       Automated release for ${{ github.ref }}.
-                      - Firmware binaries attached.
+                      - Firmware binaries and SPIFFS images for V3 and V4 attached.
                       - Web assets included.
                   draft: false
                   prerelease: false
-                  files: |
-                      .pio/build/heltec_wifi_lora_32_V3/firmware.bin
-                      .pio/build/heltec_wifi_lora_32_V4/firmware.bin
-                      web-dist.zip
+            - name: Upload firmware V3
+              uses: actions/upload-release-asset@v1
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  upload_url: ${{ steps.create_release.outputs.upload_url }}
+                  asset_path: .pio/build/heltec_wifi_lora_32_V3/firmware.bin
+                  asset_name: firmware-v3.bin
+                  asset_content_type: application/octet-stream
+            - name: Upload SPIFFS V3
+              uses: actions/upload-release-asset@v1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  upload_url: ${{ steps.create_release.outputs.upload_url }}
+                  asset_path: .pio/build/heltec_wifi_lora_32_V3/spiffs.bin
+                  asset_name: spiffs-v3.bin
+                  asset_content_type: application/octet-stream
+            - name: Upload firmware V4
+              uses: actions/upload-release-asset@v1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  upload_url: ${{ steps.create_release.outputs.upload_url }}
+                  asset_path: .pio/build/heltec_wifi_lora_32_V4/firmware.bin
+                  asset_name: firmware-v4.bin
+                  asset_content_type: application/octet-stream
+            - name: Upload SPIFFS V4
+              uses: actions/upload-release-asset@v1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  upload_url: ${{ steps.create_release.outputs.upload_url }}
+                  asset_path: .pio/build/heltec_wifi_lora_32_V4/spiffs.bin
+                  asset_name: spiffs-v4.bin
+                  asset_content_type: application/octet-stream
+            - name: Upload web assets
+              uses: actions/upload-release-asset@v1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  upload_url: ${{ steps.create_release.outputs.upload_url }}
+                  asset_path: web-assets.zip
+                  asset_name: web-assets.zip
+                  asset_content_type: application/zip
