@@ -1,0 +1,16 @@
+#ifndef VERSION_H
+#define VERSION_H
+
+// Firmware version information
+#define FIRMWARE_VERSION_MAJOR 0
+#define FIRMWARE_VERSION_MINOR 1
+#define FIRMWARE_VERSION_PATCH 1
+
+// Version string
+#define FIRMWARE_VERSION_STRING "0.1.1"
+
+// Build information
+#define FIRMWARE_BUILD_DATE FIRMWARE_BUILD_DATE_UTC
+#define FIRMWARE_BUILD_TIME FIRMWARE_BUILD_TIME_UTC
+
+#endif // VERSION_H

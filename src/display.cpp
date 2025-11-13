@@ -1,5 +1,6 @@
 #include "display.h"
 #include "board_config.h"
+#include "version.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 
@@ -437,10 +438,10 @@ void DisplayManager::renderBootScreen() {
 void DisplayManager::renderInitScreen() {
     u8g2.setFont(u8g2_font_ncenB08_tr);
     
-    // Title
-    const char* title = "LoRaTNCX Init";
-    int titleWidth = u8g2.getStrWidth(title);
-    u8g2.drawStr((128 - titleWidth) / 2, 12, title);
+    // Title - show "LoRaTNCX - [version]"
+    String title = "LoRaTNCX - " + String(FIRMWARE_VERSION_STRING);
+    int titleWidth = u8g2.getStrWidth(title.c_str());
+    u8g2.drawStr((128 - titleWidth) / 2, 12, title.c_str());
     
     // Current status message
     u8g2.setFont(u8g2_font_6x10_tr);

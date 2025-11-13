@@ -197,6 +197,44 @@ python3 tools/loratncx_config.py /dev/ttyUSB0 \
 
 3. **The TNC is now ready** - your application will send/receive KISS frames, and the TNC handles all the LoRa modulation/demodulation automatically.
 
+## Version Update Tool
+
+Command-line utility to update firmware version numbers in `include/version.h`.
+
+### Usage
+
+```bash
+# Set specific version
+python3 tools/version_update.py --major 1 --minor 2 --patch 3
+
+# Bump patch version (e.g., 1.0.0 -> 1.0.1)
+python3 tools/version_update.py --bump-patch
+
+# Bump minor version (e.g., 1.0.0 -> 1.1.0, resets patch to 0)
+python3 tools/version_update.py --bump-minor
+
+# Bump major version (e.g., 1.0.0 -> 2.0.0, resets minor and patch to 0)
+python3 tools/version_update.py --bump-major
+```
+
+### Examples
+
+```bash
+# Initial release
+python3 tools/version_update.py --major 1 --minor 0 --patch 0
+
+# Bug fix release
+python3 tools/version_update.py --bump-patch
+
+# Feature release
+python3 tools/version_update.py --bump-minor
+
+# Major release
+python3 tools/version_update.py --bump-major
+```
+
+The version numbers are stored in `include/version.h` and automatically included in the firmware build. The version is displayed on startup in the serial console, along with the UTC build date and time.
+
 ## Troubleshooting
 
 ### "Could not retrieve configuration"

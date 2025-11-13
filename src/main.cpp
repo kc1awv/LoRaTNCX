@@ -14,6 +14,7 @@
 #include "tcp_kiss.h"
 #include "gnss.h"
 #include "nmea_server.h"
+#include "version.h"
 
 // Battery monitoring globals (from board_config.cpp)
 extern bool battery_ready;
@@ -432,6 +433,13 @@ void setup() {
     if (error != INIT_SUCCESS) {
         // Serial failed - we're blind, but continue anyway
     }
+    
+    // Log firmware version
+    LOG_INFOLN("LoRaTNCX Firmware Version: " FIRMWARE_VERSION_STRING);
+    LOG_INFO("Build Date: ");
+    LOG_INFO(FIRMWARE_BUILD_DATE);
+    LOG_INFO(" ");
+    LOG_INFOLN(FIRMWARE_BUILD_TIME);
     
     // Initialize watchdog for system stability
     error = initializeWatchdog();
