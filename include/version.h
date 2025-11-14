@@ -4,10 +4,10 @@
 // Firmware version information
 #define FIRMWARE_VERSION_MAJOR 0
 #define FIRMWARE_VERSION_MINOR 1
-#define FIRMWARE_VERSION_PATCH 2
+#define FIRMWARE_VERSION_PATCH 3
 
 // Version string
-#define FIRMWARE_VERSION_STRING "0.1.2"
+#define FIRMWARE_VERSION_STRING "0.1.3"
 
 // Build information
 #define FIRMWARE_BUILD_DATE FIRMWARE_BUILD_DATE_UTC
