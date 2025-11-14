@@ -53,6 +53,12 @@ class LoRaTNCXInterface {
             this.toggleScanButton(e.target.value);
         });
 
+        // WiFi form
+        document.getElementById('wifiForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.applyWiFiConfig();
+        });
+
         // GNSS form
         document.getElementById('gnssForm').addEventListener('submit', (e) => {
             e.preventDefault();

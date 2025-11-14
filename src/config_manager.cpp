@@ -36,11 +36,11 @@ bool ConfigManager::saveConfig(const LoRaConfig& config) {
 }
 
 bool ConfigManager::loadConfig(LoRaConfig& config) {
-    if (!preferences.begin(NVS_NAMESPACE, true)) {
+    if (!preferences.begin(NVS_NAMESPACE, false)) {
         return false;
     }
     
-    // Check if config key exists to avoid error logs on first boot
+    // Check if config key exists
     if (!preferences.isKey(NVS_CONFIG_KEY)) {
         preferences.end();
         return false;
@@ -72,11 +72,11 @@ bool ConfigManager::loadConfig(LoRaConfig& config) {
 }
 
 bool ConfigManager::hasValidConfig() {
-    if (!preferences.begin(NVS_NAMESPACE, true)) {
+    if (!preferences.begin(NVS_NAMESPACE, false)) {
         return false;
     }
     
-    // Check if config key exists to avoid error logs
+    // Check if config key exists
     if (!preferences.isKey(NVS_CONFIG_KEY)) {
         preferences.end();
         return false;
@@ -134,11 +134,11 @@ bool ConfigManager::saveGNSSConfig(const GNSSConfig& config) {
 }
 
 bool ConfigManager::loadGNSSConfig(GNSSConfig& config) {
-    if (!preferences.begin(NVS_NAMESPACE, true)) {
+    if (!preferences.begin(NVS_NAMESPACE, false)) {
         return false;
     }
     
-    // Check if GNSS config key exists to avoid error logs on first boot
+    // Check if GNSS config key exists
     if (!preferences.isKey(NVS_GNSS_KEY)) {
         preferences.end();
         return false;
@@ -168,11 +168,11 @@ bool ConfigManager::loadGNSSConfig(GNSSConfig& config) {
 }
 
 bool ConfigManager::hasValidGNSSConfig() {
-    if (!preferences.begin(NVS_NAMESPACE, true)) {
+    if (!preferences.begin(NVS_NAMESPACE, false)) {
         return false;
     }
     
-    // Check if GNSS config key exists to avoid error logs
+    // Check if GNSS config key exists
     if (!preferences.isKey(NVS_GNSS_KEY)) {
         preferences.end();
         return false;

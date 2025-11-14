@@ -338,12 +338,13 @@ void DisplayManager::setBatteryVoltage(float voltage) {
     }
 }
 
-void DisplayManager::setWiFiStatus(bool apActive, bool staConnected, String apIP, String staIP, int rssi) {
+void DisplayManager::setWiFiStatus(bool apActive, bool staConnected, String apIP, String staIP, int rssi, String status) {
     wifiAPActive = apActive;
     wifiSTAConnected = staConnected;
     wifiAPIP = apIP;
     wifiSTAIP = staIP;
     wifiRSSI = rssi;
+    wifiStatus = status;
     
     // Trigger update if on WiFi screen
     if (currentScreen == SCREEN_WIFI && !bootScreenActive) {
@@ -610,6 +611,12 @@ void DisplayManager::renderWiFiScreen() {
     // Title
     u8g2.drawStr(0, 10, "WiFi Status");
     
+    // Status message
+    if (wifiStatus.length() > 0) {
+        String statusStr = "Status: " + wifiStatus;
+        u8g2.drawStr(0, 24, statusStr.c_str());
+    }
+    
     // Determine WiFi mode
     String mode = "Off";
     if (wifiAPActive && wifiSTAConnected) {
@@ -621,24 +628,26 @@ void DisplayManager::renderWiFiScreen() {
     }
     
     String modeStr = "Mode: " + mode;
-    u8g2.drawStr(0, 24, modeStr.c_str());
+    int modeY = wifiStatus.length() > 0 ? 36 : 24;
+    u8g2.drawStr(0, modeY, modeStr.c_str());
     
     // AP IP if active
     if (wifiAPActive) {
         String apStr = "AP: " + wifiAPIP;
-        u8g2.drawStr(0, 36, apStr.c_str());
+        int apY = wifiStatus.length() > 0 ? 48 : 36;
+        u8g2.drawStr(0, apY, apStr.c_str());
     }
     
     // Station IP if connected
     if (wifiSTAConnected) {
         String staStr = "STA: " + wifiSTAIP;
-        int y = wifiAPActive ? 48 : 36;  // Adjust Y position if showing both
-        u8g2.drawStr(0, y, staStr.c_str());
+        int staY = wifiAPActive ? (wifiStatus.length() > 0 ? 60 : 48) : (wifiStatus.length() > 0 ? 48 : 36);
+        u8g2.drawStr(0, staY, staStr.c_str());
         
         // RSSI signal strength if connected
         if (wifiRSSI != 0) {
             String rssiStr = "Signal: " + String(wifiRSSI) + " dBm";
-            int rssiY = wifiAPActive ? 60 : 48;
+            int rssiY = wifiAPActive ? (wifiStatus.length() > 0 ? 72 : 60) : (wifiStatus.length() > 0 ? 60 : 48);
             u8g2.drawStr(0, rssiY, rssiStr.c_str());
         }
     }

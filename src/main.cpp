@@ -944,7 +944,8 @@ static void updateWiFiStatus() {
         String apIP = wifiManager.getAPIPAddress();
         String staIP = wifiManager.getIPAddress();
         int rssi = wifiManager.getRSSI();
-        displayManager.setWiFiStatus(apActive, staConnected, apIP, staIP, rssi);
+        String status = wifiManager.getStatusMessage();
+        displayManager.setWiFiStatus(apActive, staConnected, apIP, staIP, rssi, status);
         lastWiFiUpdate = millis();
     }
 }

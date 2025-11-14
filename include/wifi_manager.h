@@ -329,6 +329,9 @@ private:
     String statusMessage;
     bool scanInProgress;  // Track if async scan is in progress
     unsigned long scanStartTime;  // Track when scan started
+    bool fallbackToAPDone;  // Track if we've already fallen back to AP mode
+    bool isConnecting;  // Track if STA connection attempt is in progress
+    int lastDisconnectReason;  // Last WiFi disconnect reason
     
     static const uint32_t CONFIG_MAGIC = 0xFEEDBEEF;
     static const char* NVS_NAMESPACE;
@@ -336,6 +339,7 @@ private:
     static const unsigned long RECONNECT_BASE_INTERVAL = 5000;   // 5 seconds
     static const unsigned long RECONNECT_MAX_INTERVAL = 60000;   // 60 seconds
     static const unsigned long CONNECTION_TIMEOUT = 15000;       // 15 seconds
+    static const unsigned int RECONNECT_MAX_ATTEMPTS = 10;       // Max reconnection attempts
     
     // Internal methods
     bool startAP();
