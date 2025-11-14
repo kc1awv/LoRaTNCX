@@ -8,7 +8,8 @@ WiFiManager::WiFiManager()
     : initialized(false), apStarted(false), staConnected(false), mdnsStarted(false),
       connectionState(WIFI_STATE_DISCONNECTED), lastReconnectAttempt(0), 
       reconnectDelay(RECONNECT_BASE_INTERVAL), reconnectAttempts(0), 
-      scanResults(0), dnsServer(nullptr), scanInProgress(false), scanStartTime(0) {
+      scanResults(0), dnsServer(nullptr), scanInProgress(false), scanStartTime(0),
+      fallbackToAPDone(false), isConnecting(false), lastDisconnectReason(0) {
 }
 
 bool WiFiManager::begin() {
@@ -124,11 +125,11 @@ bool WiFiManager::saveConfig(const WiFiConfig& config) {
 }
 
 bool WiFiManager::loadConfig(WiFiConfig& config) {
-    if (!preferences.begin(NVS_NAMESPACE, true)) {
+    if (!preferences.begin(NVS_NAMESPACE, false)) {
         return false;
     }
     
-    // Check if WiFi config key exists to avoid error logs on first boot
+    // Check if WiFi config key exists
     if (!preferences.isKey(NVS_WIFI_KEY)) {
         preferences.end();
         return false;
@@ -156,11 +157,11 @@ bool WiFiManager::loadConfig(WiFiConfig& config) {
 }
 
 bool WiFiManager::hasValidConfig() {
-    if (!preferences.begin(NVS_NAMESPACE, true)) {
+    if (!preferences.begin(NVS_NAMESPACE, false)) {
         return false;
     }
     
-    // Check if WiFi config key exists to avoid error logs
+    // Check if WiFi config key exists
     if (!preferences.isKey(NVS_WIFI_KEY)) {
         preferences.end();
         return false;
@@ -175,8 +176,8 @@ bool WiFiManager::hasValidConfig() {
 
 void WiFiManager::resetToDefaults(WiFiConfig& config) {
     // Default AP settings
-    snprintf(config.ap_ssid, sizeof(config.ap_ssid), "LoRaTNCX-%04X", 
-             (uint16_t)(ESP.getEfuseMac() & 0xFFFF));
+    snprintf(config.ap_ssid, sizeof(config.ap_ssid), "LoRaTNCX-%08X", 
+             (uint32_t)(ESP.getEfuseMac() & 0xFFFFFFFF));
     strncpy(config.ap_password, "loratncx", sizeof(config.ap_password));
     
     // Default STA settings (empty)
@@ -281,8 +282,8 @@ bool WiFiManager::getScannedEncryption(int index) {
 
 bool WiFiManager::startAsyncScan() {
     // Check if WiFi scanning is supported in current mode
-    if (currentConfig.mode == TNC_WIFI_OFF || currentConfig.mode == TNC_WIFI_AP) {
-        return false; // Cannot scan in AP-only or disabled mode
+    if (currentConfig.mode == TNC_WIFI_OFF) {
+        return false; // Cannot scan when WiFi is disabled
     }
 
     // Check if scan is already in progress
@@ -407,13 +408,14 @@ bool WiFiManager::startSTA() {
     connectionState = WIFI_STATE_CONNECTING;
     statusMessage = "Connecting to " + String(currentConfig.ssid);
     lastReconnectAttempt = millis();
+    isConnecting = true;
     
     return true;  // Return true if we started the connection attempt
 }
 
 void WiFiManager::checkConnection() {
     // Exponential backoff reconnection logic
-    if (!staConnected || WiFi.status() != WL_CONNECTED) {
+    if ((!staConnected || WiFi.status() != WL_CONNECTED) && strlen(currentConfig.ssid) > 0 && reconnectAttempts < RECONNECT_MAX_ATTEMPTS && !isConnecting && lastDisconnectReason != 15) {
         if (millis() - lastReconnectAttempt >= reconnectDelay) {
             DEBUG_PRINT("WiFi reconnect attempt ");
             DEBUG_PRINT(reconnectAttempts + 1);
@@ -429,12 +431,30 @@ void WiFiManager::checkConnection() {
             reconnectAttempts++;
             reconnectDelay = min(reconnectDelay * 2, RECONNECT_MAX_INTERVAL);
         }
+    } else if (reconnectAttempts >= RECONNECT_MAX_ATTEMPTS) {
+        // Give up after max attempts
+        if (lastDisconnectReason == 15) {
+            statusMessage = "Key exchange failed - check WiFi network/AP settings";
+        } else if (!fallbackToAPDone && currentConfig.mode == TNC_WIFI_STA) {
+            // Fall back to AP mode so user can reconfigure
+            DEBUG_PRINTLN("STA connection failed, falling back to AP mode");
+            fallbackToAPDone = true;
+            currentConfig.mode = TNC_WIFI_AP;
+            saveConfig(currentConfig);
+            applyConfig(currentConfig);
+            statusMessage = "Switched to AP mode - connect to configure WiFi";
+            connectionState = WIFI_STATE_DISCONNECTED;
+        } else {
+            statusMessage = "Connection failed - check WiFi settings";
+            connectionState = WIFI_STATE_FAILED;
+        }
     } else {
         if (!staConnected) {
             DEBUG_PRINTLN("WiFi connected!");
             // Reset reconnection parameters on successful connection
             reconnectAttempts = 0;
             reconnectDelay = RECONNECT_BASE_INTERVAL;
+            fallbackToAPDone = false;  // Reset fallback flag on successful connection
         }
         staConnected = true;
         connectionState = WIFI_STATE_CONNECTED;
@@ -463,25 +483,34 @@ void WiFiManager::setupWiFiEvents() {
                 break;
                 
             case ARDUINO_EVENT_WIFI_STA_CONNECTED:
-                DEBUG_PRINTLN("WiFi STA connected");
-                statusMessage = "Connected";
+                DEBUG_PRINTLN("WiFi STA associated");
+                statusMessage = "Associated";
                 connectionState = WIFI_STATE_CONNECTED;
+                isConnecting = false;
                 break;
                 
             case ARDUINO_EVENT_WIFI_STA_GOT_IP:
                 DEBUG_PRINT("WiFi got IP: ");
                 DEBUG_PRINTLN(WiFi.localIP());
-                statusMessage = "Got IP: " + WiFi.localIP().toString();
+                statusMessage = "Connected";
                 staConnected = true;
                 connectionState = WIFI_STATE_CONNECTED;
+                isConnecting = false;
                 // Setup mDNS after getting IP
                 setupMDNS();
                 break;
                 
             case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
-                DEBUG_PRINTLN("WiFi STA disconnected");
+                DEBUG_PRINT("WiFi STA disconnected, reason: ");
+                DEBUG_PRINTLN(info.wifi_sta_disconnected.reason);
+                lastDisconnectReason = info.wifi_sta_disconnected.reason;
+                if (info.wifi_sta_disconnected.reason == 15) {
+                    // Group key update timeout - likely persistent issue, give up quickly
+                    reconnectAttempts = RECONNECT_MAX_ATTEMPTS;
+                }
                 statusMessage = "Disconnected";
                 staConnected = false;
+                isConnecting = false;
                 if (connectionState == WIFI_STATE_CONNECTING) {
                     connectionState = WIFI_STATE_FAILED;
                 } else {

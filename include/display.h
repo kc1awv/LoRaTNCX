@@ -148,7 +148,7 @@ public:
      * @param staIP Station IP address as string
      * @param rssi WiFi signal strength in dBm
      */
-    void setWiFiStatus(bool apActive, bool staConnected, String apIP, String staIP, int rssi);
+    void setWiFiStatus(bool apActive, bool staConnected, String apIP, String staIP, int rssi, String status);
     
     /**
      * @brief Update the GNSS status display data
@@ -235,6 +235,7 @@ private:
     String wifiAPIP;
     String wifiSTAIP;
     int wifiRSSI;
+    String wifiStatus;
     
     // WiFi startup status
     String wifiStartupMessage;

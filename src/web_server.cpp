@@ -376,9 +376,7 @@ void TNCWebServer::handleScanWiFi(AsyncWebServerRequest* request) {
         
         String errorMsg = "{\"error\":\"";
         if (currentConfig.mode == TNC_WIFI_OFF) {
-            errorMsg += "WiFi is disabled. Enable WiFi in Station or AP+Station mode to scan.\"}";
-        } else if (currentConfig.mode == TNC_WIFI_AP) {
-            errorMsg += "Cannot scan in AP-only mode. Switch to Station or AP+Station mode.\"}";
+            errorMsg += "WiFi is disabled. Enable WiFi to scan.\"}";
         } else {
             errorMsg += "Scan already in progress or failed to start.\"}";
         }
