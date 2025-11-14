@@ -243,7 +243,7 @@ class LoRaTNCXInterface {
             document.getElementById('password').value = ''; // Don't populate password for security
 
             // Set AP SSID and password
-            document.getElementById('apSsid').value = config.ap_ssid || 'LoRaTNCX-XXXX';
+            document.getElementById('apSsid').value = config.ap_ssid || 'LoRaTNCX-XXXXXXXXXXXX';
             document.getElementById('apPassword').value = ''; // Don't populate password for security
 
             // Update form visibility based on mode
@@ -467,7 +467,7 @@ class LoRaTNCXInterface {
                     networkStatus += `<br><strong>STA SSID:</strong> ${wifiConfig.ssid || 'Not configured'}`;
                 }
                 if (wifiConfig.mode === 1 || wifiConfig.mode === 3) {
-                    networkStatus += `<br><strong>AP SSID:</strong> ${wifiConfig.ap_ssid || 'LoRaTNCX-XXXX'}`;
+                    networkStatus += `<br><strong>AP SSID:</strong> ${wifiConfig.ap_ssid || 'LoRaTNCX-XXXXXXXXXXXX'}`;
                 }
             } catch (error) {
                 networkStatus = '<strong>WiFi:</strong> Unable to load configuration';

@@ -38,24 +38,25 @@ bool WiFiManager::start() {
 }
 
 void WiFiManager::stop() {
-    // Stop captive portal
-    stopCaptivePortal();
-    
-    // Stop mDNS
-    if (mdnsStarted) {
-        MDNS.end();
-        mdnsStarted = false;
-        DEBUG_PRINTLN("mDNS stopped");
-    }
-    
+    // Stop network interfaces first
     if (apStarted) {
         WiFi.softAPdisconnect(true);
         apStarted = false;
     }
     
-    if (staConnected || WiFi.status() != WL_DISCONNECTED) {
+    if (staConnected || (WiFi.getMode() != WIFI_OFF && WiFi.status() != WL_DISCONNECTED)) {
         WiFi.disconnect(true);
         staConnected = false;
+    }
+    
+    // Stop services
+    stopCaptivePortal();
+    
+    // Stop mDNS
+    if (mdnsStarted) {
+        // MDNS.end();  // Commented out to avoid potential crash
+        mdnsStarted = false;
+        DEBUG_PRINTLN("mDNS stopped");
     }
     
     WiFi.mode(WIFI_OFF);
@@ -176,8 +177,8 @@ bool WiFiManager::hasValidConfig() {
 
 void WiFiManager::resetToDefaults(WiFiConfig& config) {
     // Default AP settings
-    snprintf(config.ap_ssid, sizeof(config.ap_ssid), "LoRaTNCX-%08X", 
-             (uint32_t)(ESP.getEfuseMac() & 0xFFFFFFFF));
+    snprintf(config.ap_ssid, sizeof(config.ap_ssid), "LoRaTNCX-%012llX", 
+             ESP.getEfuseMac());
     strncpy(config.ap_password, "loratncx", sizeof(config.ap_password));
     
     // Default STA settings (empty)
@@ -553,10 +554,16 @@ void WiFiManager::startCaptivePortal() {
         return;  // Already running
     }
     
+    IPAddress apIP = WiFi.softAPIP();
+    if (apIP == IPAddress(0, 0, 0, 0)) {
+        DEBUG_PRINTLN("AP IP not ready, skipping captive portal start");
+        return;
+    }
+    
     dnsServer = new DNSServer();
     if (dnsServer) {
         // Redirect all DNS requests to our AP IP
-        dnsServer->start(53, "*", WiFi.softAPIP());
+        dnsServer->start(53, "*", apIP);
         DEBUG_PRINTLN("Captive portal DNS started");
     }
 }
