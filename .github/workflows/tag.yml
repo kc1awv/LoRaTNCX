@@ -53,6 +53,16 @@ jobs:
         run: |
           pio run -e heltec_wifi_lora_32_V4
           pio run --target buildfs -e heltec_wifi_lora_32_V4
+      - name: Upload bootloader artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bootloader-${{ matrix.board }}
+          path: .pio/build/${{ matrix.board }}/bootloader.bin
+      - name: Upload partitions artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: partitions-${{ matrix.board }}
+          path: .pio/build/${{ matrix.board }}/partitions.bin
       - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4
         with:
