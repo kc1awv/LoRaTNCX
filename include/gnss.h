@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <TinyGPS++.h>
 #include "config.h"
+#include "error_handling.h"
 
 // Default GNSS settings
 #define GNSS_DEFAULT_BAUD           9600
@@ -21,9 +22,9 @@ public:
     ~GNSSModule();
     
     // Initialize GNSS module
-    bool begin(int8_t rxPin, int8_t txPin, int8_t ctrlPin = -1, 
-               int8_t wakePin = -1, int8_t ppsPin = -1, int8_t rstPin = -1,
-               uint32_t baudRate = GNSS_DEFAULT_BAUD);
+    Result<void> begin(int8_t rxPin, int8_t txPin, int8_t ctrlPin = -1, 
+                       int8_t wakePin = -1, int8_t ppsPin = -1, int8_t rstPin = -1,
+                       uint32_t baudRate = GNSS_DEFAULT_BAUD);
     
     // Stop GNSS module
     void stop();

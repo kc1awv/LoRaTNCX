@@ -165,10 +165,10 @@ bool LoRaRadio::transmit(const uint8_t* data, size_t length) {
         return false; // Not initialized or already transmitting
     }
     
-    transmitting = true;
-    
-    // Stop receiving
+    // Stop receiving first to prevent race conditions
     radio->standby();
+    
+    transmitting = true;
     
     int state = radio->transmit(const_cast<uint8_t*>(data), length);
     

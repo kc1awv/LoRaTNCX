@@ -4,57 +4,31 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include "kiss.h"
+#include "error_handling.h"
+#include "base_tcp_server.h"
 
 #define MAX_TCP_CLIENTS 4
 #define TCP_KISS_DEFAULT_PORT 8001
 
-class TCPKISSServer {
+class TCPKISSServer : public BaseTCPServer {
 public:
     TCPKISSServer();
     ~TCPKISSServer();
     
     // Initialize and start the TCP server
-    bool begin(uint16_t port = TCP_KISS_DEFAULT_PORT);
-    
-    // Stop the server
-    void stop();
-    
-    // Check if server is running
-    bool isRunning() const { return serverRunning; }
-    
-    // Get current port
-    uint16_t getPort() const { return serverPort; }
-    
-    // Update - handle client connections and data
-    void update();
+    Result<void> begin(uint16_t port = TCP_KISS_DEFAULT_PORT);
     
     // Send KISS frame to all connected clients
     void sendKISSFrame(const uint8_t* frame, size_t length);
     
-    // Check if any clients are connected
-    bool hasClients();
-    
-    // Get number of connected clients
-    uint8_t getClientCount();
-    
 private:
-    WiFiServer* server;
-    WiFiClient clients[MAX_TCP_CLIENTS];
     KISSProtocol clientKISS[MAX_TCP_CLIENTS];
-    uint16_t serverPort;
-    bool serverRunning;
     
-    // Handle new client connections
-    void acceptNewClients();
-    
-    // Process data from connected clients
-    void processClientData();
-    
-    // Clean up disconnected clients
-    void cleanupClients();
-    
-    // Send data to a specific client
-    void sendToClient(uint8_t clientIndex, const uint8_t* data, size_t length);
+    // Override base class methods
+    void onClientConnected(uint8_t clientIndex) override;
+    void onClientDisconnected(uint8_t clientIndex) override;
+    void processClientData(uint8_t clientIndex) override;
+    void sendToClient(uint8_t clientIndex, const uint8_t* data, size_t length) override;
 };
 
 #endif // TCP_KISS_H

@@ -15,12 +15,8 @@
 #include "gnss.h"
 #include "nmea_server.h"
 #include "version.h"
-
-// Battery monitoring globals (from board_config.cpp)
-extern bool battery_ready;
-extern BatteryChargeState battery_charge_state;
-extern float battery_voltage;
-extern float battery_percent;
+#include "error_handling.h"
+#include "battery_monitor.h"
 
 // Thread-safe button event queue (declared in display.cpp)
 extern QueueHandle_t buttonEventQueue;
@@ -105,6 +101,11 @@ static NMEAServer& getNMEAServer() {
     return instance;
 }
 
+static BatteryMonitor& getBatteryMonitor() {
+    static BatteryMonitor instance;
+    return instance;
+}
+
 // Global references for backward compatibility and cross-dependencies
 KISSProtocol& kiss = getKISSProtocol();
 LoRaRadio& loraRadio = getLoRaRadio();
@@ -112,6 +113,7 @@ ConfigManager& configManager = getConfigManager();
 WiFiManager& wifiManager = getWiFiManager();
 GNSSModule& gnssModule = getGNSSModule();
 NMEAServer& nmeaServer = getNMEAServer();
+BatteryMonitor& batteryMonitor = getBatteryMonitor();
 
 // Web server needs references to other services
 static TNCWebServer& getWebServer() {
@@ -131,38 +133,26 @@ TCPKISSServer& tcpKissServer = getTCPKISSServer();
 // Buffers
 uint8_t rxBuffer[LORA_BUFFER_SIZE];
 
-// Error codes for initialization
-enum InitError {
-    INIT_SUCCESS = 0,
-    INIT_BOARD_UNKNOWN = 1,
-    INIT_RADIO_FAILED = 2,
-    INIT_SPIFFS_FAILED = 3,
-    INIT_CONFIG_FAILED = 4,
-    INIT_WIFI_FAILED = 5,
-    INIT_GNSS_FAILED = 6,
-    INIT_WATCHDOG_FAILED = 7
-};
-
 // Helper functions for setup initialization
-InitError initializeSerial() {
+Result<void> initializeSerial() {
     Serial.begin(SERIAL_BAUD_RATE);
     delay(SERIAL_INIT_DELAY);
     LOG_INFOLN("\n=== LoRaTNCX Starting ===");
-    return INIT_SUCCESS;
+    return Result<void>();
 }
 
-InitError initializeFileSystem() {
+Result<void> initializeFileSystem() {
     LOG_INFOLN("Initializing SPIFFS...");
     if (!SPIFFS.begin(true)) {
         LOG_ERRORLN("SPIFFS mount failed - continuing without web server");
-        return INIT_SPIFFS_FAILED;
+        return Result<void>(ErrorCode::FILESYSTEM_ERROR);
     } else {
         LOG_INFOLN("SPIFFS mounted successfully");
-        return INIT_SUCCESS;
+        return Result<void>();
     }
 }
 
-InitError initializeHardware() {
+Result<void> initializeHardware() {
     // Initialize board-specific pins
     LOG_INFOLN("Initializing board pins...");
     initializeBoardPins();
@@ -170,7 +160,7 @@ InitError initializeHardware() {
     // Board type check - halt if unknown
     if (BOARD_TYPE == BOARD_UNKNOWN) {
         LOG_ERRORLN("FATAL: Unknown board type - cannot continue");
-        return INIT_BOARD_UNKNOWN;
+        return Result<void>(ErrorCode::BOARD_UNKNOWN);
     }
     LOG_INFOLN("Board initialized");
     
@@ -189,10 +179,10 @@ InitError initializeHardware() {
     // Setup PA control (V4 only)
     setupPAControl();
     
-    return INIT_SUCCESS;
+    return Result<void>();
 }
 
-InitError initializeConfiguration() {
+Result<void> initializeConfiguration() {
     // Initialize configuration manager
     LOG_INFOLN("Initializing config manager...");
     displayManager.setInitMessage("Loading configuration...");
@@ -202,17 +192,17 @@ InitError initializeConfiguration() {
         LOG_ERRORLN("Config manager initialization failed - using defaults");
         displayManager.setInitStatus("Config", false);
         displayManager.update();
-        delay(500);
-        return INIT_CONFIG_FAILED;
+        delay(100);
+        return Result<void>(ErrorCode::CONFIG_LOAD_FAILED);
     }
     
     displayManager.setInitStatus("Config", true);
     displayManager.update();
-    delay(200);
-    return INIT_SUCCESS;
+    delay(50);
+    return Result<void>();
 }
 
-InitError initializeRadio() {
+Result<void> initializeRadio() {
     // Initialize LoRa radio first - halt if failed
     LOG_INFOLN("Initializing radio...");
     displayManager.setInitMessage("Initializing LoRa radio...");
@@ -226,7 +216,7 @@ InitError initializeRadio() {
         displayManager.setInitStatus("Radio", false);
         displayManager.update();
         delay(1000);
-        return INIT_RADIO_FAILED;
+        return Result<void>(ErrorCode::RADIO_INIT_FAILED);
     }
     LOG_INFOLN("Radio initialized!");
     displayManager.setInitStatus("Radio", true);
@@ -243,31 +233,33 @@ InitError initializeRadio() {
         loraRadio.reconfigure();  // Reconfigure radio with saved settings
         displayManager.setInitStatus("Radio Config", true);
         displayManager.update();
-        delay(200);
+        delay(50);
     } else {
         LOG_INFOLN("Using default config");
         displayManager.setInitStatus("Radio Config", true);
         displayManager.update();
-        delay(200);
+        delay(50);
     }
     
-    return INIT_SUCCESS;
+    return Result<void>();
 }
 
-InitError initializeNetworking() {
+Result<void> initializeNetworking() {
+    Result<void> result;
     // Initialize WiFi manager
     LOG_INFOLN("Initializing WiFi manager...");
     displayManager.setInitMessage("Initializing WiFi...");
     displayManager.update();
     
-    if (wifiManager.begin()) {
+    if (wifiManager.begin().isOk()) {
         LOG_INFOLN("WiFi manager initialized");
         displayManager.setInitStatus("WiFi Manager", true);
         displayManager.update();
-        delay(200);
+        // Reduced delay for faster startup
+        delay(50);
         
         // Start WiFi with saved/default configuration
-        if (wifiManager.start()) {
+        if (wifiManager.start().isOk()) {
             LOG_INFOLN("WiFi started");
             displayManager.setInitMessage("Connecting to WiFi...");
             displayManager.update();
@@ -286,7 +278,7 @@ InitError initializeNetworking() {
                 LOG_INFOLN("WiFi ready!");
                 displayManager.setInitStatus("WiFi", true);
                 displayManager.update();
-                delay(200);
+                delay(50);
                 
                 // Start web server
                 LOG_INFOLN("Starting web server...");
@@ -298,17 +290,23 @@ InitError initializeNetworking() {
                 LOG_INFOLN(ESP.getFreeHeap());
                 
                 webServer.setGNSS(&gnssModule, &nmeaServer);  // Set GNSS references
-                if (webServer.begin()) {
-                    LOG_INFO("Web server started on port " + String(WEB_SERVER_PORT) + " ");
+                webServer.setBatteryMonitor(&batteryMonitor);  // Set battery monitor reference
+                result = webServer.begin();
+                if (result.isOk()) {
+                    LOG_INFO("Web server started on port ");
+                    LOG_INFO(WEB_SERVER_PORT);
+                    LOG_INFO(" ");
                     LOG_INFOLN("Access via: http://loratncx.local");
                     displayManager.setInitStatus("Web Server", true);
                     displayManager.update();
-                    delay(200);
+                    delay(50);
                 } else {
-                    LOG_ERRORLN("Failed to start web server");
+                    LOG_ERROR("Failed to start web server: ");
+                    LOG_ERRORLN(errorCodeToString(result.error()));
                     displayManager.setInitStatus("Web Server", false);
                     displayManager.update();
-                    delay(500);
+                    delay(100);
+                    return Result<void>(ErrorCode::WEBSERVER_INIT_FAILED);
                 }
                 
                 // Start TCP KISS server if enabled
@@ -320,16 +318,19 @@ InitError initializeNetworking() {
                     displayManager.setInitMessage("Starting TCP KISS...");
                     displayManager.update();
                     
-                    if (tcpKissServer.begin(wifiConfig.tcp_kiss_port)) {
+                    result = tcpKissServer.begin(wifiConfig.tcp_kiss_port);
+                    if (result.isOk()) {
                         LOG_INFOLN("TCP KISS server started");
                         displayManager.setInitStatus("TCP KISS", true);
                         displayManager.update();
-                        delay(200);
+                        delay(50);
                     } else {
-                        LOG_ERRORLN("Failed to start TCP KISS server");
+                        LOG_ERROR("Failed to start TCP KISS server: ");
+                        LOG_ERRORLN(errorCodeToString(result.error()));
                         displayManager.setInitStatus("TCP KISS", false);
                         displayManager.update();
-                        delay(500);
+                        delay(100);
+                        return Result<void>(ErrorCode::TCP_CONNECT_FAILED);
                     }
                 }
             } else {
@@ -337,25 +338,28 @@ InitError initializeNetworking() {
                 displayManager.setInitStatus("WiFi", false);
                 displayManager.update();
                 delay(500);
+                return Result<void>(ErrorCode::WIFI_CONNECT_FAILED);
             }
         } else {
             LOG_WARNLN("WiFi start failed or disabled");
             displayManager.setInitStatus("WiFi", false);
             displayManager.update();
-            delay(500);
+            delay(100);
+            return Result<void>(ErrorCode::WIFI_INIT_FAILED);
         }
     } else {
         LOG_ERRORLN("WiFi manager init failed - continuing without WiFi");
         displayManager.setInitStatus("WiFi Manager", false);
         displayManager.update();
-        delay(500);
-        return INIT_WIFI_FAILED;
+        delay(100);
+        return Result<void>(ErrorCode::WIFI_INIT_FAILED);
     }
     
-    return INIT_SUCCESS;
+    return Result<void>();
 }
 
-InitError initializeGNSS() {
+Result<void> initializeGNSS() {
+    Result<void> result;
     // Initialize GNSS if enabled
     GNSSConfig gnssConfig;
     if (configManager.loadGNSSConfig(gnssConfig)) {
@@ -370,14 +374,15 @@ InitError initializeGNSS() {
         displayManager.setInitMessage("Initializing GNSS...");
         displayManager.update();
         
-        if (gnssModule.begin(gnssConfig.pinRX, gnssConfig.pinTX, 
-                            gnssConfig.pinCtrl, gnssConfig.pinWake,
-                            gnssConfig.pinPPS, gnssConfig.pinRST,
-                            gnssConfig.baudRate)) {
+        result = gnssModule.begin(gnssConfig.pinRX, gnssConfig.pinTX, 
+                                   gnssConfig.pinCtrl, gnssConfig.pinWake,
+                                   gnssConfig.pinPPS, gnssConfig.pinRST,
+                                   gnssConfig.baudRate);
+        if (result.isOk()) {
             LOG_INFOLN("GNSS module initialized");
             displayManager.setInitStatus("GNSS Module", true);
             displayManager.update();
-            delay(200);
+            delay(50);
             
             // Start NMEA TCP server
             LOG_INFO("Starting NMEA server on port ");
@@ -385,24 +390,26 @@ InitError initializeGNSS() {
             displayManager.setInitMessage("Starting NMEA server...");
             displayManager.update();
             
-            if (nmeaServer.begin(gnssConfig.tcpPort)) {
+            result = nmeaServer.begin(gnssConfig.tcpPort);
+            if (result.isOk()) {
                 LOG_INFOLN("NMEA server started");
                 displayManager.setInitStatus("NMEA Server", true);
                 displayManager.update();
-                delay(200);
+                delay(50);
             } else {
-                LOG_ERRORLN("Failed to start NMEA server");
+                LOG_ERROR("Failed to start NMEA server: ");
+                LOG_ERRORLN(errorCodeToString(result.error()));
                 displayManager.setInitStatus("NMEA Server", false);
                 displayManager.update();
-                delay(500);
-                return INIT_GNSS_FAILED;
+                delay(100);
+                return Result<void>(ErrorCode::TCP_CONNECT_FAILED);
             }
         } else {
             LOG_WARNLN("Failed to initialize GNSS module - continuing without GNSS");
             displayManager.setInitStatus("GNSS Module", false);
             displayManager.update();
-            delay(500);
-            return INIT_GNSS_FAILED;
+            delay(100);
+            return Result<void>(ErrorCode::GNSS_INIT_FAILED);
         }
     } else {
         LOG_INFOLN("GNSS disabled or not configured");
@@ -411,10 +418,10 @@ InitError initializeGNSS() {
         delay(200);
     }
     
-    return INIT_SUCCESS;
+    return Result<void>();
 }
 
-InitError initializeWatchdog() {
+Result<void> initializeWatchdog() {
     // Enable ESP32 Task Watchdog Timer with 30 second timeout
     esp_task_wdt_init(WDT_TIMEOUT_SECONDS, true);
     
@@ -422,15 +429,16 @@ InitError initializeWatchdog() {
     esp_task_wdt_add(NULL);
     
     LOG_INFOLN("Watchdog initialized");
-    return INIT_SUCCESS;
+    return Result<void>();
 }
 
 void setup() {
-    InitError error;
+    Result<void> result;
+    bool radioInitialized = false;
     
     // Initialize serial first for error reporting
-    error = initializeSerial();
-    if (error != INIT_SUCCESS) {
+    result = initializeSerial();
+    if (result.isErr()) {
         // Serial failed - we're blind, but continue anyway
     }
     
@@ -442,22 +450,22 @@ void setup() {
     LOG_INFOLN(FIRMWARE_BUILD_TIME);
     
     // Initialize watchdog for system stability
-    error = initializeWatchdog();
-    if (error != INIT_SUCCESS) {
+    result = initializeWatchdog();
+    if (result.isErr()) {
         LOG_WARNLN("Warning: Watchdog initialization failed - system may hang on errors");
     }
     
     // Initialize file system (non-critical)
-    error = initializeFileSystem();
-    if (error != INIT_SUCCESS) {
+    result = initializeFileSystem();
+    if (result.isErr()) {
         LOG_WARNLN("Warning: File system initialization failed - web server disabled");
     }
     
     // Initialize hardware (critical)
-    error = initializeHardware();
-    if (error != INIT_SUCCESS) {
+    result = initializeHardware();
+    if (result.isErr()) {
         LOG_ERROR("Critical error during hardware initialization: ");
-        LOG_ERRORLN(error);
+        LOG_ERRORLN(errorCodeToString(result.error()));
         LOG_ERRORLN("System cannot continue safely");
         displayManager.setScreen(SCREEN_STATUS);
         displayManager.update();
@@ -465,6 +473,12 @@ void setup() {
         while (1) {
             delay(1000);
         }
+    }
+    
+    // Initialize battery monitor
+    LOG_INFOLN("Initializing battery monitor...");
+    if (!batteryMonitor.begin()) {
+        LOG_WARNLN("Warning: Battery monitor initialization failed");
     }
     
     // Wait for boot screen to complete, then switch to initialization screen
@@ -478,42 +492,45 @@ void setup() {
     displayManager.update();
     
     // Initialize configuration (non-critical, but affects other systems)
-    error = initializeConfiguration();
-    if (error != INIT_SUCCESS) {
+    result = initializeConfiguration();
+    if (result.isErr()) {
         LOG_WARNLN("Warning: Configuration system failed - using defaults");
     }
     
     // Initialize radio (critical for TNC functionality)
-    error = initializeRadio();
-    if (error != INIT_SUCCESS) {
+    result = initializeRadio();
+    if (result.isErr()) {
         LOG_ERROR("Critical error during radio initialization: ");
-        LOG_ERRORLN(error);
+        LOG_ERRORLN(errorCodeToString(result.error()));
         LOG_ERRORLN("TNC functionality disabled - system will still start for configuration");
         // For radio failure, we continue but with limited functionality
         // Display error on screen
         displayManager.setScreen(SCREEN_STATUS);
         displayManager.update();
+        radioInitialized = false;
+    } else {
+        radioInitialized = true;
     }
     
     // Initialize networking (non-critical)
-    error = initializeNetworking();
-    if (error != INIT_SUCCESS) {
+    result = initializeNetworking();
+    if (result.isErr()) {
         LOG_WARNLN("Warning: Networking initialization failed - WiFi features disabled");
     }
     
     // Initialize GNSS (non-critical)
-    error = initializeGNSS();
-    if (error != INIT_SUCCESS) {
+    result = initializeGNSS();
+    if (result.isErr()) {
         LOG_WARNLN("Warning: GNSS initialization failed - location features disabled");
     }
     
     LOG_INFOLN("LoRaTNCX ready - entering KISS mode");
     
     // Prepare ready screen data
-    bool radioOK = (initializeRadio() == INIT_SUCCESS);  // We already initialized radio, but check if it was successful
-    // Actually, we need to track if radio init was successful. Let me check if we can determine this.
-    // For now, assume radio is OK if we reached this point
-    radioOK = true;
+    // Radio status was already determined during initialization
+    bool radioOK = radioInitialized;
+    
+    // Determine WiFi status
     
     // Determine WiFi status
     String wifiStatus = "OFF";
@@ -578,14 +595,20 @@ size_t buildBatteryData(uint8_t* buffer) {
     buffer[0] = HW_QUERY_BATTERY;
     
     // Read current battery voltage (also updates sampling)
-    float battVoltage = readBatteryVoltage();
-    memcpy(&buffer[1], &battVoltage, sizeof(float));
+    float battVoltage = batteryMonitor.readBatteryVoltageRaw();
     
-    // Include averaged values if ready
-    memcpy(&buffer[5], &battery_voltage, sizeof(float));
-    memcpy(&buffer[9], &battery_percent, sizeof(float));
-    buffer[13] = (uint8_t)battery_charge_state;
-    buffer[14] = battery_ready ? 1 : 0;
+    // Get battery monitor data
+    float avgVoltage = batteryMonitor.getVoltage();
+    float percent = batteryMonitor.getPercent();
+    BatteryChargeState chargeState = batteryMonitor.getChargeState();
+    bool ready = batteryMonitor.isReady();
+    
+    // Include values
+    memcpy(&buffer[1], &battVoltage, sizeof(float));
+    memcpy(&buffer[5], &avgVoltage, sizeof(float));
+    memcpy(&buffer[9], &percent, sizeof(float));
+    buffer[13] = (uint8_t)chargeState;
+    buffer[14] = ready ? 1 : 0;
     
     return 15;  // Total size: cmd(1) + voltage(4) + avg_voltage(4) + percent(4) + state(1) + ready(1)
 }
@@ -938,14 +961,26 @@ static void updateBatteryVoltage() {
 
 static void updateWiFiStatus() {
     static uint32_t lastWiFiUpdate = 0;
+    static char apIPBuffer[16] = {0};
+    static char staIPBuffer[16] = {0};
+    static char statusBuffer[32] = {0};
+    
     if (!displayManager.isBootScreenActive() && millis() - lastWiFiUpdate >= 5000) {
         bool apActive = wifiManager.isAPActive();
         bool staConnected = wifiManager.isConnected();
-        String apIP = wifiManager.getAPIPAddress();
-        String staIP = wifiManager.getIPAddress();
+        
+        // Get IP addresses as strings without creating temporary String objects
+        String apIPStr = wifiManager.getAPIPAddress();
+        String staIPStr = wifiManager.getIPAddress();
+        String statusStr = wifiManager.getStatusMessage();
+        
+        // Copy to static buffers to avoid repeated allocations
+        strlcpy(apIPBuffer, apIPStr.c_str(), sizeof(apIPBuffer));
+        strlcpy(staIPBuffer, staIPStr.c_str(), sizeof(staIPBuffer));
+        strlcpy(statusBuffer, statusStr.c_str(), sizeof(statusBuffer));
+        
         int rssi = wifiManager.getRSSI();
-        String status = wifiManager.getStatusMessage();
-        displayManager.setWiFiStatus(apActive, staConnected, apIP, staIP, rssi, status);
+        displayManager.setWiFiStatus(apActive, staConnected, apIPBuffer, staIPBuffer, rssi, statusBuffer);
         lastWiFiUpdate = millis();
     }
 }
@@ -997,7 +1032,7 @@ static void updateGNSSData() {
                 // NMEA sentences need CR+LF line ending
                 if (gnssSerialPassthroughEnabled) {
                     Serial.print(sentence);
-                    Serial.print("\r\n");
+                    Serial.println();  // More efficient than print("\r\n")
                 }
             }
             gnssModule.clearNMEASentence();
@@ -1151,7 +1186,7 @@ void loop() {
     displayManager.update();
     
     // Update periodic status information
-    updateBatteryVoltage();
+    batteryMonitor.update();
     updateWiFiStatus();
     updateGNSSStatus();
     

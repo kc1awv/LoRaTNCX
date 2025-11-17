@@ -1,0 +1,7 @@
+#ifndef BUILD_INFO_H
+#define BUILD_INFO_H
+
+#define FIRMWARE_BUILD_DATE_UTC "2025-11-17"
+#define FIRMWARE_BUILD_TIME_UTC "21:49:24"
+
+#endif // BUILD_INFO_H

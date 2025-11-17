@@ -6,6 +6,7 @@
 #include <Preferences.h>
 #include <ESPmDNS.h>
 #include <DNSServer.h>
+#include "error_handling.h"
 
 /**
  * @brief WiFi connection states for status tracking
@@ -72,10 +73,9 @@ public:
      * Sets up preferences storage and prepares for WiFi operations.
      * Must be called before using other WiFi functions.
      *
-     * @return true if initialization successful
-     * @return false if initialization failed
+     * @return Result<void> with success or error code
      */
-    bool begin();
+    Result<void> begin();
     
     /**
      * @brief Start WiFi with saved or default configuration
@@ -83,10 +83,9 @@ public:
      * Loads the saved WiFi configuration and starts WiFi in the configured mode.
      * If no valid configuration exists, starts with default AP mode.
      *
-     * @return true if WiFi started successfully
-     * @return false if startup failed
+     * @return Result<void> with success or error code
      */
-    bool start();
+    Result<void> start();
     
     /**
      * @brief Stop all WiFi operations
@@ -349,6 +348,7 @@ private:
     void startCaptivePortal();
     void stopCaptivePortal();
     bool setupMDNS();
+    void generateSecurePassword(char* buffer, size_t bufferSize);
 };
 
 #endif // WIFI_MANAGER_H

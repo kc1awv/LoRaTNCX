@@ -1,6 +1,8 @@
 #ifndef VERSION_H
 #define VERSION_H
 
+#include "build_info.h"
+
 // Firmware version information
 #define FIRMWARE_VERSION_MAJOR 0
 #define FIRMWARE_VERSION_MINOR 1

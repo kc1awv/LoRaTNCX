@@ -1,22 +1,23 @@
 #include "web_server.h"
 #include <SPIFFS.h>
+#include "error_handling.h"
 
 TNCWebServer::TNCWebServer(WiFiManager* wifiMgr, LoRaRadio* radio, ConfigManager* configMgr)
     : wifiManager(wifiMgr), loraRadio(radio), configManager(configMgr), 
-      gnssModule(nullptr), nmeaServer(nullptr),
+      gnssModule(nullptr), nmeaServer(nullptr), batteryMonitor(nullptr),
       server(nullptr), running(false), pendingWiFiChange(false), wifiChangeTime(0) {
 }
 
-bool TNCWebServer::begin() {
+Result<void> TNCWebServer::begin() {
     if (running) {
-        return true;
+        return Result<void>();
     }
     
     // Create server instance
     server = new AsyncWebServer(WEB_SERVER_PORT);
     
     if (!server) {
-        return false;
+        return Result<void>(ErrorCode::WEBSERVER_INIT_FAILED);
     }
     
     // Setup routes
@@ -26,7 +27,7 @@ bool TNCWebServer::begin() {
     server->begin();
     running = true;
     
-    return true;
+    return Result<void>();
 }
 
 void TNCWebServer::stop() {
@@ -86,16 +87,22 @@ void TNCWebServer::setupRoutes() {
         [](AsyncWebServerRequest* request) {},
         NULL,
         [this](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total) {
+            // Validate JSON size
+            if (!ValidationUtils::validateJSONSize(len)) {
+                sendErrorResponse(request, HTTP_BAD_REQUEST, "JSON payload too large");
+                return;
+            }
+            
             // Parse JSON body
             JsonDocument doc;
             DeserializationError error = deserializeJson(doc, data, len);
             
             if (error) {
-                request->send(HTTP_BAD_REQUEST, "application/json", "{\"error\":\"Invalid JSON\"}");
+                sendErrorResponse(request, HTTP_BAD_REQUEST, "Invalid JSON format");
                 return;
             }
             
-            // Apply configuration
+            // Apply configuration with validation
             bool needsReconfig = false;
             
             if (!doc["frequency"].isNull()) {
@@ -103,13 +110,23 @@ void TNCWebServer::setupRoutes() {
                 if (freq >= RADIO_FREQ_MIN && freq <= RADIO_FREQ_MAX) {
                     loraRadio->setFrequency(freq);
                     needsReconfig = true;
+                } else {
+                    sendErrorResponse(request, HTTP_BAD_REQUEST, "Invalid frequency value");
+                    return;
                 }
             }
             
             if (!doc["bandwidth"].isNull()) {
                 float bw = doc["bandwidth"].as<float>();
-                loraRadio->setBandwidth(bw);
-                needsReconfig = true;
+                // Validate bandwidth is one of the allowed values
+                if (bw == 7.8 || bw == 10.4 || bw == 15.6 || bw == 20.8 || bw == 31.25 || 
+                    bw == 41.7 || bw == 62.5 || bw == 125 || bw == 250 || bw == 500) {
+                    loraRadio->setBandwidth(bw);
+                    needsReconfig = true;
+                } else {
+                    sendErrorResponse(request, HTTP_BAD_REQUEST, "Invalid bandwidth value");
+                    return;
+                }
             }
             
             if (!doc["spreading"].isNull()) {
@@ -117,6 +134,9 @@ void TNCWebServer::setupRoutes() {
                 if (sf >= RADIO_SF_MIN && sf <= RADIO_SF_MAX) {
                     loraRadio->setSpreadingFactor(sf);
                     needsReconfig = true;
+                } else {
+                    sendErrorResponse(request, HTTP_BAD_REQUEST, "Invalid spreading factor");
+                    return;
                 }
             }
             
@@ -125,6 +145,9 @@ void TNCWebServer::setupRoutes() {
                 if (cr >= RADIO_CR_MIN && cr <= RADIO_CR_MAX) {
                     loraRadio->setCodingRate(cr);
                     needsReconfig = true;
+                } else {
+                    sendErrorResponse(request, HTTP_BAD_REQUEST, "Invalid coding rate");
+                    return;
                 }
             }
             
@@ -133,13 +156,21 @@ void TNCWebServer::setupRoutes() {
                 if (pwr >= RADIO_POWER_MIN && pwr <= RADIO_POWER_MAX) {
                     loraRadio->setOutputPower(pwr);
                     needsReconfig = true;
+                } else {
+                    sendErrorResponse(request, HTTP_BAD_REQUEST, "Invalid power value");
+                    return;
                 }
             }
             
             if (!doc["syncWord"].isNull()) {
                 uint16_t sw = doc["syncWord"].as<uint16_t>();
-                loraRadio->setSyncWord(sw);
-                needsReconfig = true;
+                if (sw >= RADIO_SYNCWORD_MIN && sw <= RADIO_SYNCWORD_MAX) {
+                    loraRadio->setSyncWord(sw);
+                    needsReconfig = true;
+                } else {
+                    sendErrorResponse(request, HTTP_BAD_REQUEST, "Invalid sync word");
+                    return;
+                }
             }
             
             if (needsReconfig) {
@@ -169,12 +200,18 @@ void TNCWebServer::setupRoutes() {
         [](AsyncWebServerRequest* request) {},
         NULL,
         [this](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total) {
+            // Validate JSON size
+            if (!ValidationUtils::validateJSONSize(len)) {
+                sendErrorResponse(request, HTTP_BAD_REQUEST, "JSON payload too large");
+                return;
+            }
+            
             // Parse JSON body
             JsonDocument doc;
             DeserializationError error = deserializeJson(doc, data, len);
             
             if (error) {
-                request->send(HTTP_BAD_REQUEST, "application/json", "{\"error\":\"Invalid JSON\"}");
+                sendErrorResponse(request, HTTP_BAD_REQUEST, "Invalid JSON format");
                 return;
             }
             
@@ -182,33 +219,83 @@ void TNCWebServer::setupRoutes() {
             WiFiConfig config;
             wifiManager->getCurrentConfig(config);
             
-            // Update fields - use more flexible type checking
+            // Update fields with validation
             if (!doc["ssid"].isNull()) {
                 const char* ssid = doc["ssid"];
-                strncpy(config.ssid, ssid, sizeof(config.ssid) - 1);
-                config.ssid[sizeof(config.ssid) - 1] = '\0';
+                if (validateSSID(ssid)) {
+                    String sanitized = ValidationUtils::sanitizeString(ssid);
+                    if (sanitized.length() > 0) {
+                        strncpy(config.ssid, sanitized.c_str(), sizeof(config.ssid) - 1);
+                        config.ssid[sizeof(config.ssid) - 1] = '\0';
+                    } else {
+                        sendErrorResponse(request, HTTP_BAD_REQUEST, "Invalid SSID");
+                        return;
+                    }
+                } else {
+                    sendErrorResponse(request, HTTP_BAD_REQUEST, "Invalid SSID format");
+                    return;
+                }
             }
             
             if (!doc["password"].isNull()) {
                 const char* password = doc["password"];
-                strncpy(config.password, password, sizeof(config.password) - 1);
-                config.password[sizeof(config.password) - 1] = '\0';
+                if (validateWiFiPassword(password)) {
+                    String sanitized = ValidationUtils::sanitizeString(password);
+                    if (sanitized.length() >= 8) {
+                        strncpy(config.password, sanitized.c_str(), sizeof(config.password) - 1);
+                        config.password[sizeof(config.password) - 1] = '\0';
+                    } else {
+                        sendErrorResponse(request, HTTP_BAD_REQUEST, "Password too short");
+                        return;
+                    }
+                } else {
+                    sendErrorResponse(request, HTTP_BAD_REQUEST, "Invalid password (min 8 chars, no weak passwords)");
+                    return;
+                }
             }
             
             if (!doc["ap_ssid"].isNull()) {
                 const char* ap_ssid = doc["ap_ssid"];
-                strncpy(config.ap_ssid, ap_ssid, sizeof(config.ap_ssid) - 1);
-                config.ap_ssid[sizeof(config.ap_ssid) - 1] = '\0';
+                if (validateSSID(ap_ssid)) {
+                    String sanitized = ValidationUtils::sanitizeString(ap_ssid);
+                    if (sanitized.length() > 0) {
+                        strncpy(config.ap_ssid, sanitized.c_str(), sizeof(config.ap_ssid) - 1);
+                        config.ap_ssid[sizeof(config.ap_ssid) - 1] = '\0';
+                    } else {
+                        sendErrorResponse(request, HTTP_BAD_REQUEST, "Invalid AP SSID");
+                        return;
+                    }
+                } else {
+                    sendErrorResponse(request, HTTP_BAD_REQUEST, "Invalid AP SSID format");
+                    return;
+                }
             }
             
             if (!doc["ap_password"].isNull()) {
                 const char* ap_password = doc["ap_password"];
-                strncpy(config.ap_password, ap_password, sizeof(config.ap_password) - 1);
-                config.ap_password[sizeof(config.ap_password) - 1] = '\0';
+                if (validateWiFiPassword(ap_password)) {
+                    String sanitized = ValidationUtils::sanitizeString(ap_password);
+                    if (sanitized.length() >= 8) {
+                        strncpy(config.ap_password, sanitized.c_str(), sizeof(config.ap_password) - 1);
+                        config.ap_password[sizeof(config.ap_password) - 1] = '\0';
+                    } else {
+                        sendErrorResponse(request, HTTP_BAD_REQUEST, "AP password too short");
+                        return;
+                    }
+                } else {
+                    sendErrorResponse(request, HTTP_BAD_REQUEST, "Invalid AP password (min 8 chars, no weak passwords)");
+                    return;
+                }
             }
             
             if (!doc["mode"].isNull()) {
-                config.mode = doc["mode"].as<uint8_t>();
+                uint8_t mode = doc["mode"].as<uint8_t>();
+                if (mode <= 2) { // Valid modes: 0=AP, 1=STA, 2=AP+STA
+                    config.mode = mode;
+                } else {
+                    sendErrorResponse(request, HTTP_BAD_REQUEST, "Invalid WiFi mode");
+                    return;
+                }
             }
             
             if (!doc["dhcp"].isNull()) {
@@ -220,7 +307,13 @@ void TNCWebServer::setupRoutes() {
             }
             
             if (!doc["tcp_kiss_port"].isNull()) {
-                config.tcp_kiss_port = doc["tcp_kiss_port"].as<uint16_t>();
+                uint16_t port = doc["tcp_kiss_port"].as<uint16_t>();
+                if (port >= 1024 && port <= 65535) { // Valid port range
+                    config.tcp_kiss_port = port;
+                } else {
+                    sendErrorResponse(request, HTTP_BAD_REQUEST, "Invalid TCP KISS port");
+                    return;
+                }
             }
             
             // Send response immediately
@@ -475,7 +568,11 @@ String TNCWebServer::getJSONStatus() {
     }
     
     // Battery
-    doc["battery"]["voltage"] = readBatteryVoltage();
+    if (batteryMonitor) {
+        doc["battery"]["voltage"] = batteryMonitor->readBatteryVoltageRaw();
+    } else {
+        doc["battery"]["voltage"] = 0.0f;
+    }
     
     // System status with memory monitoring
     doc["system"]["uptime"] = millis() / 1000;
@@ -568,11 +665,17 @@ void TNCWebServer::handleGetGNSSConfig(AsyncWebServerRequest* request) {
 }
 
 void TNCWebServer::handleSetGNSSConfig(AsyncWebServerRequest* request, const char* jsonData, size_t len) {
+    // Validate JSON size to prevent memory exhaustion
+    if (!ValidationUtils::validateJSONSize(len)) {
+        sendErrorResponse(request, HTTP_BAD_REQUEST, "JSON payload too large");
+        return;
+    }
+    
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, jsonData, len);
     
     if (error) {
-        request->send(HTTP_BAD_REQUEST, "application/json", "{\"error\":\"Invalid JSON\"}");
+        sendErrorResponse(request, HTTP_BAD_REQUEST, "Invalid JSON format");
         return;
     }
     
@@ -797,4 +900,61 @@ void TNCWebServer::serveCompressedFile(AsyncWebServerRequest* request, const cha
     } else {
         request->send(404, "text/plain", "File not found");
     }
+}
+
+// Input validation and security methods
+bool TNCWebServer::validateStringInput(const char* input, size_t maxLen, bool allowSpecialChars) {
+    if (!input || strlen(input) >= maxLen) {
+        return false;
+    }
+    
+    // Check for null bytes and control characters
+    for (size_t i = 0; i < strlen(input); i++) {
+        char c = input[i];
+        if (c == '\0') break; // Null byte in middle of string
+        
+        // Allow printable characters, spaces, and optionally special chars
+        if (c < 32 || c > 126) { // Control characters
+            return false;
+        }
+        
+        if (!allowSpecialChars && !isalnum(c) && c != '-' && c != '_' && c != ' ') {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+bool TNCWebServer::validateWiFiPassword(const char* password) {
+    size_t len = strlen(password);
+    if (len < 8 || len >= 64) { // WPA2 requires minimum 8 characters
+        return false;
+    }
+    
+    // Check for common weak passwords
+    const char* weakPasswords[] = {"password", "12345678", "loratncx", "admin", "default"};
+    for (const char* weak : weakPasswords) {
+        if (strcasecmp(password, weak) == 0) {
+            return false;
+        }
+    }
+    
+    return validateStringInput(password, 64, true);
+}
+
+bool TNCWebServer::validateSSID(const char* ssid) {
+    size_t len = strlen(ssid);
+    if (len < 1 || len >= 32) { // SSID max 32 characters
+        return false;
+    }
+    
+    return validateStringInput(ssid, 32, true);
+}
+
+void TNCWebServer::sendErrorResponse(AsyncWebServerRequest* request, int code, const char* message) {
+    AsyncWebServerResponse* response = request->beginResponse(code, "application/json", 
+        String("{\"error\":\"") + message + "\"}");
+    addCORSHeaders(response);
+    request->send(response);
 }
