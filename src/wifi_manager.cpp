@@ -12,7 +12,7 @@ WiFiManager::WiFiManager()
       fallbackToAPDone(false), isConnecting(false), lastDisconnectReason(0) {
 }
 
-bool WiFiManager::begin() {
+Result<void> WiFiManager::begin() {
     initialized = true;
     
     // Setup WiFi event handlers
@@ -23,18 +23,24 @@ bool WiFiManager::begin() {
         // No saved config, use defaults
         resetToDefaults(currentConfig);
         // Save defaults to create the NVS namespace
-        saveConfig(currentConfig);
+        if (!saveConfig(currentConfig)) {
+            return Result<void>(ErrorCode::CONFIG_SAVE_FAILED);
+        }
     }
     
-    return true;
+    return Result<void>();
 }
 
-bool WiFiManager::start() {
+Result<void> WiFiManager::start() {
     if (!initialized) {
-        return false;
+        return Result<void>(ErrorCode::NOT_INITIALIZED);
     }
     
-    return applyConfig(currentConfig);
+    if (!applyConfig(currentConfig)) {
+        return Result<void>(ErrorCode::WIFI_INIT_FAILED);
+    }
+    
+    return Result<void>();
 }
 
 void WiFiManager::stop() {
@@ -179,7 +185,7 @@ void WiFiManager::resetToDefaults(WiFiConfig& config) {
     // Default AP settings
     snprintf(config.ap_ssid, sizeof(config.ap_ssid), "LoRaTNCX-%012llX", 
              ESP.getEfuseMac());
-    strncpy(config.ap_password, "loratncx", sizeof(config.ap_password));
+    generateSecurePassword(config.ap_password, sizeof(config.ap_password));
     
     // Default STA settings (empty)
     config.ssid[0] = '\0';
@@ -595,4 +601,29 @@ bool WiFiManager::setupMDNS() {
     
     mdnsStarted = true;
     return true;
+}
+
+void WiFiManager::generateSecurePassword(char* buffer, size_t bufferSize) {
+    // Character set for secure password: uppercase, lowercase, numbers, and some special chars
+    const char charset[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
+    const size_t charsetSize = sizeof(charset) - 1; // Exclude null terminator
+    
+    // Generate 12-character password (secure minimum for WPA2)
+    const size_t passwordLength = 12;
+    
+    if (bufferSize < passwordLength + 1) {
+        // Buffer too small, use fallback
+        strncpy(buffer, "SecurePass123!", bufferSize);
+        return;
+    }
+    
+    // Seed ESP32's random number generator with current time and some entropy
+    randomSeed(micros() ^ ESP.getCycleCount() ^ analogRead(0));
+    
+    for (size_t i = 0; i < passwordLength; ++i) {
+        uint32_t randomValue = esp_random(); // Use ESP32's hardware RNG
+        buffer[i] = charset[randomValue % charsetSize];
+    }
+    
+    buffer[passwordLength] = '\0';
 }

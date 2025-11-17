@@ -81,6 +81,7 @@ void setupPAControl();
     #define HAS_GNSS_PORT       1
     #define PIN_GNSS_RX         39  // GPIO39 - GNSS TX -> MCU RX
     #define PIN_GNSS_TX         38  // GPIO38 - MCU TX -> GNSS RX
+    #define PIN_GNSS_VEXT       37  // GPIO37 - GNSS Vext control (active LOW)
     #define PIN_GNSS_CTRL       34  // GPIO34 - VGNSS_CTRL (power control - LOW to enable)
     #define PIN_GNSS_WAKE       40  // GPIO40 - GNSS Wake
     #define PIN_GNSS_PPS        41  // GPIO41 - GNSS PPS (pulse per second)

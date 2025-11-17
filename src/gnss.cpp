@@ -1,5 +1,6 @@
 #include "gnss.h"
 #include "debug.h"
+#include "error_handling.h"
 
 GNSSModule::GNSSModule() 
     : gnssSerial(nullptr), pinRX(-1), pinTX(-1), pinCtrl(-1), 
@@ -12,18 +13,18 @@ GNSSModule::~GNSSModule() {
     stop();
 }
 
-bool GNSSModule::begin(int8_t rxPin, int8_t txPin, int8_t ctrlPin, 
-                       int8_t wakePin, int8_t ppsPin, int8_t rstPin,
-                       uint32_t baud) {
+Result<void> GNSSModule::begin(int8_t rxPin, int8_t txPin, int8_t ctrlPin, 
+                            int8_t wakePin, int8_t ppsPin, int8_t rstPin,
+                            uint32_t baud) {
     if (gnssEnabled) {
         DEBUG_PRINTLN("GNSS already initialized");
-        return true;
+        return Result<void>();
     }
     
     // Validate required pins
     if (rxPin < 0 || txPin < 0) {
         DEBUG_PRINTLN("GNSS: Invalid RX/TX pins");
-        return false;
+        return Result<void>(ErrorCode::GNSS_INIT_FAILED);
     }
     
     // Store pin configuration
@@ -70,7 +71,7 @@ bool GNSSModule::begin(int8_t rxPin, int8_t txPin, int8_t ctrlPin,
     gnssEnabled = true;
     DEBUG_PRINTLN("GNSS initialized");
     
-    return true;
+    return Result<void>();
 }
 
 void GNSSModule::stop() {
@@ -94,9 +95,11 @@ void GNSSModule::stop() {
 void GNSSModule::powerOn() {
     // GNSS module on V4 requires GPIO 37 (GNSS Vext) to be LOW
     // GPIO 34 (VGNSS_CTRL) is for additional control
-    pinMode(37, OUTPUT);       // GNSS Vext
-    digitalWrite(37, LOW);     // Enable GNSS Vext (active LOW)
+#ifdef ARDUINO_HELTEC_WIFI_LORA_32_V4
+    pinMode(PIN_GNSS_VEXT, OUTPUT);       // GNSS Vext
+    digitalWrite(PIN_GNSS_VEXT, LOW);     // Enable GNSS Vext (active LOW)
     delay(10);
+#endif
     
     if (pinCtrl >= 0) {
         // For V4, VGNSS_CTRL (GPIO 34) LOW enables additional control

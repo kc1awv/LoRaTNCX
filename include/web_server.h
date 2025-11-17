@@ -10,6 +10,8 @@
 #include "board_config.h"
 #include "gnss.h"
 #include "nmea_server.h"
+#include "validation_utils.h"
+#include "battery_monitor.h"
 
 // Web Server Constants
 #define HTTP_STATUS_OK              200     ///< HTTP OK status code
@@ -55,14 +57,22 @@ public:
     }
     
     /**
-     * @brief Initialize the web server
+     * @brief Set BatteryMonitor instance
+     *
+     * @param battery Pointer to BatteryMonitor instance
+     */
+    void setBatteryMonitor(BatteryMonitor* battery) {
+        batteryMonitor = battery;
+    }
+    
+    /**
+     * @brief Initialize and start the web server
      *
      * Sets up HTTP routes, starts the server, and prepares for client connections.
      *
-     * @return true if server started successfully
-     * @return false if initialization failed
+     * @return Result<void> indicating success or specific error
      */
-    bool begin();
+    Result<void> begin();
     
     /**
      * @brief Stop the web server
@@ -94,6 +104,7 @@ private:
     ConfigManager* configManager;
     GNSSModule* gnssModule;
     NMEAServer* nmeaServer;
+    BatteryMonitor* batteryMonitor;
     bool running;
     
     // Pending WiFi config change
@@ -140,6 +151,12 @@ private:
     
     // CORS headers
     void addCORSHeaders(AsyncWebServerResponse* response);
+    
+    // Input validation and security
+    bool validateStringInput(const char* input, size_t maxLen, bool allowSpecialChars = false);
+    bool validateWiFiPassword(const char* password);
+    bool validateSSID(const char* ssid);
+    void sendErrorResponse(AsyncWebServerRequest* request, int code, const char* message);
 };
 
 #endif // WEB_SERVER_H
