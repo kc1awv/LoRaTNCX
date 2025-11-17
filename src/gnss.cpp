@@ -1,6 +1,7 @@
 #include "gnss.h"
 #include "debug.h"
 #include "error_handling.h"
+#include "board_config.h"
 
 GNSSModule::GNSSModule() 
     : gnssSerial(nullptr), pinRX(-1), pinTX(-1), pinCtrl(-1), 
@@ -95,11 +96,11 @@ void GNSSModule::stop() {
 void GNSSModule::powerOn() {
     // GNSS module on V4 requires GPIO 37 (GNSS Vext) to be LOW
     // GPIO 34 (VGNSS_CTRL) is for additional control
-#ifdef ARDUINO_HELTEC_WIFI_LORA_32_V4
-    pinMode(PIN_GNSS_VEXT, OUTPUT);       // GNSS Vext
-    digitalWrite(PIN_GNSS_VEXT, LOW);     // Enable GNSS Vext (active LOW)
-    delay(10);
-#endif
+    if (PIN_GNSS_VEXT >= 0) {
+        pinMode(PIN_GNSS_VEXT, OUTPUT);       // GNSS Vext
+        digitalWrite(PIN_GNSS_VEXT, LOW);     // Enable GNSS Vext (active LOW)
+        delay(10);
+    }
     
     if (pinCtrl >= 0) {
         // For V4, VGNSS_CTRL (GPIO 34) LOW enables additional control

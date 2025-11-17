@@ -42,6 +42,7 @@ void setupPAControl();
     #define HAS_GNSS_PORT       0
     #define PIN_GNSS_RX         -1  // User-configurable
     #define PIN_GNSS_TX         -1  // User-configurable
+    #define PIN_GNSS_VEXT       -1  // Not available on V3
     #define PIN_GNSS_CTRL       -1  // Optional power control
     #define PIN_GNSS_WAKE       -1  // Optional wake pin
     #define PIN_GNSS_PPS        -1  // Optional PPS pin
