@@ -1,5 +1,6 @@
 #include "battery_monitor.h"
 #include "board_config.h"
+#include "debug.h"
 #include <Arduino.h>
 
 BatteryMonitor::BatteryMonitor()
@@ -30,6 +31,12 @@ bool BatteryMonitor::begin() {
     // Initialize battery monitoring pins
     pinMode(PIN_ADC_CTRL, OUTPUT);
     digitalWrite(PIN_ADC_CTRL, ADC_CTRL_ACTIVE_HIGH ? HIGH : LOW);
+
+    // Configure ADC pin
+    pinMode(PIN_ADC_BATTERY, INPUT);
+    adcAttachPin(PIN_ADC_BATTERY);
+    analogReadResolution(ADC_RESOLUTION);
+    analogSetAttenuation(ADC_2_5db);
 
     ready = true;
     return true;
@@ -159,9 +166,8 @@ float BatteryMonitor::readBatteryVoltageRaw() {
     const float factor = (adcMaxVoltage / adcMax) * ((R1 + R2) / (float)R2) * (measuredVoltage / reportedVoltage);
 
     // Configure pins
+    // ADC is already configured in begin(), just set pin mode
     pinMode(PIN_ADC_BATTERY, INPUT);
-    analogReadResolution(resolution);
-    analogSetAttenuation(ADC_2_5db);  // 2.5dB attenuation for 0-1.5V range
 
     // Enable battery voltage measurement circuit
     // IMPORTANT: Logic depends on board version:
@@ -178,6 +184,11 @@ float BatteryMonitor::readBatteryVoltageRaw() {
 
     // Read ADC value
     int analogValue = analogRead(PIN_ADC_BATTERY);
+    DEBUG_PRINT("Battery ADC raw value: ");
+    DEBUG_PRINTLN(analogValue);
+
+    // For more accurate voltage reading, we could use analogReadMilliVolts()
+    // but we'll stick with the calibrated analogRead() for now
 
     // Disable battery voltage measurement circuit to save power
 #if ADC_CTRL_ACTIVE_HIGH

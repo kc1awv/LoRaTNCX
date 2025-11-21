@@ -98,7 +98,7 @@
 #define BATTERY_R1          390    // 390k ohm
 #define BATTERY_R2          100    // 100k ohm
 #define BATTERY_CAL_VOLTAGE 4.2f   // Target voltage to display (standard LiPo)
-#define BATTERY_CAL_REPORTED 4.75f // What ADC actually reports for target voltage
+#define BATTERY_CAL_REPORTED 4.095f // What ADC actually reports for target voltage
 
 // Battery Monitoring Constants
 #define BATTERY_SAMPLE_COUNT    10     // Number of samples to average

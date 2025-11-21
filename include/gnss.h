@@ -13,7 +13,7 @@
 #define NMEA_MAX_SENTENCE_LENGTH    82      // Standard NMEA sentence max length
 
 // GNSS Hardware Pins (GPIO numbers)
-#define GNSS_VEXT_PIN               37      // GPIO 37 - GNSS power control (active LOW)
+#define GNSS_VEXT_PIN               PIN_GNSS_VEXT      // GNSS power control (active LOW)
 
 // GNSS module class
 class GNSSModule {
